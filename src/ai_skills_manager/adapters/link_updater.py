@@ -76,6 +76,14 @@ class LinkUpdater:
             if link_path.startswith(("http://", "https://", "ftp://", "mailto:", "#", "/")):
                 return full_match
 
+            # Strip URL fragment for file resolution
+            if "#" in link_path:
+                link_path_clean, fragment = link_path.split("#", 1)
+                fragment = f"#{fragment}"
+            else:
+                link_path_clean = link_path
+                fragment = ""
+
             # Resolve link relative to the SOURCE file's directory
             if my_mapping.is_flat:
                 source_dir = my_mapping.source_path.parent
@@ -86,27 +94,28 @@ class LinkUpdater:
                 except ValueError:
                     source_dir = my_mapping.source_path
 
-            linked_source = (source_dir / link_path).resolve()
+            linked_source = (source_dir / link_path_clean).resolve()
 
             # Check if resolved source path is in our source_to_target map
             if linked_source in self.source_to_target:
                 new_target = self.source_to_target[linked_source]
                 try:
                     new_rel = os.path.relpath(new_target, filepath.parent).replace(os.sep, "/")
+                    new_rel_with_fragment = new_rel + fragment
                     logger.debug(
                         "- Change link %s -> %s\n"
                         "   source file %s\n"
                         "   target file %s",
-                        link_path, new_rel, filepath, new_target
+                        link_path, new_rel_with_fragment, filepath, new_target
                     )
                     self.fixes.append({
                         "file": str(filepath),
                         "old": link_path,
-                        "new": new_rel,
+                        "new": new_rel_with_fragment,
                         "status": "fixed"
                     })
                     prefix = "!" if is_image else ""
-                    return f"{prefix}[{text}]({new_rel})"
+                    return f"{prefix}[{text}]({new_rel_with_fragment})"
                 except ValueError:
                     self.fixes.append({
                         "file": str(filepath),
@@ -120,20 +129,21 @@ class LinkUpdater:
             if linked_source.exists():
                 try:
                     new_rel = os.path.relpath(linked_source, filepath.parent).replace(os.sep, "/")
+                    new_rel_with_fragment = new_rel + fragment
                     logger.debug(
                         "- Change link %s -> %s\n"
                         "   source file %s\n"
                         "   target file %s",
-                        link_path, new_rel, filepath, linked_source
+                        link_path, new_rel_with_fragment, filepath, linked_source
                     )
                     self.fixes.append({
                         "file": str(filepath),
                         "old": link_path,
-                        "new": new_rel,
+                        "new": new_rel_with_fragment,
                         "status": "external"
                     })
                     prefix = "!" if is_image else ""
-                    return f"{prefix}[{text}]({new_rel})"
+                    return f"{prefix}[{text}]({new_rel_with_fragment})"
                 except ValueError:
                     self.fixes.append({
                         "file": str(filepath),

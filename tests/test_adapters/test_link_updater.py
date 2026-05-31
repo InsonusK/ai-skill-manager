@@ -239,6 +239,93 @@ class TestLinkUpdater(unittest.TestCase):
         # Ensure image marker is preserved
         self.assertIn("![img](", content)
 
+    def test_link_with_fragment(self):
+        """Links with URL fragments (anchors) should preserve the fragment."""
+        source_dir = self.tmpdir / "source"
+        source_dir.mkdir()
+        source_guide = source_dir / "guide.md"
+        source_guide.write_text("# Guide\nSee [other](./other.md#section).")
+        source_other = source_dir / "other.md"
+        source_other.write_text("# Other")
+
+        target_guide = self.target / "guide" / "SKILL.md"
+        target_guide.parent.mkdir()
+        target_guide.write_text("# Guide\nSee [other](./other.md#section).")
+
+        target_other = self.target / "other" / "SKILL.md"
+        target_other.parent.mkdir()
+        target_other.write_text("# Other")
+
+        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        other_mapping = SkillMapping(source_other, target_other.parent, "other", True)
+
+        source_to_target = {
+            source_guide: target_guide,
+            source_other: target_other,
+        }
+
+        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, {source_guide, source_other})
+        updater.adapt(target_guide)
+
+        content = target_guide.read_text()
+        self.assertNotIn("./other.md#section", content)
+        self.assertIn("../other/SKILL.md#section", content)
+
+        fixes = [f for f in updater.fixes if f["status"] == "fixed"]
+        self.assertEqual(len(fixes), 1)
+        self.assertEqual(fixes[0]["old"], "./other.md#section")
+        self.assertEqual(fixes[0]["new"], "../other/SKILL.md#section")
+
+    def test_external_link_with_fragment(self):
+        """External links with fragments should preserve the fragment and be marked external."""
+        source_dir = self.tmpdir / "source"
+        source_dir.mkdir()
+        source_guide = source_dir / "guide.md"
+        source_guide.write_text("# Guide\nSee [ext](./external.md#section).")
+
+        external = source_dir / "external.md"
+        external.write_text("# External")
+
+        target_guide = self.target / "guide" / "SKILL.md"
+        target_guide.parent.mkdir()
+        target_guide.write_text("# Guide\nSee [ext](./external.md#section).")
+
+        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+
+        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater.adapt(target_guide)
+
+        content = target_guide.read_text()
+        # External links point back to source; fragment is preserved
+        self.assertIn("../../source/external.md#section", content)
+
+        ext = [f for f in updater.fixes if f["status"] == "external"]
+        self.assertEqual(len(ext), 1)
+        self.assertEqual(ext[0]["new"], "../../source/external.md#section")
+
+    def test_broken_link_with_fragment(self):
+        """Broken links with fragments should still be reported as broken."""
+        source_dir = self.tmpdir / "source"
+        source_dir.mkdir()
+        source_guide = source_dir / "guide.md"
+        source_guide.write_text("# Guide\nSee [missing](./missing.md#section).")
+
+        target_guide = self.target / "guide" / "SKILL.md"
+        target_guide.parent.mkdir()
+        target_guide.write_text("# Guide\nSee [missing](./missing.md#section).")
+
+        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+
+        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater.adapt(target_guide)
+
+        content = target_guide.read_text()
+        self.assertIn("./missing.md#section", content)
+
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
+        self.assertEqual(broken[0]["reason"], "target file does not exist")
+
 
 if __name__ == "__main__":
     unittest.main()
