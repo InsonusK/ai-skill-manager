@@ -74,6 +74,15 @@ def run(args):
                 emoji = {'fixed': '✅', 'external': '🔗', 'broken': '⚠️'}.get(status, '?')
                 print(f"   {emoji} {status}: {count}")
 
+        broken_fixes = [f for f in result.get('fixes', []) if f['status'] == 'broken']
+        if broken_fixes:
+            print(f"\n⚠️  Broken links:")
+            for fix in broken_fixes:
+                print(f"   • {fix['file']}")
+                print(f"     Link: {fix['old']}")
+                if 'reason' in fix:
+                    print(f"     Reason: {fix['reason']}")
+
         if result['dry_run']:
             print(f"\n🏃 Dry run - no changes")
 

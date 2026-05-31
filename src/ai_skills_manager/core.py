@@ -256,6 +256,7 @@ class SkillSync:
                 'synced_count': len(self.mappings) - skipped,
                 'skipped_count': skipped,
                 'fix_summary': fix_summary,
+                'fixes': fixes,
                 'dry_run': self.dry_run,
             }
         finally:

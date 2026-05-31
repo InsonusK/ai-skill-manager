@@ -111,7 +111,8 @@ class LinkUpdater:
                     self.fixes.append({
                         "file": str(filepath),
                         "old": link_path,
-                        "status": "broken"
+                        "status": "broken",
+                        "reason": "cannot compute relative path for managed link"
                     })
                     return full_match
 
@@ -137,7 +138,8 @@ class LinkUpdater:
                     self.fixes.append({
                         "file": str(filepath),
                         "old": link_path,
-                        "status": "broken"
+                        "status": "broken",
+                        "reason": "cannot compute relative path for external link"
                     })
                     return full_match
 
@@ -145,7 +147,8 @@ class LinkUpdater:
             self.fixes.append({
                 "file": str(filepath),
                 "old": link_path,
-                "status": "broken"
+                "status": "broken",
+                "reason": "target file does not exist"
             })
             return full_match
 
