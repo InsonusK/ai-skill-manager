@@ -55,9 +55,7 @@ def _extract_archive(archive_path: Path, extract_to: Path) -> None:
     """Extract a tar.gz archive."""
     with tarfile.open(archive_path, "r:gz") as tar:
         # filter available in Python 3.12+; suppresses deprecation warning
-        kwargs = {"filter": "fully_trusted"} if hasattr(tarfile, "TarFile") else {}
-        if hasattr(tarfile, "data_filter"):
-            kwargs = {"filter": "fully_trusted"}
+        kwargs = {"filter": "fully_trusted"} if hasattr(tarfile, "data_filter") else {}
         tar.extractall(path=extract_to, **kwargs)
 
 

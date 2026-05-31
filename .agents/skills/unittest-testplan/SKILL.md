@@ -1,7 +1,19 @@
 ---
-name: unittest-testplan
-version: 1.0.0
-description: Describe how to write test cases for unit testing
+name: workflow-unittest-testplan
+
+description: Describes how to write test cases and test plans for unit testing. Covers use cases, edge cases, and business-critical scenarios.
+
+metadata:
+  domain: workflow
+  tags:
+  - testing
+  - test-plan
+  - use-cases
+  - edge-cases
+  - coverage
+  version: 1.0.0
+  ai_hints:
+    category: guide
 ---
 
 # When to use this skill
