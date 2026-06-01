@@ -27,22 +27,35 @@ class AutoDiscovery(DiscoveryStrategy):
     def _handle_file(self, filepath: Path) -> List[SkillMapping]:
         """Handle a single file."""
         if filepath.suffix == '.md':
-            return [self._create_mapping(filepath, filepath.stem, is_flat=True)]
+            name = filepath.stem
+            if filepath.name.endswith('.skill.md'):
+                name = filepath.name[:-9]
+            return [self._create_mapping(filepath, name, is_flat=True)]
         return []
 
     def _scan_directory(self, directory: Path, prefix: str) -> List[SkillMapping]:
         """Recursively scan directory for skills."""
         results = []
+        dir_name = directory.name
 
         # Check if this directory itself is a skill
         if (directory / 'SKILL.md').exists():
             # Directory skills use their own name, no prefix
-            results.append(self._create_mapping(directory, directory.name, is_flat=False))
+            results.append(self._create_mapping(directory, dir_name, is_flat=False))
+            return results
+
+        # Check if there is a file named dir_name.skill.md
+        if (directory / f"{dir_name}.skill.md").exists():
+            results.append(self._create_mapping(directory, dir_name, is_flat=False))
             return results
 
         # Flat: collect .md files
         for md_file in sorted(directory.glob('*.md')):
-            name = prefix + md_file.stem if prefix else md_file.stem
+            if md_file.name.endswith('.skill.md'):
+                name = md_file.name[:-9]
+            else:
+                name = md_file.stem
+            name = prefix + name if prefix else name
             results.append(self._create_mapping(md_file, name, is_flat=True))
 
         # Recurse into subdirectories
