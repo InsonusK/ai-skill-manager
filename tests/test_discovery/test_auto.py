@@ -164,6 +164,74 @@ class TestAutoDiscovery(unittest.TestCase):
 
         self.assertEqual(len(result), 0)
 
+    def test_directory_with_dir_name_skill_md(self):
+        skill_dir = self.tmpdir / 'web'
+        skill_dir.mkdir()
+        (skill_dir / 'web.skill.md').write_text('# Web')
+
+        strategy = AutoDiscovery(skill_dir, self.target)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].skill_name, 'web')
+        self.assertFalse(result[0].is_flat)
+        self.assertEqual(result[0].target_path, self.target / 'web')
+
+    def test_flat_skill_md_file(self):
+        skill_file = self.tmpdir / 'guide.skill.md'
+        skill_file.write_text('# Guide')
+
+        strategy = AutoDiscovery(skill_file, self.target)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].skill_name, 'guide')
+        self.assertTrue(result[0].is_flat)
+        self.assertEqual(result[0].source_path, skill_file)
+        self.assertEqual(result[0].target_path, self.target / 'guide')
+
+    def test_flat_directory_with_skill_md(self):
+        flat = self.tmpdir / 'guides'
+        flat.mkdir()
+        (flat / 'guide1.skill.md').write_text('# Guide1')
+        (flat / 'guide2.skill.md').write_text('# Guide2')
+
+        strategy = AutoDiscovery(flat, self.target)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 2)
+        names = {r.skill_name for r in result}
+        self.assertEqual(names, {'guide1', 'guide2'})
+        for mapping in result:
+            self.assertTrue(mapping.is_flat)
+
+    def test_mixed_md_and_skill_md_in_directory(self):
+        flat = self.tmpdir / 'guides'
+        flat.mkdir()
+        (flat / 'regular.md').write_text('# Regular')
+        (flat / 'special.skill.md').write_text('# Special')
+
+        strategy = AutoDiscovery(flat, self.target)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 2)
+        names = {r.skill_name for r in result}
+        self.assertEqual(names, {'regular', 'special'})
+
+    def test_nested_skill_md_in_subdir(self):
+        root = self.tmpdir / 'skills'
+        root.mkdir()
+        sub = root / 'frontend'
+        sub.mkdir()
+        (sub / 'react.skill.md').write_text('# React')
+
+        strategy = AutoDiscovery(root, self.target)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].skill_name, 'frontend-react')
+        self.assertTrue(result[0].is_flat)
+
 
 if __name__ == '__main__':
     unittest.main()
