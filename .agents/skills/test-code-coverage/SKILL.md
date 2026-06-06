@@ -9,7 +9,7 @@ When you write code or write test
 # How to use it
 1. Unittest test is required. Unless user ask to skip it. 
 2. You must cover 80+% of code.
-3. You could skill testing parts or logic branches which raise exceptions and doesn't change data
+3. You could skip testing parts or logic branches which raise exceptions and doesn't change data
 
 Example: 
 **Could skip**
