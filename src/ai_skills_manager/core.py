@@ -30,10 +30,15 @@ def build_source_to_target_map(mappings: List[SkillMapping]) -> Dict[Path, Path]
         if mapping.is_flat:
             result[mapping.source_path] = mapping.target_path / 'SKILL.md'
         else:
+            skill_md = mapping.source_skill_md
             for src_file in mapping.source_path.rglob('*'):
                 if src_file.is_file():
                     rel = src_file.relative_to(mapping.source_path)
-                    result[src_file] = mapping.target_path / rel
+                    # The main skill markdown may be renamed to SKILL.md on copy.
+                    if skill_md is not None and src_file == skill_md.resolve():
+                        result[src_file] = mapping.target_path / 'SKILL.md'
+                    else:
+                        result[src_file] = mapping.target_path / rel
     return result
 
 
@@ -61,6 +66,25 @@ def compute_skill_hash(mapping: SkillMapping) -> str:
     return h.hexdigest()
 
 
+def _copy_directory_skill(mapping: SkillMapping) -> None:
+    """Copy a directory skill, renaming the source skill markdown to SKILL.md."""
+    source_dir = mapping.source_path
+    target_dir = mapping.target_path
+    skill_md = mapping.source_skill_md
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for src_file in sorted(source_dir.rglob('*')):
+        if not src_file.is_file():
+            continue
+        rel = src_file.relative_to(source_dir)
+        if skill_md is not None and src_file == skill_md.resolve():
+            dst = target_dir / 'SKILL.md'
+        else:
+            dst = target_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_file, dst)
+
+
 def copy_skill(mapping: SkillMapping, dry_run: bool, adapters: Optional[List] = None) -> None:
     """Copy a skill from source to target."""
     if dry_run:
@@ -73,7 +97,7 @@ def copy_skill(mapping: SkillMapping, dry_run: bool, adapters: Optional[List] = 
         mapping.target_path.mkdir(parents=True, exist_ok=True)
         shutil.copy2(mapping.source_path, mapping.target_path / 'SKILL.md')
     else:
-        shutil.copytree(mapping.source_path, mapping.target_path)
+        _copy_directory_skill(mapping)
 
     tag_managed(mapping.target_path)
 

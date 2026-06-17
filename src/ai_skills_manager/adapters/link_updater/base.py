@@ -81,7 +81,9 @@ def parse_skill_info(mapping: SkillMapping) -> Optional[SkillInfo]:
     Always returns a SkillInfo for valid mappings, using fallback values
     when frontmatter is missing or incomplete.
     """
-    if mapping.is_flat:
+    if mapping.source_skill_md is not None:
+        skill_md = mapping.source_skill_md
+    elif mapping.is_flat:
         skill_md = mapping.source_path
     else:
         skill_md = mapping.source_path / 'SKILL.md'

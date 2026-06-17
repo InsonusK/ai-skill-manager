@@ -1,7 +1,8 @@
 """GitHub source discovery strategy.
 
 Downloads a GitHub repository archive, extracts it to a temp directory,
-and discovers skills from one or more subpaths using auto logic.
+and discovers skills from one or more subpaths using directory, flat, or
+auto logic.
 """
 
 import logging
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from .auto import AutoDiscovery
-from .base import DiscoveryStrategy, SkillMapping
+from .base import DiscoveryStrategy, SkillMapping, is_skill_md, skill_name_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,11 @@ class GitHubDiscovery(DiscoveryStrategy):
     """Discover skills from a GitHub repository.
 
     Downloads the repo archive for the specified tree/branch, extracts it,
-    and discovers skills from the configured subpaths using auto logic.
-    Each subpath can be a directory (scanned recursively with auto logic)
-    or a single ``.md`` file (treated as a flat skill).
+    and discovers skills from the configured subpaths.
+
+    Each subpath can be:
+    - a directory (scanned recursively with auto logic)
+    - a single *.skill.md file (treated as a flat skill)
     """
 
     def __init__(
@@ -115,16 +118,20 @@ class GitHubDiscovery(DiscoveryStrategy):
                     logger.error("subpath not found: %s", scan_path)
                     continue
 
-                if scan_path.is_file() and scan_path.suffix == ".md":
-                    # Single markdown file selected directly — treat as flat skill
-                    all_mappings.append(
-                        self._create_mapping(
-                            scan_path, scan_path.stem, is_flat=True
+                if scan_path.is_file():
+                    if is_skill_md(scan_path):
+                        all_mappings.append(
+                            self._create_mapping(
+                                scan_path,
+                                skill_name_from_file(scan_path),
+                                is_flat=True,
+                                source_skill_md=scan_path,
+                            )
                         )
-                    )
-                else:
-                    strategy = AutoDiscovery(scan_path, self.target_dir)
-                    all_mappings.extend(strategy.discover())
+                    continue
+
+                strategy = AutoDiscovery(scan_path, self.target_dir)
+                all_mappings.extend(strategy.discover())
 
             return all_mappings
         finally:

@@ -173,6 +173,28 @@ class TestCopySkill(unittest.TestCase):
         self.assertFalse((existing / 'old.md').exists())
         self.assertTrue((existing / 'SKILL.md').exists())
 
+    def test_copy_directory_skill_renames_skill_md(self):
+        """Directory skills with {name}.skill.md are copied with SKILL.md."""
+        skill = self.source / 'web'
+        skill.mkdir()
+        (skill / 'web.skill.md').write_text('# Web')
+        (skill / 'extra.md').write_text('# Extra')
+
+        mapping = SkillMapping(
+            source_path=skill,
+            target_path=self.target / 'web',
+            skill_name='web',
+            is_flat=False,
+            source_skill_md=skill / 'web.skill.md',
+        )
+        copy_skill(mapping, dry_run=False)
+
+        self.assertTrue((self.target / 'web').exists())
+        self.assertTrue((self.target / 'web' / 'SKILL.md').exists())
+        self.assertEqual((self.target / 'web' / 'SKILL.md').read_text(), '# Web')
+        self.assertFalse((self.target / 'web' / 'web.skill.md').exists())
+        self.assertTrue((self.target / 'web' / 'extra.md').exists())
+
 
 class TestSkillSyncIntegration(unittest.TestCase):
     def setUp(self):
@@ -185,11 +207,11 @@ class TestSkillSyncIntegration(unittest.TestCase):
         # Create source structure
         src = self.tmpdir / 'skills-repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         web = src / 'web'
         web.mkdir()
-        (web / 'SKILL.md').write_text('# Web')
+        (web / 'web.skill.md').write_text('# Web')
 
         # Create config
         config = self.tmpdir / 'ai-skills.yaml'
@@ -216,11 +238,11 @@ class TestSkillSyncIntegration(unittest.TestCase):
 
         a = src / 'a'
         a.mkdir()
-        (a / 'SKILL.md').write_text('# A')
+        (a / 'a.skill.md').write_text('# A')
 
         b = src / 'b'
         b.mkdir()
-        (b / 'SKILL.md').write_text('# B')
+        (b / 'b.skill.md').write_text('# B')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -240,7 +262,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
     def test_dry_run(self):
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -264,7 +286,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
 
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'new.md').write_text('# New')
+        (src / 'new.skill.md').write_text('# New')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -281,7 +303,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
     def test_skip_when_unchanged(self):
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -300,7 +322,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
     def test_copy_when_source_changed(self):
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -310,7 +332,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         sync = SkillSync(config_file=config)
         sync.sync()
 
-        (src / 'guide.md').write_text('# Guide Updated')
+        (src / 'guide.skill.md').write_text('# Guide Updated')
 
         result = sync.sync()
         self.assertEqual(result['synced_count'], 1)
@@ -319,7 +341,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
     def test_force_copies_unchanged(self):
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -337,7 +359,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
     def test_copy_when_adapter_version_changed(self):
         src = self.tmpdir / 'repo'
         src.mkdir()
-        (src / 'guide.md').write_text('# Guide')
+        (src / 'guide.skill.md').write_text('# Guide')
 
         config = self.tmpdir / 'ai-skills.yaml'
         config.write_text(json.dumps({
@@ -363,9 +385,9 @@ class TestSkillSyncIntegration(unittest.TestCase):
         archive = _make_fake_archive(
             "ai-skills-master",
             {
-                "skills/version-control/SKILL.md": "# Version Control",
+                "skills/version-control/version-control.skill.md": "# Version Control",
                 "skills/version-control/extra.md": "# Extra",
-                "skills/ansible/SKILL.md": "# Ansible",
+                "skills/ansible/ansible.skill.md": "# Ansible",
             },
         )
 
@@ -407,7 +429,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         archive = _make_fake_archive(
             "ai-skills-master",
             {
-                "docs/quickstart.md": "# Quickstart",
+                "docs/quickstart.skill.md": "# Quickstart",
             },
         )
 
@@ -422,7 +444,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
                 'type': 'github',
                 'path': 'https://github.com/owner/ai-skills',
                 'tree': 'master',
-                'subpath': 'docs/quickstart.md',
+                'subpath': 'docs/quickstart.skill.md',
             }],
             'settings': {'target': '.agents/skills'}
         }))
@@ -447,8 +469,8 @@ class TestSkillSyncIntegration(unittest.TestCase):
         archive = _make_fake_archive(
             "ai-skills-master",
             {
-                "skills/web/SKILL.md": "# Web",
-                "docs/guide.md": "# Guide",
+                "skills/web/web.skill.md": "# Web",
+                "docs/guide.skill.md": "# Guide",
             },
         )
 

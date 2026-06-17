@@ -1,6 +1,7 @@
 """Tests for GitHubDiscovery strategy."""
 
 import io
+import shutil
 import tarfile
 import tempfile
 import unittest
@@ -15,19 +16,21 @@ from ai_skills_manager.discovery.github import (
 from ai_skills_manager.core import copy_skill
 
 
-def _make_fake_archive(repo_name: str, files: dict) -> bytes:
-    """Create a tar.gz archive in memory.
+MOCK_DIR = Path(__file__).parent / 'mock' / 'test_github'
 
-    files: dict of {path_inside_repo: content}
-    """
+
+def _make_archive_from_mock(mock_name: str, repo_name: str) -> bytes:
+    """Build a tar.gz archive from a mock directory."""
+    src = MOCK_DIR / mock_name
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for rel_path, content in files.items():
-            arcname = f"{repo_name}/{rel_path}"
-            data = content.encode("utf-8")
-            info = tarfile.TarInfo(name=arcname)
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
+        for path in src.rglob("*"):
+            if path.is_file():
+                arcname = f"{repo_name}/{path.relative_to(src)}"
+                data = path.read_bytes()
+                info = tarfile.TarInfo(name=arcname)
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
     return buf.getvalue()
 
 
@@ -68,7 +71,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.target.mkdir()
 
     def tearDown(self):
-        import shutil
         shutil.rmtree(self.tmpdir)
 
     def _mock_download(self, archive_bytes: bytes):
@@ -84,13 +86,7 @@ class TestGitHubDiscovery(unittest.TestCase):
         )
 
     def test_discover_flat_files(self):
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/guide.md": "# Guide",
-                "skills/tips.md": "# Tips",
-            },
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -106,13 +102,7 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.assertEqual(names, {"guide", "tips"})
 
     def test_discover_directory_skills(self):
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/web/SKILL.md": "# Web",
-                "skills/web/extra.md": "# Extra",
-            },
-        )
+        archive = _make_archive_from_mock("discover_directory_skills", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -128,27 +118,21 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.assertFalse(result[0].is_flat)
 
     def test_missing_subpath_returns_empty(self):
-        archive = _make_fake_archive(
-            "repo-main",
-            {"other/readme.md": "# Readme"},
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
                 self.target,
                 tree="main",
-                subpath="skills",
+                subpath="missing",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
     def test_default_tree_master(self):
-        archive = _make_fake_archive(
-            "repo-master",
-            {"skills/a.md": "# A"},
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-master")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -158,14 +142,10 @@ class TestGitHubDiscovery(unittest.TestCase):
             )
             result = strategy.discover()
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "a")
+        self.assertEqual(len(result), 2)
 
     def test_default_subpath_skills(self):
-        archive = _make_fake_archive(
-            "repo-main",
-            {"skills/b.md": "# B"},
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -175,14 +155,10 @@ class TestGitHubDiscovery(unittest.TestCase):
             )
             result = strategy.discover()
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "b")
+        self.assertEqual(len(result), 2)
 
     def test_ssh_url_accepted(self):
-        archive = _make_fake_archive(
-            "repo-main",
-            {"skills/x.md": "# X"},
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -193,22 +169,10 @@ class TestGitHubDiscovery(unittest.TestCase):
             )
             result = strategy.discover()
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "x")
+        self.assertEqual(len(result), 2)
 
     def test_discover_source_paths_remain_valid_after_return(self):
-        """Regression test: source_path must point to real files after discover() returns.
-
-        Previously the extracted temp directory was cleaned up inside the
-        discover() method, so callers got dangling paths.
-        """
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/version-control/SKILL.md": "# Version Control",
-                "skills/version-control/extra.md": "# Extra",
-            },
-        )
+        archive = _make_archive_from_mock("discover_directory_skills", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -221,26 +185,20 @@ class TestGitHubDiscovery(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         mapping = result[0]
-        self.assertEqual(mapping.skill_name, "version-control")
+        self.assertEqual(mapping.skill_name, "web")
         self.assertFalse(mapping.is_flat)
 
         # The source_path must still exist after discover() returned
         self.assertTrue(mapping.source_path.exists())
-        self.assertTrue((mapping.source_path / "SKILL.md").exists())
+        self.assertTrue((mapping.source_path / "web.skill.md").exists())
         self.assertEqual(
-            (mapping.source_path / "SKILL.md").read_text(),
-            "# Version Control",
+            (mapping.source_path / "web.skill.md").read_text(),
+            "# Web\n",
         )
 
     def test_discover_and_copy_directory_skill(self):
         """End-to-end: discover from GitHub archive and copy skill to target."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/version-control/SKILL.md": "# Version Control",
-                "skills/version-control/extra.md": "# Extra",
-            },
-        )
+        archive = _make_archive_from_mock("discover_directory_skills", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -257,28 +215,23 @@ class TestGitHubDiscovery(unittest.TestCase):
         copy_skill(mapping, dry_run=False)
 
         # Verify the skill was copied into the target directory
-        skill_dir = self.target / "version-control"
+        skill_dir = self.target / "web"
         self.assertTrue(skill_dir.exists())
         self.assertTrue((skill_dir / "SKILL.md").exists())
-        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Version Control")
+        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Web\n")
         self.assertTrue((skill_dir / "extra.md").exists())
-        self.assertEqual((skill_dir / "extra.md").read_text(), "# Extra")
+        self.assertEqual((skill_dir / "extra.md").read_text(), "# Extra\n")
 
-    def test_discover_single_md_file(self):
-        """A single .md file selected via subpath is treated as a flat skill."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/nested/guide.md": "# Guide",
-            },
-        )
+    def test_discover_single_skill_file(self):
+        """A single *.skill.md file selected via subpath is treated as a flat skill."""
+        archive = _make_archive_from_mock("discover_single_skill_file", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
                 self.target,
                 tree="main",
-                subpath="skills/nested/guide.md",
+                subpath="skills/nested/guide.skill.md",
             )
             result = strategy.discover()
 
@@ -287,63 +240,34 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.assertTrue(result[0].is_flat)
         self.assertTrue(result[0].source_path.exists())
 
-    def test_discover_single_md_file_copies_correctly(self):
-        """End-to-end: discover a single .md file and copy it as a flat skill."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "docs/quickstart.md": "# Quickstart",
-            },
-        )
+    def test_discover_single_skill_file_copies_correctly(self):
+        """End-to-end: discover a single *.skill.md file and copy it as a flat skill."""
+        archive = _make_archive_from_mock("discover_single_skill_file", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
                 self.target,
                 tree="main",
-                subpath="docs/quickstart.md",
+                subpath="skills/nested/guide.skill.md",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
         mapping = result[0]
-        self.assertEqual(mapping.skill_name, "quickstart")
+        self.assertEqual(mapping.skill_name, "guide")
         self.assertTrue(mapping.is_flat)
 
         copy_skill(mapping, dry_run=False)
 
-        skill_dir = self.target / "quickstart"
+        skill_dir = self.target / "guide"
         self.assertTrue(skill_dir.exists())
         self.assertTrue((skill_dir / "SKILL.md").exists())
-        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Quickstart")
-
-    def test_discover_single_nonexistent_file_returns_empty(self):
-        """Selecting a missing file returns an empty list."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {"skills/guide.md": "# Guide"},
-        )
-
-        with self._mock_download(archive):
-            strategy = GitHubDiscovery(
-                "https://github.com/owner/repo",
-                self.target,
-                tree="main",
-                subpath="skills/missing.md",
-            )
-            result = strategy.discover()
-
-        self.assertEqual(len(result), 0)
+        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Guide\n")
 
     def test_discover_multiple_subpaths(self):
         """Multiple subpaths can be provided as a list."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/web/SKILL.md": "# Web",
-                "docs/guide.md": "# Guide",
-            },
-        )
+        archive = _make_archive_from_mock("multiple_subpaths", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -359,21 +283,15 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.assertEqual(names, {"web", "guide"})
 
     def test_discover_multiple_subpaths_mixed(self):
-        """A list of subpaths can contain both directories and single .md files."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/web/SKILL.md": "# Web",
-                "docs/quickstart.md": "# Quickstart",
-            },
-        )
+        """A list of subpaths can contain both directories and single *.skill.md files."""
+        archive = _make_archive_from_mock("mixed_subpaths", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
                 self.target,
                 tree="main",
-                subpath=["skills", "docs/quickstart.md"],
+                subpath=["skills", "docs/quickstart.skill.md"],
             )
             result = strategy.discover()
 
@@ -386,12 +304,7 @@ class TestGitHubDiscovery(unittest.TestCase):
 
     def test_discover_multiple_subpaths_skips_missing(self):
         """Missing subpaths in a list are skipped rather than failing."""
-        archive = _make_fake_archive(
-            "repo-main",
-            {
-                "skills/guide.md": "# Guide",
-            },
-        )
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
 
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
@@ -402,8 +315,7 @@ class TestGitHubDiscovery(unittest.TestCase):
             )
             result = strategy.discover()
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "guide")
+        self.assertEqual(len(result), 2)
 
 
 class TestFindExtractedRoot(unittest.TestCase):
@@ -411,7 +323,6 @@ class TestFindExtractedRoot(unittest.TestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
 
     def tearDown(self):
-        import shutil
         shutil.rmtree(self.tmpdir)
 
     def test_single_directory(self):
