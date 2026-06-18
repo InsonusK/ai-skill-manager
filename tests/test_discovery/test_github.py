@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_skill_manager.discovery.github import (
+from ai_skill_manager.commands.discover.core.github import (
     GitHubDiscovery,
     _parse_github_url,
     _find_extracted_root,
@@ -81,7 +81,7 @@ class TestGitHubDiscovery(unittest.TestCase):
             return path
 
         return patch(
-            "ai_skill_manager.discovery.github._download_archive",
+            "ai_skill_manager.commands.discover.core.github._download_archive",
             side_effect=fake_download,
         )
 

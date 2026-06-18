@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import List
 
 from ...config import load_config
-from ...core import STRATEGIES
-from ...discovery.base import SkillMapping
+from .core.base import SkillMapping
 from .api import (
     DEFAULT_CONFIG,
     DEFAULT_TARGET,
     discover_from_config,
     discover_single_source,
     resolve_target,
+    STRATEGIES
 )
 from .formatter import format_mappings
 

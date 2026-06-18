@@ -13,16 +13,21 @@ from pathlib import Path
 from typing import List, Optional
 
 from ...config import load_config
-from ...core import STRATEGIES
-from ...discovery.base import SkillMapping
-from ...discovery.github import GitHubDiscovery
+from .core.base import SkillMapping
+from .core import AutoDiscovery, DirectoryDiscovery, GitHubDiscovery,FlatDiscovery
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
 
 DEFAULT_TARGET = ".agents/skills"
-#: Default target directory. / Целевая директория по умолчанию.
 
+#: Default target directory. / Целевая директория по умолчанию.
+STRATEGIES = {
+    'auto': AutoDiscovery,
+    'flat': FlatDiscovery,
+    'directory': DirectoryDiscovery,
+    'github': GitHubDiscovery,
+}
 
 def resolve_target(
     config_dir: Path, settings: dict, target_override: Optional[str] = None

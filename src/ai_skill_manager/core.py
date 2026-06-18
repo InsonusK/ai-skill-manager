@@ -5,23 +5,13 @@ import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 
+from .commands.discover.api import STRATEGIES
+
 from .config import load_config
-from .discovery.base import SkillMapping
-from .discovery.auto import AutoDiscovery
-from .discovery.flat import FlatDiscovery
-from .discovery.directory import DirectoryDiscovery
-from .discovery.github import GitHubDiscovery
+from .commands.discover.core.base import SkillMapping
+from .commands.discover.core.auto import AutoDiscovery
 from .adapters.link_updater import LinkUpdater
 from .utils import is_managed, tag_managed, compute_hash, read_managed_state, write_managed_state
-
-
-STRATEGIES = {
-    'auto': AutoDiscovery,
-    'flat': FlatDiscovery,
-    'directory': DirectoryDiscovery,
-    'github': GitHubDiscovery,
-}
-
 
 def build_source_to_target_map(mappings: List[SkillMapping]) -> Dict[Path, Path]:
     """Build map from source file path to target file path."""

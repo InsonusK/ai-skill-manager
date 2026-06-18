@@ -15,7 +15,7 @@ from ai_skill_manager.core import (
     collect_source_files,
     copy_skill,
 )
-from ai_skill_manager.discovery.base import SkillMapping
+from ai_skill_manager.commands.discover.core.base import SkillMapping
 from ai_skill_manager.utils import is_managed
 
 
@@ -408,7 +408,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skill_manager.discovery.github._download_archive',
+            'ai_skill_manager.commands.discover.core.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)
@@ -450,7 +450,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skill_manager.discovery.github._download_archive',
+            'ai_skill_manager.commands.discover.core.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)
@@ -491,7 +491,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skill_manager.discovery.github._download_archive',
+            'ai_skill_manager.commands.discover.core.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)
