@@ -1,4 +1,8 @@
-"""Discover command package."""
+"""Discover command package.
+
+Exposes the API, formatter and CLI entry points for discovering skills.
+Экспортирует точки входа API, форматёра и CLI для обнаружения навыков.
+"""
 
 from .api import (
     DEFAULT_CONFIG,

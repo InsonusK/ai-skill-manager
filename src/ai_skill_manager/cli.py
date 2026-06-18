@@ -1,4 +1,11 @@
-"""Command-line interface."""
+"""Command-line interface.
+
+Entry point for the ``ai-skill-manager`` / ``aism`` commands.
+Registers subcommands from the ``commands`` package.
+
+Точка входа для команд ``ai-skill-manager`` / ``aism``.
+Регистрирует подкоманды из пакета ``commands``.
+"""
 
 import argparse
 
@@ -8,12 +15,18 @@ from .commands.sync.cli import add_parser as sync_add_parser
 
 
 def main():
+    """Run the main CLI entry point.
+
+    Запускает основную точку входа CLI.
+    """
     parser = argparse.ArgumentParser(
         prog='ai-skill-manager',
-        description='AI skills manager CLI',
+        description='AI skills manager CLI / CLI менеджера AI-навыков',
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
 
+    # Register subcommand parsers.
+    # Регистрируем парсеры подкоманд.
     sync_add_parser(subparsers)
     new_add_parser(subparsers)
     discover_add_parser(subparsers)

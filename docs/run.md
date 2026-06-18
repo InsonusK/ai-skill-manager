@@ -1,65 +1,143 @@
-# Running
+# Running / Запуск
 
-## Basic usage
-
-By default, the tool looks for `ai-skills.yaml` in the current directory and syncs skills to `.agents/skills/` relative to the config file.
+The CLI is organized into subcommands. Each command has its own options and output format.
+CLI разделён на подкоманды. У каждой команды свои опции и формат вывода.
 
 ```bash
-# Use default config (ai-skills.yaml)
-ai-skill-manager
-
-# Or use the short alias
-aism
-
-# Or run via module
-python -m ai_skill_manager.cli
+ai-skill-manager <command> [options]
+aism <command> [options]
 ```
 
-## Custom config file
+---
+
+## `sync`
+
+Synchronize skills from the config file to the target directory.
+Синхронизирует навыки из файла конфигурации в целевую директорию.
+
+### Usage / Использование
 
 ```bash
-ai-skill-manager -c ./config/my-skills.yaml
+ai-skill-manager sync [options]
 ```
 
-## Common options
+### Options / Опции
 
-| Option | Description |
-|--------|-------------|
-| `-c, --config` | Path to config file (default: `ai-skills.yaml`) |
-| `--target` | Override the target directory |
-| `--on-conflict` | Conflict resolution: `error` or `last_wins` |
-| `--remove-orphans` | Remove skills not present in config |
-| `--keep-orphans` | Keep skills not present in config |
-| `--dry-run` | Preview changes without applying them |
+| Option / Опция | Description / Описание |
+|----------------|------------------------|
+| `-c, --config <path>` | Config file path (default: `ai-skills.yaml`). / Путь к файлу конфигурации (по умолчанию: `ai-skills.yaml`). |
+| `--target <dir>` | Override the target directory. / Переопределить целевую директорию. |
+| `--on-conflict <error\|last_wins>` | Conflict resolution strategy. / Стратегия разрешения конфликтов имён. |
+| `--remove-orphans` | Remove skills not present in the config. / Удалить навыки, отсутствующие в конфиге. |
+| `--keep-orphans` | Keep orphan skills. / Оставить осиротевшие навыки. |
+| `--dry-run` | Preview changes without writing anything. / Показать изменения без записи. |
+| `-f, --force` | Force copy all skills, skip hash/version checks. / Принудительно скопировать все навыки, пропустив проверку хеша и версии. |
+| `-v, --verbose` | Enable debug logging. / Включить подробное логирование. |
 
-## Examples
-
-### Preview changes
+### Examples / Примеры
 
 ```bash
-ai-skill-manager --dry-run
+# Sync using default config
+# Синхронизация с конфигом по умолчанию
+ai-skill-manager sync
+
+# Preview changes
+# Предварительный просмотр изменений
+ai-skill-manager sync --dry-run
+
+# Use custom config
+# Использовать свой конфиг
+ai-skill-manager sync -c ./config/my-skills.yaml
+
+# Override target directory
+# Переопределить целевую директорию
+ai-skill-manager sync --target ./my-skills
 ```
 
-### Override target directory
+---
+
+## `discover`
+
+Discover skills and print their mappings without copying anything.
+Обнаруживает навыки и выводит их сопоставления без копирования.
+
+### Usage / Использование
 
 ```bash
-ai-skill-manager --target ./my-skills
+ai-skill-manager discover [options]
 ```
 
-### Force orphan removal
+### Options / Опции
+
+| Option / Опция | Description / Описание |
+|----------------|------------------------|
+| `-c, --config <path>` | Discover from config file. / Обнаружить из файла конфигурации. |
+| `-t, --type <auto\|directory\|flat\|github>` | Discovery strategy for a single source. / Стратегия обнаружения для одного источника. |
+| `-p, --path <path>` | Source path or GitHub URL. / Путь к источнику или URL GitHub. |
+| `--target <dir>` | Override target directory. / Переопределить целевую директорию. |
+| `--tree <branch>` | Git tree/branch when `type=github` (default: `master`). / Ветка Git при `type=github` (по умолчанию: `master`). |
+| `--subpath <path>` | GitHub subpath (can be repeated). / Подпуть в GitHub (можно повторять). |
+| `-v, --verbose` | Enable debug logging. / Включить подробное логирование. |
+
+### Examples / Примеры
 
 ```bash
-ai-skill-manager --remove-orphans
+# Discover from default config
+# Обнаружить из конфига по умолчанию
+ai-skill-manager discover
+
+# Discover from a single local source
+# Обнаружить из одного локального источника
+ai-skill-manager discover -t auto -p ./my-skills
+
+# Discover from GitHub
+# Обнаружить из GitHub
+ai-skill-manager discover -t github -p https://github.com/owner/skills-repo.git
 ```
 
-### Keep orphan skills
+---
+
+## `new`
+
+Create a new skill from a template.
+Создаёт новый навык из шаблона.
+
+### Usage / Использование
 
 ```bash
-ai-skill-manager --keep-orphans
+ai-skill-manager new <skill_name> <path> [options]
 ```
 
-### Set conflict resolution
+### Arguments / Аргументы
+
+| Argument / Аргумент | Description / Описание |
+|---------------------|------------------------|
+| `skill_name` | Name of the new skill. / Имя нового навыка. |
+| `path` | Target path. / Целевой путь. |
+
+### Options / Опции
+
+| Option / Опция | Description / Описание |
+|----------------|------------------------|
+| `--type <flat\|dir>` | Skill type: `flat` creates a single `.md` file, `dir` creates a folder with `SKILL.md` (default: `dir`). / Тип навыка: `flat` создаёт один `.md` файл, `dir` создаёт папку с `SKILL.md` (по умолчанию: `dir`). |
+
+### Examples / Примеры
 
 ```bash
-ai-skill-manager --on-conflict last_wins
+# Create a directory skill
+# Создать навык в виде директории
+ai-skill-manager new my-skill ./my-skill
+
+# Create a flat skill
+# Создать плоский навык
+ai-skill-manager new my-skill ./my-skill.md --type flat
+```
+
+---
+
+## Global options / Глобальные опции
+
+```bash
+ai-skill-manager --help
+ai-skill-manager <command> --help
 ```

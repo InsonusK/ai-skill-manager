@@ -20,9 +20,9 @@ settings:
 Run the sync:
 
 ```bash
-ai-skill-manager
+ai-skill-manager sync
 # or use the short alias
-aism
+aism sync
 ```
 
 ## Documentation
