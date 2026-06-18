@@ -44,5 +44,5 @@ aism --help
 Or run the CLI module directly:
 
 ```bash
-python -m ai_skills_manager.cli --help
+python -m ai_skill_manager.cli --help
 ```

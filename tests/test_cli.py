@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import patch
 import io
 
-from ai_skills_manager.cli import main
-from ai_skills_manager.commands.new import SKILL_TEMPLATE, run as new_run
+from ai_skill_manager.cli import main
+from ai_skill_manager.commands.new import SKILL_TEMPLATE, run as new_run
 
 
 class TestNewCommand(unittest.TestCase):

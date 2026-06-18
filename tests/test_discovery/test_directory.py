@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skills_manager.discovery.directory import DirectoryDiscovery
+from ai_skill_manager.discovery.directory import DirectoryDiscovery
 
 
 MOCK_DIR = Path(__file__).parent / 'mock' / 'test_directory'

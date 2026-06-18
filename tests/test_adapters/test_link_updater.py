@@ -5,8 +5,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from ai_skills_manager.adapters.link_updater import LinkUpdater
-from ai_skills_manager.discovery.base import SkillMapping
+from ai_skill_manager.adapters.link_updater import LinkUpdater
+from ai_skill_manager.discovery.base import SkillMapping
 
 
 class TestLinkUpdater(unittest.TestCase):

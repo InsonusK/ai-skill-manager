@@ -2,7 +2,7 @@
 
 import argparse
 
-from .commands import sync, new
+from .commands import sync, new, discover
 
 
 def main():
@@ -14,6 +14,7 @@ def main():
 
     sync.add_parser(subparsers)
     new.add_parser(subparsers)
+    discover.add_parser(subparsers)
 
     args = parser.parse_args()
     args.func(args)

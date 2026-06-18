@@ -9,14 +9,14 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_skills_manager.core import (
+from ai_skill_manager.core import (
     SkillSync,
     build_source_to_target_map,
     collect_source_files,
     copy_skill,
 )
-from ai_skills_manager.discovery.base import SkillMapping
-from ai_skills_manager.utils import is_managed
+from ai_skill_manager.discovery.base import SkillMapping
+from ai_skill_manager.utils import is_managed
 
 
 def _make_fake_archive(repo_name: str, files: dict) -> bytes:
@@ -281,7 +281,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
 
         old = target / 'old-skill'
         old.mkdir()
-        from ai_skills_manager.utils import tag_managed
+        from ai_skill_manager.utils import tag_managed
         tag_managed(old)
 
         src = self.tmpdir / 'repo'
@@ -370,7 +370,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         sync.sync()
 
         # Simulate adapter version change
-        from ai_skills_manager.utils import read_managed_state, write_managed_state
+        from ai_skill_manager.utils import read_managed_state, write_managed_state
         target = self.tmpdir / '.agents' / 'skills' / 'guide'
         state = read_managed_state(target)
         state['adapters'][0]['version'] = 999
@@ -408,7 +408,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skills_manager.discovery.github._download_archive',
+            'ai_skill_manager.discovery.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)
@@ -450,7 +450,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skills_manager.discovery.github._download_archive',
+            'ai_skill_manager.discovery.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)
@@ -491,7 +491,7 @@ class TestSkillSyncIntegration(unittest.TestCase):
         }))
 
         with patch(
-            'ai_skills_manager.discovery.github._download_archive',
+            'ai_skill_manager.discovery.github._download_archive',
             side_effect=fake_download,
         ):
             sync = SkillSync(config_file=config)

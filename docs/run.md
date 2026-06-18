@@ -12,7 +12,7 @@ ai-skill-manager
 aism
 
 # Or run via module
-python -m ai_skills_manager.cli
+python -m ai_skill_manager.cli
 ```
 
 ## Custom config file
