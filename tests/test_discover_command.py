@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.commands.discover import run as discover_run
+from ai_skill_manager.commands.discover.cli import run as discover_run
 
 
 class TestDiscoverCommand(unittest.TestCase):

@@ -2,7 +2,9 @@
 
 import argparse
 
-from .commands import sync, new, discover
+from .commands.discover.cli import add_parser as discover_add_parser
+from .commands.new.cli import add_parser as new_add_parser
+from .commands.sync.cli import add_parser as sync_add_parser
 
 
 def main():
@@ -12,9 +14,9 @@ def main():
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    sync.add_parser(subparsers)
-    new.add_parser(subparsers)
-    discover.add_parser(subparsers)
+    sync_add_parser(subparsers)
+    new_add_parser(subparsers)
+    discover_add_parser(subparsers)
 
     args = parser.parse_args()
     args.func(args)
