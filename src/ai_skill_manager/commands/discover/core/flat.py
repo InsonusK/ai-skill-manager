@@ -6,7 +6,9 @@ Treats *.skill.md files as individual flat skills.
 from pathlib import Path
 from typing import List
 
-from .base import DiscoveryStrategy, SkillMapping, is_skill_md, skill_name_from_file
+from . import SkillMapping
+
+from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
 
 
 class FlatDiscovery(DiscoveryStrategy):

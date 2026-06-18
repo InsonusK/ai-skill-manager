@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater import LinkUpdater
-from ai_skill_manager.commands.discover.core.base import SkillMapping
+from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
 
 
 class TestLinkUpdater(unittest.TestCase):

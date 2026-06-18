@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 from .commands.discover.api import STRATEGIES
 
 from .config import load_config
-from .commands.discover.core.base import SkillMapping
+from .commands.discover.models.skill_mapping import SkillMapping
 from .commands.discover.core.auto import AutoDiscovery
 from .adapters.link_updater import LinkUpdater
 from .utils import is_managed, tag_managed, compute_hash, read_managed_state, write_managed_state

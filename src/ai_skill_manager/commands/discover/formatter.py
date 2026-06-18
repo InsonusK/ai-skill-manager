@@ -9,7 +9,7 @@ list for console output.
 
 from typing import List
 
-from .core.base import SkillMapping
+from .models.skill_mapping import SkillMapping
 
 
 def format_mappings(mappings: List[SkillMapping]) -> str:

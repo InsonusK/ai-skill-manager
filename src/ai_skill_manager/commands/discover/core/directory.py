@@ -6,7 +6,9 @@ Finds directories that contain a file named {directory_name}.skill.md.
 from pathlib import Path
 from typing import List
 
-from .base import DiscoveryStrategy, SkillMapping
+from . import SkillMapping
+
+from .base import DiscoveryStrategy
 from ._common import discover_directory_skill
 
 

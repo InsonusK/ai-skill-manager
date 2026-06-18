@@ -1,6 +1,8 @@
 """Skill discovery strategies."""
 
-from .base import SkillMapping, DiscoveryStrategy
+from ..models.skill_mapping import SkillMapping
+
+from .base import DiscoveryStrategy
 from .auto import AutoDiscovery
 from .flat import FlatDiscovery
 from .directory import DirectoryDiscovery

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from ...config import load_config
-from .core.base import SkillMapping
+from .models.skill_mapping import SkillMapping
 from .core import AutoDiscovery, DirectoryDiscovery, GitHubDiscovery,FlatDiscovery
 
 DEFAULT_CONFIG = "ai-skills.yaml"

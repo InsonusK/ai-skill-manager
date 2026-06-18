@@ -2,9 +2,9 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
+from ..models.skill_mapping import SkillMapping
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +17,6 @@ def is_skill_md(path: Path) -> bool:
 def skill_name_from_file(path: Path) -> str:
     """Extract skill name from a *.skill.md file name."""
     return path.name[:-9]  # strip '.skill.md'
-
-
-@dataclass
-class SkillMapping:
-    """Maps a source to a target skill."""
-    source_path: Path
-    target_path: Path
-    skill_name: str
-    is_flat: bool
-    source_skill_md: Optional[Path] = field(default=None)
 
 
 class DiscoveryStrategy(ABC):

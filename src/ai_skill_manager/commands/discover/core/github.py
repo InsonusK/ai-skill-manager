@@ -14,8 +14,10 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Union
 
+from . import SkillMapping
+
 from .auto import AutoDiscovery
-from .base import DiscoveryStrategy, SkillMapping, is_skill_md, skill_name_from_file
+from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
 
 logger = logging.getLogger(__name__)
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List
 
 from ...config import load_config
-from .core.base import SkillMapping
+from .models.skill_mapping import SkillMapping
 from .api import (
     DEFAULT_CONFIG,
     DEFAULT_TARGET,

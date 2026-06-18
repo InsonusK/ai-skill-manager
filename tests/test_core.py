@@ -15,7 +15,7 @@ from ai_skill_manager.core import (
     collect_source_files,
     copy_skill,
 )
-from ai_skill_manager.commands.discover.core.base import SkillMapping
+from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
 from ai_skill_manager.utils import is_managed
 
 

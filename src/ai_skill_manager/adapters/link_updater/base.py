@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Literal
 
 import yaml
 
-from ai_skill_manager.commands.discover.core.base import SkillMapping
+from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
 
 logger = logging.getLogger(__name__)
 
