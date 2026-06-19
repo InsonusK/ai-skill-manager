@@ -13,12 +13,12 @@ from typing import List, Sequence
 
 from ..models.skill import Skill
 from .models import Source
-from .source import AutoDiscovery, DirectoryDiscovery, FlatDiscovery, GitHubDiscovery
+from .source import AutoDiscovery, GitHubDiscovery
 
 STRATEGIES = {
     "auto": AutoDiscovery,
-    "flat": FlatDiscovery,
-    "directory": DirectoryDiscovery,
+    "flat": AutoDiscovery,
+    "directory": AutoDiscovery,
     "github": GitHubDiscovery,
 }
 

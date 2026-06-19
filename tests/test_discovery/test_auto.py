@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.discovery.source.auto import AutoDiscovery
+from ai_skill_manager.models.skill_format import SkillFormat
 
 
 MOCK_DIR = Path(__file__).parent / "mock" / "test_auto"
@@ -46,6 +47,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "guide")
         self.assertTrue(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanFlat)
         self.assertEqual(result[0].file_path, md)
 
     def test_non_skill_file_ignored(self):
@@ -66,7 +68,32 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "web")
         self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanDir)
         self.assertEqual(result[0].folder_path, skill_dir)
+
+    def test_agent_skill(self):
+        skill_dir = self.tmpdir / "agent"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: agent\n---\n# Agent")
+
+        strategy = AutoDiscovery(skill_dir)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "agent")
+        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.Agent)
+        self.assertEqual(result[0].file_path, skill_dir / "SKILL.md")
+
+    def test_conflicting_skill_markers_raises(self):
+        skill_dir = self.tmpdir / "conflict"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: conflict\n---\n# Agent")
+        (skill_dir / "conflict.skill.md").write_text("---\nname: conflict\n---\n# HumanDir")
+
+        strategy = AutoDiscovery(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
 
     def test_flat_directory(self):
         flat = self._copy_mock("flat_directory") / "guides"
@@ -124,6 +151,54 @@ class TestAutoDiscovery(unittest.TestCase):
 
     def test_directory_skill_with_extra_skill_md_raises(self):
         skill_dir = self._copy_mock("directory_with_extra_skill_md_raises") / "web"
+
+        strategy = AutoDiscovery(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_human_dir_and_matching_flat_file_takes_directory(self):
+        """If {dir}.skill.md is both a flat and directory pattern, prefer directory."""
+        skill_dir = self.tmpdir / "web"
+        skill_dir.mkdir()
+        (skill_dir / "web.skill.md").write_text("---\nname: web\n---\n# Web")
+
+        strategy = AutoDiscovery(skill_dir)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "web")
+        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanDir)
+
+    def test_agent_with_extra_flat_file_raises_conflict(self):
+        """Agent SKILL.md + unrelated *.skill.md is ambiguous."""
+        skill_dir = self.tmpdir / "agent"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: agent\n---\n# Agent")
+        (skill_dir / "other.skill.md").write_text("---\nname: other\n---\n# Other")
+
+        strategy = AutoDiscovery(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_agent_with_nested_skill_raises(self):
+        skill_dir = self.tmpdir / "agent"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: agent\n---\n# Agent")
+        nested = skill_dir / "nested"
+        nested.mkdir()
+        (nested / "nested.skill.md").write_text("---\nname: nested\n---\n# Nested")
+
+        strategy = AutoDiscovery(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_multiple_directory_patterns_raises(self):
+        """Both SKILL.md and {dir}.skill.md in the same directory conflict."""
+        skill_dir = self.tmpdir / "ambiguous"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: ambiguous\n---\n# Agent")
+        (skill_dir / "ambiguous.skill.md").write_text("---\nname: ambiguous\n---\n# HumanDir")
 
         strategy = AutoDiscovery(skill_dir)
         with self.assertRaises(ValueError):

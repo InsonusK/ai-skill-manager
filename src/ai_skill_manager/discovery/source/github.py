@@ -1,8 +1,7 @@
 """GitHub source discovery strategy.
 
 Downloads a GitHub repository archive, extracts it to a temp directory,
-and discovers skills from one or more subpaths using directory, flat, or
-auto logic.
+and discovers skills from one or more subpaths using :class:`AutoDiscovery`.
 """
 
 import logging
@@ -15,9 +14,8 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from ...models.skill import Skill
-from ...models.skill_format import SkillFormat
 from .auto import AutoDiscovery
-from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
+from .DiscoveryStrategy import DiscoveryStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +74,7 @@ class GitHubDiscovery(DiscoveryStrategy):
     """Discover skills from a GitHub repository.
 
     Downloads the repo archive for the specified tree/branch, extracts it,
-    and discovers skills from the configured subpaths.
-
-    Each subpath can be:
-    - a directory (scanned recursively with auto logic)
-    - a single *.skill.md file (treated as a flat skill)
+    and discovers skills from the configured subpaths using :class:`AutoDiscovery`.
     """
 
     def __init__(
@@ -94,6 +88,7 @@ class GitHubDiscovery(DiscoveryStrategy):
         self.tree = tree
         self.subpath = subpath
         self._extracted_dir: Optional[Path] = None
+        super().__init__(Path("."))
 
     def discover(self) -> List[Skill]:
         """Download repo, extract, and discover skills."""
@@ -118,18 +113,7 @@ class GitHubDiscovery(DiscoveryStrategy):
                     logger.error("subpath not found: %s", scan_path)
                     continue
 
-                if scan_path.is_file():
-                    if is_skill_md(scan_path):
-                        all_skills.append(
-                            self._create_skill(
-                                file_path=scan_path,
-                                format=SkillFormat.HumanFlat,
-                            )
-                        )
-                    continue
-
-                strategy = AutoDiscovery(scan_path)
-                all_skills.extend(strategy.discover())
+                all_skills.extend(AutoDiscovery(scan_path).discover())
 
             return all_skills
         finally:
