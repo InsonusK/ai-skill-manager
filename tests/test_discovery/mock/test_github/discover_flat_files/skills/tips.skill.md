@@ -1,1 +1,4 @@
+---
+name: tips
+---
 # Tips

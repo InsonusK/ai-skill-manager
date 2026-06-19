@@ -20,17 +20,17 @@ class TestDiscoverCommand(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def _make_source_dir(self):
-        src = self.tmp / 'skills'
+        src = self.tmp / "skills"
         src.mkdir()
-        (src / 'guide.skill.md').write_text('# Guide')
+        (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
 
-        web = src / 'web'
+        web = src / "web"
         web.mkdir()
-        (web / 'web.skill.md').write_text('# Web')
+        (web / "web.skill.md").write_text("---\nname: web\n---\n# Web")
         return src
 
     def test_help_shows_discover(self):
-        with patch('sys.argv', ['ai-skill-manager', 'discover', '--help']):
+        with patch("sys.argv", ["ai-skill-manager", "discover", "--help"]):
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, 0)
@@ -38,63 +38,62 @@ class TestDiscoverCommand(unittest.TestCase):
     def test_discover_single_source_auto(self):
         src = self._make_source_dir()
 
-        args = type('Args', (), {
-            'config': None,
-            'type': 'auto',
-            'path': str(src),
-            'target': str(self.tmp / 'target'),
-            'tree': 'master',
-            'subpath': None,
-            'verbose': False,
+        args = type("Args", (), {
+            "config": None,
+            "type": "auto",
+            "path": str(src),
+            "target": str(self.tmp / "target"),
+            "tree": "master",
+            "subpath": None,
+            "verbose": False,
         })()
 
-        with patch('sys.stdout', new_callable=StringIO) as stdout:
+        with patch("sys.stdout", new_callable=StringIO) as stdout:
             discover_run(args)
             output = stdout.getvalue()
 
-        self.assertIn('guide', output)
-        self.assertIn('web', output)
-        self.assertIn('1. guide | flat | guide.skill.md', output)
-        self.assertIn('2. web | directory | web.skill.md', output)
-        self.assertIn('Source:', output)
-        self.assertIn('Target:', output)
-        self.assertIn('Total: 2 skill(s)', output)
+        self.assertIn("guide", output)
+        self.assertIn("web", output)
+        self.assertIn("1. guide | flat | guide.skill.md", output)
+        self.assertIn("2. web | directory | web.skill.md", output)
+        self.assertIn("File:", output)
+        self.assertIn("Total: 2 skill(s)", output)
 
     def test_discover_from_config(self):
         src = self._make_source_dir()
-        config = self.tmp / 'ai-skills.yaml'
+        config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            'sources': [{'path': './skills'}],
-            'settings': {'target': '.agents/skills'}
+            "sources": [{"path": "./skills"}],
+            "settings": {"target": ".agents/skills"}
         }))
 
-        args = type('Args', (), {
-            'config': str(config),
-            'type': None,
-            'path': None,
-            'target': None,
-            'tree': 'master',
-            'subpath': None,
-            'verbose': False,
+        args = type("Args", (), {
+            "config": str(config),
+            "type": None,
+            "path": None,
+            "target": None,
+            "tree": "master",
+            "subpath": None,
+            "verbose": False,
         })()
 
-        with patch('sys.stdout', new_callable=StringIO) as stdout:
+        with patch("sys.stdout", new_callable=StringIO) as stdout:
             discover_run(args)
             output = stdout.getvalue()
 
-        self.assertIn('1. guide | flat | guide.skill.md', output)
-        self.assertIn('2. web | directory | web.skill.md', output)
-        self.assertIn('Total: 2 skill(s)', output)
+        self.assertIn("1. guide | flat | guide.skill.md", output)
+        self.assertIn("2. web | directory | web.skill.md", output)
+        self.assertIn("Total: 2 skill(s)", output)
 
     def test_discover_missing_config_exits(self):
-        args = type('Args', (), {
-            'config': str(self.tmp / 'missing.yaml'),
-            'type': None,
-            'path': None,
-            'target': None,
-            'tree': 'master',
-            'subpath': None,
-            'verbose': False,
+        args = type("Args", (), {
+            "config": str(self.tmp / "missing.yaml"),
+            "type": None,
+            "path": None,
+            "target": None,
+            "tree": "master",
+            "subpath": None,
+            "verbose": False,
         })()
 
         with self.assertRaises(SystemExit) as cm:
@@ -102,25 +101,25 @@ class TestDiscoverCommand(unittest.TestCase):
         self.assertEqual(cm.exception.code, 1)
 
     def test_discover_empty_source(self):
-        empty = self.tmp / 'empty'
+        empty = self.tmp / "empty"
         empty.mkdir()
 
-        args = type('Args', (), {
-            'config': None,
-            'type': 'auto',
-            'path': str(empty),
-            'target': str(self.tmp / 'target'),
-            'tree': 'master',
-            'subpath': None,
-            'verbose': False,
+        args = type("Args", (), {
+            "config": None,
+            "type": "auto",
+            "path": str(empty),
+            "target": str(self.tmp / "target"),
+            "tree": "master",
+            "subpath": None,
+            "verbose": False,
         })()
 
-        with patch('sys.stdout', new_callable=StringIO) as stdout:
+        with patch("sys.stdout", new_callable=StringIO) as stdout:
             discover_run(args)
             output = stdout.getvalue()
 
-        self.assertIn('No skills discovered.', output)
+        self.assertIn("No skills discovered.", output)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

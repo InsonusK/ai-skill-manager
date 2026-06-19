@@ -5,17 +5,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.commands.discover.core.flat import FlatDiscovery
+from ai_skill_manager.discovery.source.flat import FlatDiscovery
 
 
-MOCK_DIR = Path(__file__).parent / 'mock' / 'test_flat'
+MOCK_DIR = Path(__file__).parent / "mock" / "test_flat"
 
 
 class TestFlatDiscovery(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.target = self.tmpdir / 'target'
-        self.target.mkdir()
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -31,54 +29,58 @@ class TestFlatDiscovery(unittest.TestCase):
         return dst
 
     def test_single_skill_file(self):
-        md = self._copy_mock('single_skill_file') / 'guide.skill.md'
+        md = self._copy_mock("single_skill_file") / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n# Guide")
 
-        strategy = FlatDiscovery(md, self.target)
+        strategy = FlatDiscovery(md)
         result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'guide')
-        self.assertTrue(result[0].is_flat)
-        self.assertEqual(result[0].source_skill_md, md)
+        self.assertEqual(result[0].name, "guide")
+        self.assertTrue(result[0].is_flat())
+        self.assertEqual(result[0].file_path, md)
 
     def test_non_skill_file_ignored(self):
-        txt = self._copy_mock('non_md_file_ignored') / 'readme.txt'
+        txt = self._copy_mock("non_md_file_ignored") / "readme.txt"
 
-        strategy = FlatDiscovery(txt, self.target)
+        strategy = FlatDiscovery(txt)
         result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
     def test_flat_directory(self):
-        flat = self._copy_mock('flat_directory')
+        flat = self._copy_mock("flat_directory")
+        for f in flat.glob("*.skill.md"):
+            name = f.name[:-9]
+            f.write_text(f"---\nname: {name}\n---\n# {name}")
 
-        strategy = FlatDiscovery(flat, self.target)
+        strategy = FlatDiscovery(flat)
         result = strategy.discover()
 
         self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
-        self.assertEqual(names, {'a', 'b'})
-        for mapping in result:
-            self.assertTrue(mapping.is_flat)
+        names = {r.name for r in result}
+        self.assertEqual(names, {"a", "b"})
+        for skill in result:
+            self.assertTrue(skill.is_flat())
 
     def test_ignores_regular_md(self):
         """Flat mode should ignore plain .md files without .skill.md suffix."""
-        flat = self._copy_mock('flat_directory')
+        flat = self._copy_mock("flat_directory")
 
-        strategy = FlatDiscovery(flat, self.target)
+        strategy = FlatDiscovery(flat)
         result = strategy.discover()
 
-        names = {r.skill_name for r in result}
-        self.assertNotIn('ignored', names)
+        names = {r.name for r in result}
+        self.assertNotIn("ignored", names)
 
     def test_empty_directory(self):
-        empty = self._copy_mock('empty_directory') / 'empty'
+        empty = self._copy_mock("empty_directory") / "empty"
 
-        strategy = FlatDiscovery(empty, self.target)
+        strategy = FlatDiscovery(empty)
         result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

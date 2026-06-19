@@ -1,12 +1,33 @@
 """Tests for LinkUpdater adapter."""
 
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater import LinkUpdater
-from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
+from ai_skill_manager.models.skill import Skill
+
+
+def _derive_name(file_path: Path) -> str:
+    if file_path.name.endswith(".skill.md"):
+        return file_path.name[:-9]
+    return file_path.stem
+
+
+def _skill(file_path: Path, folder_path: Path | None = None) -> Skill:
+    """Create a Skill and ensure its markdown file has a frontmatter name."""
+    name = folder_path.name if folder_path else _derive_name(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    original = ""
+    if file_path.exists():
+        original = file_path.read_text()
+        if not original.startswith("---"):
+            original = f"---\nname: {name}\n---\n{original}"
+    else:
+        original = f"---\nname: {name}\n---\n"
+    file_path.write_text(original)
+    return Skill(file_path=file_path, folder_path=folder_path)
 
 
 class TestLinkUpdater(unittest.TestCase):
@@ -22,7 +43,7 @@ class TestLinkUpdater(unittest.TestCase):
         md = self.target / "guide.md"
         md.write_text("# Guide\nNo links here.")
 
-        updater = LinkUpdater([], {}, set())
+        updater = LinkUpdater([], self.target, {}, set())
         updater.adapt(md)
 
         content = md.read_text()
@@ -33,7 +54,7 @@ class TestLinkUpdater(unittest.TestCase):
         md = self.target / "guide.md"
         md.write_text("# Guide\nSee [example](https://example.com).")
 
-        updater = LinkUpdater([], {}, set())
+        updater = LinkUpdater([], self.target, {}, set())
         updater.adapt(md)
 
         content = md.read_text()
@@ -44,7 +65,7 @@ class TestLinkUpdater(unittest.TestCase):
         md = self.target / "guide.md"
         md.write_text("# Guide\nSee [section](#section).")
 
-        updater = LinkUpdater([], {}, set())
+        updater = LinkUpdater([], self.target, {}, set())
         updater.adapt(md)
 
         content = md.read_text()
@@ -55,7 +76,7 @@ class TestLinkUpdater(unittest.TestCase):
         md = self.target / "guide.md"
         md.write_text("# Guide\nSee [root](/etc/passwd).")
 
-        updater = LinkUpdater([], {}, set())
+        updater = LinkUpdater([], self.target, {}, set())
         updater.adapt(md)
 
         content = md.read_text()
@@ -81,9 +102,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir()
         target_other.write_text("# Other")
 
-        # Create mappings
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
-        other_mapping = SkillMapping(source_other, target_other.parent, "other", True)
+        # Create skills
+        guide_skill = _skill(source_guide)
+        other_skill = _skill(source_other)
 
         # Build source_to_target map
         source_to_target = {
@@ -91,7 +112,12 @@ class TestLinkUpdater(unittest.TestCase):
             source_other: target_other,
         }
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, {source_guide, source_other})
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            {source_guide, source_other},
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -123,16 +149,17 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir()
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
-        other_mapping = SkillMapping(source_other, target_other.parent, "other", True)
+        guide_skill = _skill(source_guide)
+        other_skill = _skill(source_other)
 
         source_to_target = {source_guide: target_guide, source_other: target_other}
 
         updater = LinkUpdater(
-            [guide_mapping, other_mapping],
+            [guide_skill, other_skill],
+            self.target,
             source_to_target,
             {source_guide, source_other},
-            dry_run=True
+            dry_run=True,
         )
         updater.adapt(target_guide)
 
@@ -155,9 +182,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [missing](./missing.md).")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
-        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
         # Link stays as-is
@@ -183,9 +210,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [ext](./external.md).")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
-        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
         # Should be recorded as external (file exists but not in source_to_target)
@@ -203,7 +230,7 @@ class TestLinkUpdater(unittest.TestCase):
         md2 = sub / "b.md"
         md2.write_text("# B")
 
-        updater = LinkUpdater([], {}, set())
+        updater = LinkUpdater([], self.target, {}, set())
         updater.adapt_all(self.target)
 
         # Should process both files
@@ -225,11 +252,16 @@ class TestLinkUpdater(unittest.TestCase):
         target_img = self.target / "img.png"
         target_img.write_text("png")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
         source_to_target = {source_guide: target_guide, source_img: target_img}
 
-        updater = LinkUpdater([guide_mapping], source_to_target, {source_guide, source_img})
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            {source_guide, source_img},
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -257,15 +289,20 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir()
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
-        other_mapping = SkillMapping(source_other, target_other.parent, "other", True)
+        guide_skill = _skill(source_guide)
+        other_skill = _skill(source_other)
 
         source_to_target = {
             source_guide: target_guide,
             source_other: target_other,
         }
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, {source_guide, source_other})
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            {source_guide, source_other},
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -292,9 +329,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [ext](./external.md#section).")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
-        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -316,9 +353,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [missing](./missing.md#section).")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
-        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -345,14 +382,19 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True, exist_ok=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide, target_guide.parent, "guide", True)
+        guide_skill = _skill(source_guide)
 
         source_to_target = {
             source_guide: target_guide,
             source_other: target_other,
         }
 
-        updater = LinkUpdater([guide_mapping], source_to_target, {source_guide, source_other})
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            {source_guide, source_other},
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -377,7 +419,7 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True, exist_ok=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_dir, target_guide.parent, "guide", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -385,7 +427,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -413,8 +460,8 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
-        other_mapping = SkillMapping(source_other.parent, target_other.parent, "other", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
+        other_skill = _skill(source_other, source_other.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -422,7 +469,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -450,8 +502,8 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
-        other_mapping = SkillMapping(source_other.parent, target_other.parent, "other", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
+        other_skill = _skill(source_other, source_other.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -459,7 +511,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -486,8 +543,8 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
-        other_mapping = SkillMapping(source_other.parent, target_other.parent, "other", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
+        other_skill = _skill(source_other, source_other.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -495,7 +552,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -523,8 +585,8 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
-        other_mapping = SkillMapping(source_other.parent, target_other.parent, "other", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
+        other_skill = _skill(source_other, source_other.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -532,7 +594,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping, other_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill, other_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -559,12 +626,17 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir(parents=True)
         target_guide.write_text("# Guide\nSee [[common.md]].")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
 
         source_to_target = {source_guide: target_guide}
         all_source_files = {source_guide, source_common1, source_common2}
 
-        updater = LinkUpdater([guide_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -588,9 +660,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_guide.parent.mkdir(parents=True)
         target_guide.write_text("# Guide\nSee [[missing]].")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
 
-        updater = LinkUpdater([guide_mapping], {}, {source_guide})
+        updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -616,7 +688,7 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True, exist_ok=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -624,7 +696,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
@@ -648,7 +725,7 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir(parents=True, exist_ok=True)
         target_other.write_text("# Other")
 
-        guide_mapping = SkillMapping(source_guide.parent, target_guide.parent, "guide", False)
+        guide_skill = _skill(source_guide, source_guide.parent)
 
         source_to_target = {
             source_guide: target_guide,
@@ -656,7 +733,12 @@ class TestLinkUpdater(unittest.TestCase):
         }
         all_source_files = {source_guide, source_other}
 
-        updater = LinkUpdater([guide_mapping], source_to_target, all_source_files)
+        updater = LinkUpdater(
+            [guide_skill],
+            self.target,
+            source_to_target,
+            all_source_files,
+        )
         updater.adapt(target_guide)
 
         content = target_guide.read_text()

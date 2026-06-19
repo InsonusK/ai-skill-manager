@@ -8,15 +8,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_skill_manager.commands.discover.core.github import (
-    GitHubDiscovery,
-    _parse_github_url,
-    _find_extracted_root,
-)
 from ai_skill_manager.core import copy_skill
+from ai_skill_manager.discovery.source.github import (
+    GitHubDiscovery,
+    _find_extracted_root,
+    _parse_github_url,
+)
 
 
-MOCK_DIR = Path(__file__).parent / 'mock' / 'test_github'
+MOCK_DIR = Path(__file__).parent / "mock" / "test_github"
 
 
 def _make_archive_from_mock(mock_name: str, repo_name: str) -> bytes:
@@ -81,7 +81,7 @@ class TestGitHubDiscovery(unittest.TestCase):
             return path
 
         return patch(
-            "ai_skill_manager.commands.discover.core.github._download_archive",
+            "ai_skill_manager.discovery.source.github._download_archive",
             side_effect=fake_download,
         )
 
@@ -91,14 +91,13 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
+        names = {r.name for r in result}
         self.assertEqual(names, {"guide", "tips"})
 
     def test_discover_directory_skills(self):
@@ -107,15 +106,14 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "web")
-        self.assertFalse(result[0].is_flat)
+        self.assertEqual(result[0].name, "web")
+        self.assertFalse(result[0].is_flat())
 
     def test_missing_subpath_returns_empty(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -123,7 +121,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="missing",
             )
@@ -137,7 +134,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 subpath="skills",
             )
             result = strategy.discover()
@@ -150,7 +146,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
             )
             result = strategy.discover()
@@ -163,7 +158,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "git@github.com:owner/repo.git",
-                self.target,
                 tree="main",
                 subpath="skills",
             )
@@ -177,23 +171,22 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        mapping = result[0]
-        self.assertEqual(mapping.skill_name, "web")
-        self.assertFalse(mapping.is_flat)
+        skill = result[0]
+        self.assertEqual(skill.name, "web")
+        self.assertFalse(skill.is_flat())
 
         # The source_path must still exist after discover() returned
-        self.assertTrue(mapping.source_path.exists())
-        self.assertTrue((mapping.source_path / "web.skill.md").exists())
+        self.assertTrue(skill.folder_path.exists())
+        self.assertTrue((skill.folder_path / "web.skill.md").exists())
         self.assertEqual(
-            (mapping.source_path / "web.skill.md").read_text(),
-            "# Web\n",
+            (skill.folder_path / "web.skill.md").read_text(),
+            "---\nname: web\n---\n# Web\n",
         )
 
     def test_discover_and_copy_directory_skill(self):
@@ -203,22 +196,23 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        mapping = result[0]
+        skill = result[0]
 
-        copy_skill(mapping, dry_run=False)
+        from ai_skill_manager.core import _SyncSkill
+        sync_skill = _SyncSkill(skill=skill, target_name=skill.name or "web")
+        copy_skill(sync_skill, self.target, dry_run=False)
 
         # Verify the skill was copied into the target directory
         skill_dir = self.target / "web"
         self.assertTrue(skill_dir.exists())
         self.assertTrue((skill_dir / "SKILL.md").exists())
-        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Web\n")
+        self.assertEqual((skill_dir / "SKILL.md").read_text(), "---\nname: web\n---\n# Web\n")
         self.assertTrue((skill_dir / "extra.md").exists())
         self.assertEqual((skill_dir / "extra.md").read_text(), "# Extra\n")
 
@@ -229,16 +223,15 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills/nested/guide.skill.md",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, "guide")
-        self.assertTrue(result[0].is_flat)
-        self.assertTrue(result[0].source_path.exists())
+        self.assertEqual(result[0].name, "guide")
+        self.assertTrue(result[0].is_flat())
+        self.assertTrue(result[0].file_path.exists())
 
     def test_discover_single_skill_file_copies_correctly(self):
         """End-to-end: discover a single *.skill.md file and copy it as a flat skill."""
@@ -247,23 +240,24 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath="skills/nested/guide.skill.md",
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        mapping = result[0]
-        self.assertEqual(mapping.skill_name, "guide")
-        self.assertTrue(mapping.is_flat)
+        skill = result[0]
+        self.assertEqual(skill.name, "guide")
+        self.assertTrue(skill.is_flat())
 
-        copy_skill(mapping, dry_run=False)
+        from ai_skill_manager.core import _SyncSkill
+        sync_skill = _SyncSkill(skill=skill, target_name=skill.name or "guide")
+        copy_skill(sync_skill, self.target, dry_run=False)
 
         skill_dir = self.target / "guide"
         self.assertTrue(skill_dir.exists())
         self.assertTrue((skill_dir / "SKILL.md").exists())
-        self.assertEqual((skill_dir / "SKILL.md").read_text(), "# Guide\n")
+        self.assertEqual((skill_dir / "SKILL.md").read_text(), "---\nname: guide\n---\n# Guide\n")
 
     def test_discover_multiple_subpaths(self):
         """Multiple subpaths can be provided as a list."""
@@ -272,14 +266,13 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath=["skills", "docs"],
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
+        names = {r.name for r in result}
         self.assertEqual(names, {"web", "guide"})
 
     def test_discover_multiple_subpaths_mixed(self):
@@ -289,18 +282,17 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath=["skills", "docs/quickstart.skill.md"],
             )
             result = strategy.discover()
 
         self.assertEqual(len(result), 2)
-        by_name = {r.skill_name: r for r in result}
+        by_name = {r.name: r for r in result}
         self.assertIn("web", by_name)
-        self.assertFalse(by_name["web"].is_flat)
+        self.assertFalse(by_name["web"].is_flat())
         self.assertIn("quickstart", by_name)
-        self.assertTrue(by_name["quickstart"].is_flat)
+        self.assertTrue(by_name["quickstart"].is_flat())
 
     def test_discover_multiple_subpaths_skips_missing(self):
         """Missing subpaths in a list are skipped rather than failing."""
@@ -309,7 +301,6 @@ class TestGitHubDiscovery(unittest.TestCase):
         with self._mock_download(archive):
             strategy = GitHubDiscovery(
                 "https://github.com/owner/repo",
-                self.target,
                 tree="main",
                 subpath=["missing", "skills"],
             )
