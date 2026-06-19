@@ -6,7 +6,15 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater import LinkUpdater
-from ai_skill_manager.models.skill import Skill
+from ai_skill_manager.adapters.link_updater.base import Context, Link, SkillInfo
+from ai_skill_manager.adapters.link_updater.map import LinkMapError, LinkMapper
+from ai_skill_manager.adapters.link_updater.replace import LinkReplacer
+from ai_skill_manager.adapters.link_updater.rules import (
+    MarkdawnRelativeRule,
+    WikilinkAbsoluteRule,
+    WikilinkRelativeRule,
+)
+from ai_skill_manager.models import LocalSource, Skill
 
 
 def _derive_name(file_path: Path) -> str:
@@ -27,7 +35,11 @@ def _skill(file_path: Path, folder_path: Path | None = None) -> Skill:
     else:
         original = f"---\nname: {name}\n---\n"
     file_path.write_text(original)
-    return Skill(file_path=file_path, folder_path=folder_path)
+    return Skill(
+        file_path=file_path,
+        folder_path=folder_path,
+        source=LocalSource(folder_path if folder_path else file_path.parent),
+    )
 
 
 class TestLinkUpdater(unittest.TestCase):
@@ -72,7 +84,8 @@ class TestLinkUpdater(unittest.TestCase):
         self.assertIn("#section", content)
         self.assertEqual(len(updater.fixes), 0)
 
-    def test_absolute_link_unchanged(self):
+    def test_absolute_markdown_link_is_broken(self):
+        """Absolute Markdown paths are not a supported link format."""
         md = self.target / "guide.md"
         md.write_text("# Guide\nSee [root](/etc/passwd).")
 
@@ -81,11 +94,12 @@ class TestLinkUpdater(unittest.TestCase):
 
         content = md.read_text()
         self.assertIn("/etc/passwd", content)
-        self.assertEqual(len(updater.fixes), 0)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
+        self.assertIn("no matching rule", broken[0]["reason"])
 
     def test_fix_managed_link_cross_skill(self):
         """Link to a file in another skill becomes a skill link."""
-        # Setup source structure
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
         source_guide = source_dir / "guide.md"
@@ -93,7 +107,6 @@ class TestLinkUpdater(unittest.TestCase):
         source_other = source_dir / "other.md"
         source_other.write_text("# Other")
 
-        # Setup target structure (simulating copied files)
         target_guide = self.target / "guide" / "SKILL.md"
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [other](./other.md).")
@@ -102,11 +115,9 @@ class TestLinkUpdater(unittest.TestCase):
         target_other.parent.mkdir()
         target_other.write_text("# Other")
 
-        # Create skills
         guide_skill = _skill(source_guide)
         other_skill = _skill(source_other)
 
-        # Build source_to_target map
         source_to_target = {
             source_guide: target_guide,
             source_other: target_other,
@@ -122,17 +133,14 @@ class TestLinkUpdater(unittest.TestCase):
 
         content = target_guide.read_text()
         self.assertNotIn("./other.md", content)
-        # Should be converted to skill link format
-        self.assertIn("[other](other|uid:", content)
+        self.assertIn("[other](skill: other)", content)
 
-        # Check fix recorded
         fixes = [f for f in updater.fixes if f["status"] == "fixed"]
         self.assertEqual(len(fixes), 1)
         self.assertEqual(fixes[0]["old"], "[other](./other.md)")
 
     def test_dry_run_no_changes(self):
         """Dry run should not modify files but record fixes."""
-        # Setup source
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
         source_guide = source_dir / "guide.md"
@@ -140,7 +148,6 @@ class TestLinkUpdater(unittest.TestCase):
         source_other = source_dir / "other.md"
         source_other.write_text("# Other")
 
-        # Setup target
         target_guide = self.target / "guide" / "SKILL.md"
         target_guide.parent.mkdir()
         target_guide.write_text("# Guide\nSee [other](./other.md).")
@@ -163,11 +170,9 @@ class TestLinkUpdater(unittest.TestCase):
         )
         updater.adapt(target_guide)
 
-        # File should be unchanged
         content = target_guide.read_text()
         self.assertIn("./other.md", content)
 
-        # But fix should be recorded
         self.assertEqual(len(updater.fixes), 1)
         self.assertEqual(updater.fixes[0]["status"], "fixed")
 
@@ -187,22 +192,19 @@ class TestLinkUpdater(unittest.TestCase):
         updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
-        # Link stays as-is
         content = target_guide.read_text()
         self.assertIn("./missing.md", content)
 
-        # But recorded as broken
         broken = [f for f in updater.fixes if f["status"] == "broken"]
         self.assertEqual(len(broken), 1)
 
-    def test_external_existing_file(self):
-        """Link to existing file outside sources is external."""
+    def test_external_existing_file_is_broken(self):
+        """Links to files outside managed skills are forbidden."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
         source_guide = source_dir / "guide.md"
         source_guide.write_text("# Guide\nSee [ext](./external.md).")
 
-        # External file exists in source dir but not in our map
         external = source_dir / "external.md"
         external.write_text("# External")
 
@@ -215,9 +217,11 @@ class TestLinkUpdater(unittest.TestCase):
         updater = LinkUpdater([guide_skill], self.target, {}, {source_guide})
         updater.adapt(target_guide)
 
-        # Should be recorded as external (file exists but not in source_to_target)
-        ext = [f for f in updater.fixes if f["status"] == "external"]
-        self.assertEqual(len(ext), 1)
+        content = target_guide.read_text()
+        self.assertIn("./external.md", content)
+
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
 
     def test_adapt_all_recursive(self):
         """adapt_all processes all .md files recursively."""
@@ -233,11 +237,10 @@ class TestLinkUpdater(unittest.TestCase):
         updater = LinkUpdater([], self.target, {}, set())
         updater.adapt_all(self.target)
 
-        # Should process both files
-        self.assertEqual(len(updater.fixes), 0)  # No links to fix
+        self.assertEqual(len(updater.fixes), 0)
 
     def test_image_link(self):
-        """Image links should also be processed."""
+        """Image links are rewritten to relative target paths."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
         source_guide = source_dir / "guide.md"
@@ -265,11 +268,8 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        # Check that the old relative link is gone and new one is present
-        # Use regex-like check to ensure it's a proper link, not substring
         self.assertNotIn("](./img.png)", content)
         self.assertIn("](../img.png)", content)
-        # Ensure image marker is preserved
         self.assertIn("![img](", content)
 
     def test_link_with_fragment_cross_skill(self):
@@ -307,16 +307,14 @@ class TestLinkUpdater(unittest.TestCase):
 
         content = target_guide.read_text()
         self.assertNotIn("./other.md#section", content)
-        # Should be skill link with fragment
-        self.assertIn("[other](other|uid:", content)
-        self.assertIn("|#section)", content)
+        self.assertIn("[other](skill: other#section)", content)
 
         fixes = [f for f in updater.fixes if f["status"] == "fixed"]
         self.assertEqual(len(fixes), 1)
         self.assertEqual(fixes[0]["old"], "[other](./other.md#section)")
 
-    def test_external_link_with_fragment(self):
-        """External links with fragments should preserve the fragment and be marked external."""
+    def test_external_link_with_fragment_is_broken(self):
+        """External file links with fragments are forbidden."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
         source_guide = source_dir / "guide.md"
@@ -335,12 +333,10 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        # External links point back to source; fragment is preserved
-        self.assertIn("../../source/external.md#section", content)
+        self.assertIn("./external.md#section", content)
 
-        ext = [f for f in updater.fixes if f["status"] == "external"]
-        self.assertEqual(len(ext), 1)
-        self.assertEqual(ext[0]["new"], "[ext](../../source/external.md#section)")
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
 
     def test_broken_link_with_fragment(self):
         """Broken links with fragments should still be reported as broken."""
@@ -363,7 +359,7 @@ class TestLinkUpdater(unittest.TestCase):
 
         broken = [f for f in updater.fixes if f["status"] == "broken"]
         self.assertEqual(len(broken), 1)
-        self.assertEqual(broken[0]["reason"], "target file does not exist")
+        self.assertIn("target file does not exist", broken[0]["reason"])
 
     def test_markdown_link_same_skill(self):
         """Markdown link within same skill stays relative."""
@@ -398,12 +394,11 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        # Same skill - relative path updated but not skill link
         self.assertNotIn("./other.md", content)
         self.assertIn("[other](other.md)", content)
 
-    def test_wiki_link_by_name_same_skill(self):
-        """Wiki link by name within same skill becomes relative markdown."""
+    def test_wiki_link_by_name_same_skill_is_broken(self):
+        """Plain wiki links by file name are forbidden."""
         source_dir = self.tmpdir / "source" / "guide"
         source_dir.mkdir(parents=True)
         source_guide = source_dir / "SKILL.md"
@@ -436,11 +431,13 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[other]]", content)
-        self.assertIn("[other](other.md)", content)
+        self.assertIn("[[other]]", content)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
+        self.assertIn("no matching rule", broken[0]["reason"])
 
-    def test_wiki_link_by_name_cross_skill(self):
-        """Wiki link by name to another skill becomes skill link."""
+    def test_wiki_link_by_name_cross_skill_is_broken(self):
+        """Plain wiki links to another skill are forbidden."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
 
@@ -478,11 +475,12 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[other]]", content)
-        self.assertIn("[other](other|uid:", content)
+        self.assertIn("[[other]]", content)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
 
-    def test_wiki_link_with_header_and_custom_text(self):
-        """Wiki link with header and custom text produces correct skill link."""
+    def test_wiki_link_with_header_and_custom_text_is_broken(self):
+        """Plain wiki links with headers/custom text are still forbidden."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
 
@@ -520,9 +518,9 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[other#section|Custom Name]]", content)
-        self.assertIn("[Custom Name](other|uid:", content)
-        self.assertIn("|#section)", content)
+        self.assertIn("[[other#section|Custom Name]]", content)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
 
     def test_wiki_link_by_relative_path(self):
         """Wiki link with relative path resolves correctly."""
@@ -562,10 +560,10 @@ class TestLinkUpdater(unittest.TestCase):
 
         content = target_guide.read_text()
         self.assertNotIn("[[../other/SKILL.md]]", content)
-        self.assertIn("[SKILL.md](other|uid:", content)
+        self.assertIn("[SKILL.md](skill: other)", content)
 
     def test_wiki_link_by_absolute_path(self):
-        """Wiki link with absolute path resolves correctly."""
+        """Wiki link with absolute path from repo root resolves correctly."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
 
@@ -575,11 +573,11 @@ class TestLinkUpdater(unittest.TestCase):
 
         source_guide = source_dir / "guide" / "SKILL.md"
         source_guide.parent.mkdir(parents=True)
-        source_guide.write_text("# Guide\nSee [[{}]].".format(source_other))
+        source_guide.write_text("# Guide\nSee [[other/SKILL.md]].")
 
         target_guide = self.target / "guide" / "SKILL.md"
         target_guide.parent.mkdir(parents=True)
-        target_guide.write_text("# Guide\nSee [[{}]].".format(source_other))
+        target_guide.write_text("# Guide\nSee [[other/SKILL.md]].")
 
         target_other = self.target / "other" / "SKILL.md"
         target_other.parent.mkdir(parents=True)
@@ -603,11 +601,11 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[{}]]".format(source_other), content)
-        self.assertIn("[SKILL.md](other|uid:", content)
+        self.assertNotIn("[[other/SKILL.md]]", content)
+        self.assertIn("[SKILL.md](skill: other)", content)
 
-    def test_wiki_link_ambiguous_name(self):
-        """Wiki link by name matching multiple files is left unchanged and warned."""
+    def test_wiki_link_ambiguous_name_is_broken(self):
+        """Plain wiki links matching multiple files are forbidden."""
         source_dir = self.tmpdir / "source"
         source_dir.mkdir()
 
@@ -640,12 +638,11 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        # Ambiguous link should remain unchanged
         self.assertIn("[[common.md]]", content)
 
         broken = [f for f in updater.fixes if f["status"] == "broken"]
         self.assertEqual(len(broken), 1)
-        self.assertIn("target file does not exist", broken[0]["reason"])
+        self.assertIn("no matching rule", broken[0]["reason"])
 
     def test_wiki_link_broken(self):
         """Wiki link to non-existent file is marked broken."""
@@ -671,8 +668,8 @@ class TestLinkUpdater(unittest.TestCase):
         broken = [f for f in updater.fixes if f["status"] == "broken"]
         self.assertEqual(len(broken), 1)
 
-    def test_wiki_link_same_skill_with_header(self):
-        """Wiki link with header within same skill preserves header in relative link."""
+    def test_wiki_link_same_skill_with_header_is_broken(self):
+        """Plain wiki links with headers within same skill are forbidden."""
         source_dir = self.tmpdir / "source" / "guide"
         source_dir.mkdir(parents=True)
         source_guide = source_dir / "SKILL.md"
@@ -705,11 +702,12 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[other#section]]", content)
-        self.assertIn("[other](other.md#section)", content)
+        self.assertIn("[[other#section]]", content)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
 
-    def test_wiki_link_by_name_with_custom_text_same_skill(self):
-        """Wiki link with custom text within same skill uses custom text."""
+    def test_wiki_link_by_name_with_custom_text_same_skill_is_broken(self):
+        """Plain wiki links with custom text are forbidden."""
         source_dir = self.tmpdir / "source" / "guide"
         source_dir.mkdir(parents=True)
         source_guide = source_dir / "SKILL.md"
@@ -742,8 +740,123 @@ class TestLinkUpdater(unittest.TestCase):
         updater.adapt(target_guide)
 
         content = target_guide.read_text()
-        self.assertNotIn("[[other|My Other File]]", content)
-        self.assertIn("[My Other File](other.md)", content)
+        self.assertIn("[[other|My Other File]]", content)
+        broken = [f for f in updater.fixes if f["status"] == "broken"]
+        self.assertEqual(len(broken), 1)
+
+
+class TestLinkMapper(unittest.TestCase):
+    def test_single_matching_rule(self):
+        mapper = LinkMapper()
+        link = Link(full="[text](./file.md)", kind="markdown", text="text", target="./file.md", fragment="", is_image=False)
+        context = Context(
+            filepath=Path("/tmp/guide/SKILL.md"),
+            file_skill=None,
+            repo_root=Path("/tmp"),
+            skills={},
+            source_to_target={},
+            target_to_source={},
+            all_source_files=set(),
+            target_to_skill={},
+            source_to_skill={},
+        )
+        with self.assertRaises(RuntimeError):
+            # Matching rule exists but target is not resolved
+            mapper.map(link, context)
+
+    def test_no_matching_rule_raises(self):
+        mapper = LinkMapper()
+        link = Link(full="[[plain]]", kind="wiki", text="plain", target="plain", fragment="", is_image=False)
+        context = Context(
+            filepath=Path("/tmp/guide/SKILL.md"),
+            file_skill=None,
+            repo_root=Path("/tmp"),
+            skills={},
+            source_to_target={},
+            target_to_source={},
+            all_source_files=set(),
+            target_to_skill={},
+            source_to_skill={},
+        )
+        with self.assertRaises(LinkMapError) as cm:
+            mapper.map(link, context)
+        self.assertIn("no matching rule", str(cm.exception))
+
+    def test_multiple_matching_rules_raises(self):
+        class FakeRule:
+            def match(self, link):
+                return True
+            def apply(self, link, context):
+                return ""
+        mapper = LinkMapper(rules=[FakeRule(), FakeRule()])
+        link = Link(full="[text](./file.md)", kind="markdown", text="text", target="./file.md", fragment="", is_image=False)
+        context = Context(
+            filepath=Path("/tmp/guide/SKILL.md"),
+            file_skill=None,
+            repo_root=Path("/tmp"),
+            skills={},
+            source_to_target={},
+            target_to_source={},
+            all_source_files=set(),
+            target_to_skill={},
+            source_to_skill={},
+        )
+        with self.assertRaises(LinkMapError) as cm:
+            mapper.map(link, context)
+        self.assertIn("ambiguous", str(cm.exception))
+
+
+class TestLinkReplacer(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_creates_copy_and_returns_path(self):
+        md = self.tmpdir / "guide.md"
+        md.write_text("# Guide\nSee [other](./other.md).")
+
+        replacer = LinkReplacer()
+        context = Context(
+            filepath=md,
+            file_skill=None,
+            repo_root=self.tmpdir,
+            skills={},
+            source_to_target={},
+            target_to_source={},
+            all_source_files=set(),
+            target_to_skill={},
+            source_to_skill={},
+        )
+        result = replacer.replace(md, context)
+
+        self.assertTrue(result.new_path.exists())
+        self.assertNotEqual(result.new_path, md)
+        self.assertIn("./other.md", result.new_path.read_text())
+        self.assertEqual(len(result.fixes), 1)
+        self.assertEqual(result.fixes[0]["status"], "broken")
+
+    def test_skips_external_links(self):
+        md = self.tmpdir / "guide.md"
+        md.write_text("# Guide\nSee [example](https://example.com).")
+
+        replacer = LinkReplacer()
+        context = Context(
+            filepath=md,
+            file_skill=None,
+            repo_root=self.tmpdir,
+            skills={},
+            source_to_target={},
+            target_to_source={},
+            all_source_files=set(),
+            target_to_skill={},
+            source_to_skill={},
+        )
+        result = replacer.replace(md, context)
+
+        self.assertIn("https://example.com", result.new_path.read_text())
+        self.assertEqual(len(result.fixes), 0)
 
 
 if __name__ == "__main__":

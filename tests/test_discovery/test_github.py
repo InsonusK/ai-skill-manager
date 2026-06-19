@@ -14,6 +14,7 @@ from ai_skill_manager.discovery.source.github import (
     _find_extracted_root,
     _parse_github_url,
 )
+from ai_skill_manager.models import GitHubSource
 
 
 MOCK_DIR = Path(__file__).parent / "mock" / "test_github"
@@ -99,6 +100,24 @@ class TestGitHubDiscovery(unittest.TestCase):
         self.assertEqual(len(result), 2)
         names = {r.name for r in result}
         self.assertEqual(names, {"guide", "tips"})
+
+    def test_discover_attaches_github_source(self):
+        archive = _make_archive_from_mock("discover_flat_files", "repo-main")
+
+        with self._mock_download(archive):
+            strategy = GitHubDiscovery(
+                "https://github.com/owner/repo",
+                tree="main",
+                subpath="skills",
+            )
+            result = strategy.discover()
+
+        self.assertEqual(len(result), 2)
+        for skill in result:
+            self.assertIsInstance(skill.source, GitHubSource)
+            self.assertEqual(skill.source.repo_url, "https://github.com/owner/repo")
+            self.assertEqual(skill.source.tree, "main")
+            self.assertEqual(skill.source.subpath, "skills")
 
     def test_discover_directory_skills(self):
         archive = _make_archive_from_mock("discover_directory_skills", "repo-main")

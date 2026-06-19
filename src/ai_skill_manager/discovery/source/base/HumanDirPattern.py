@@ -6,7 +6,7 @@
 from pathlib import Path
 from typing import Optional
 
-from ....models import Skill, SkillFormat
+from ....models import Skill, SkillFormat, Source
 from .SkillPattern import SkillPattern
 
 
@@ -20,13 +20,17 @@ class HumanDirPattern(SkillPattern):
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanDir
 
-    def match(self, path: Path) -> Optional[Skill]:
+    def match(
+        self, path: Path, source: Source
+    ) -> Optional[Skill]:
         """Match a directory containing ``{dir_name}.skill.md``.
 
         Сопоставить директорию, содержащую ``{dir_name}.skill.md``.
 
         Args:
             path: Path to check. / Путь для проверки.
+            source: Source metadata to attach to the skill. /
+                Метаданные источника для навыка.
 
         Returns:
             Directory :class:`Skill` if matched, otherwise ``None``. /
@@ -45,5 +49,6 @@ class HumanDirPattern(SkillPattern):
                 file_path=skill_md,
                 folder_path=path,
                 format=self.skill_format,
+                source=source,
             )
         return None

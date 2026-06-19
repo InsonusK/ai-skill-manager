@@ -5,12 +5,14 @@ from typing import Optional
 import yaml
 
 from .skill_format import SkillFormat
+from .source import Source
 
 
 @dataclass(frozen=True)
 class Skill:
     file_path: Path
     folder_path: Path | None
+    source: Source
     format: SkillFormat | None = None
 
     def is_flat(self) -> bool:

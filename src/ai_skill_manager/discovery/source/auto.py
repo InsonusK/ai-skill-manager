@@ -18,9 +18,10 @@ Directory patterns (detected on directories):
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from ...models import Skill
+from ...models import Skill, Source
+from ...models.source import LocalSource
 from .base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
 from .DiscoveryStrategy import DiscoveryStrategy
 
@@ -38,6 +39,22 @@ class AutoDiscovery(DiscoveryStrategy):
     # Directory patterns are applied to the directory itself.
     # Директориальные паттерны применяются к самой директории.
     _DIR_PATTERNS: List[SkillPattern] = [AgentPattern(), HumanDirPattern()]
+
+    def __init__(
+        self, source_path: Path, source: Optional[Source] = None
+    ):
+        """Initialize auto-discovery.
+
+        Инициализировать автообнаружение.
+
+        Args:
+            source_path: Path to scan. / Путь для сканирования.
+            source: Optional source metadata; defaults to a LocalSource for
+                ``source_path``. / Опциональные метаданные источника; по
+                умолчанию LocalSource для ``source_path``.
+        """
+        super().__init__(source_path)
+        self._source = source if source is not None else LocalSource(self.source_path)
 
     def discover(self) -> List[Skill]:
         """Recursively discover all skills at the source path.
@@ -75,7 +92,7 @@ class AutoDiscovery(DiscoveryStrategy):
         return [
             skill
             for pattern in self._FLAT_PATTERNS
-            if (skill := pattern.match(path)) is not None
+            if (skill := pattern.match(path, self._source)) is not None
         ]
 
     def _match_directory_patterns(self, path: Path) -> List[Skill]:
@@ -92,7 +109,7 @@ class AutoDiscovery(DiscoveryStrategy):
         return [
             skill
             for pattern in self._DIR_PATTERNS
-            if (skill := pattern.match(path)) is not None
+            if (skill := pattern.match(path, self._source)) is not None
         ]
 
     def _handle_file(self, filepath: Path) -> List[Skill]:
@@ -237,7 +254,7 @@ class AutoDiscovery(DiscoveryStrategy):
                 # Any flat file other than the main file is a nested skill.
                 # Любой плоский файл, кроме основного, является вложенным навыком.
                 for pattern in self._FLAT_PATTERNS:
-                    if pattern.match(path) is not None:
+                    if pattern.match(path, self._source) is not None:
                         if path.resolve() != main_file_resolved:
                             raise ValueError(
                                 f"Nested skills detected in directory skill: {directory}"

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ....models import Skill, SkillFormat
+from ....models import Skill, SkillFormat, Source
 
 
 class SkillPattern(ABC):
@@ -35,13 +35,17 @@ class SkillPattern(ABC):
         ...
 
     @abstractmethod
-    def match(self, path: Path) -> Optional[Skill]:
+    def match(
+        self, path: Path, source: Source
+    ) -> Optional[Skill]:
         """Return a Skill if the path matches this pattern.
 
         Вернуть Skill, если путь соответствует этому паттерну.
 
         Args:
             path: Filesystem path to check. / Путь файловой системы для проверки.
+            source: Source metadata to attach to the skill. /
+                Метаданные источника для навыка.
 
         Returns:
             A :class:`Skill` instance if matched, otherwise ``None``. /

@@ -2,10 +2,9 @@
 
 import logging
 import os
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Dict, Literal, Optional
 
 import yaml
 
@@ -25,12 +24,12 @@ class SkillInfo:
     is_flat: bool
 
 
-@dataclass
+@dataclass(frozen=True)
 class Link:
     """Represents a parsed link found in markdown content."""
 
-    full_match: str
-    link_type: Literal["markdown", "wiki"]
+    full: str
+    kind: Literal["markdown", "wiki"]
     text: str
     target: str
     fragment: str
@@ -38,16 +37,18 @@ class Link:
 
 
 @dataclass
-class AdaptContext:
-    """Context passed to link adapters during adaptation."""
+class Context:
+    """Context passed to link rules during adaptation."""
 
     filepath: Path
     file_skill: Optional[SkillInfo]
+    repo_root: Path
+    skills: Dict[str, SkillInfo]
     source_to_target: Dict[Path, Path]
+    target_to_source: Dict[Path, Path]
     all_source_files: set[Path]
     target_to_skill: Dict[Path, SkillInfo]
     source_to_skill: Dict[Path, SkillInfo]
-    skills: Dict[str, SkillInfo]
 
 
 @dataclass
@@ -58,25 +59,12 @@ class AdaptResult:
     status: str = "fixed"
 
 
-class LinkTypeAdapter(ABC):
-    """Base class for concrete link type adapters."""
+@dataclass
+class ReplaceResult:
+    """Result of replacing links in a file."""
 
-    @abstractmethod
-    def is_match(self, link: Link) -> bool:
-        """Check if this adapter can handle the given link.
-
-        Returns True if the link belongs to this adapter's domain.
-        """
-        pass
-
-    @abstractmethod
-    def adapt(self, link: Link, context: AdaptContext) -> Optional[AdaptResult]:
-        """Adapt the link to the target format.
-
-        Returns AdaptResult on success, or None if the link is broken
-        and should be left unchanged.
-        """
-        pass
+    new_path: Path
+    fixes: list[dict]
 
 
 def parse_skill_info(skill: Skill, target_name: Optional[str] = None) -> Optional[SkillInfo]:
@@ -122,59 +110,38 @@ def parse_skill_info(skill: Skill, target_name: Optional[str] = None) -> Optiona
     )
 
 
-def find_source_dir_for_file(
-    filepath: Path,
-    file_skill: Optional[SkillInfo],
-    skills: Dict[str, SkillInfo],
-) -> Optional[Path]:
-    """Determine the source directory corresponding to a target file."""
-    if not file_skill:
-        return None
+def resolve_target(path: Path, context: Context) -> Optional[Path]:
+    """Resolve a path to a managed target file.
 
-    skill = skills.get(file_skill.name)
-    if not skill:
-        return None
+    Tries the path as-is, with a ``.md`` extension, and as a directory
+    containing ``SKILL.md``.
+    """
+    normalized = path.resolve()
+    candidates = [normalized]
+    if not normalized.suffix:
+        candidates.append(Path(str(normalized) + ".md"))
+    if not normalized.suffix or normalized.is_dir():
+        candidates.append(normalized / "SKILL.md")
 
-    source_dir = skill.source_path.parent
-    if skill.is_flat:
-        return source_dir
-    else:
-        try:
-            rel = filepath.relative_to(skill.target_path)
-            return source_dir / rel.parent
-        except ValueError:
-            return source_dir
+    for candidate in candidates:
+        for src_file, target_file in context.source_to_target.items():
+            if src_file.resolve() == candidate:
+                return target_file
+            if target_file.resolve() == candidate:
+                return target_file
+    return None
 
 
-def format_managed_link(
-    target_file: Path,
-    text: str,
-    fragment: str,
-    is_image: bool,
-    context: AdaptContext,
-) -> Optional[AdaptResult]:
-    """Format a link to a managed (known) target file."""
+def format_link(link: Link, target_file: Path, context: Context) -> str:
+    """Format a link to a managed target file."""
     target_skill = context.target_to_skill.get(target_file)
-    prefix = "!" if is_image else ""
+    prefix = "!" if link.is_image else ""
 
-    if target_skill and target_skill != context.file_skill and not is_image:
-        # Cross-skill link -> skill link format
-        header = fragment.lstrip("#")
-        if header:
-            link_url = f"{target_skill.name}|uid: {target_skill.uid}|#{header}"
-        else:
-            link_url = f"{target_skill.name}|uid: {target_skill.uid}"
-        return AdaptResult(
-            text=f"{prefix}[{text}]({link_url})",
-            status="fixed",
-        )
-    else:
-        # Same skill or image -> relative path
-        try:
-            rel = os.path.relpath(target_file, context.filepath.parent).replace(os.sep, "/")
-            return AdaptResult(
-                text=f"{prefix}[{text}]({rel}{fragment})",
-                status="fixed",
-            )
-        except ValueError:
-            return None
+    if target_skill and target_skill != context.file_skill and not link.is_image:
+        url = f"skill: {target_skill.name}"
+        if link.fragment:
+            url += link.fragment
+        return f"{prefix}[{link.text}]({url})"
+
+    rel = os.path.relpath(target_file, context.filepath.parent).replace(os.sep, "/")
+    return f"{prefix}[{link.text}]({rel}{link.fragment})"

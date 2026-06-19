@@ -7,9 +7,11 @@ for console output.
 для вывода в консоль.
 """
 
+from pathlib import Path
 from typing import List
 
 from ...models.skill import Skill
+from ...models.source import LocalSource
 
 
 def format_skills(skills: List[Skill]) -> str:
@@ -23,7 +25,11 @@ def format_skills(skills: List[Skill]) -> str:
         / Нумерованная многострочная строка или сообщение об отсутствии навыков.
 
     Example:
-        >>> format_skills([Skill(file_path=Path("guide.skill.md"), folder_path=None)])
+        >>> format_skills([Skill(
+        ...     file_path=Path("guide.skill.md"),
+        ...     folder_path=None,
+        ...     source=LocalSource(Path(".")),
+        ... )])
         '1. guide | flat | guide.skill.md\n    File: ...'
     """
     if not skills:

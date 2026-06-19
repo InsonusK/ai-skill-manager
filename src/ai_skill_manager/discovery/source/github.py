@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from ...models import Skill
+from ...models.source import GitHubSource
 from .auto import AutoDiscovery
 from .DiscoveryStrategy import DiscoveryStrategy
 
@@ -200,7 +201,14 @@ class GitHubDiscovery(DiscoveryStrategy):
 
                 # Delegate actual discovery to AutoDiscovery for each subpath.
                 # Делегируем непосредственное обнаружение AutoDiscovery для каждого подпути.
-                all_skills.extend(AutoDiscovery(scan_path).discover())
+                github_source = GitHubSource(
+                    repo_url=self.repo_url,
+                    tree=self.tree,
+                    subpath=sp,
+                )
+                all_skills.extend(
+                    AutoDiscovery(scan_path, source=github_source).discover()
+                )
 
             return all_skills
         finally:

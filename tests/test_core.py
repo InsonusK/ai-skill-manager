@@ -16,7 +16,7 @@ from ai_skill_manager.core import (
     collect_source_files,
     copy_skill,
 )
-from ai_skill_manager.models.skill import Skill
+from ai_skill_manager.models import LocalSource, Skill
 from ai_skill_manager.utils import is_managed
 
 
@@ -39,7 +39,11 @@ def _skill(file_path: Path, folder_path: Path | None = None) -> Skill:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         name = folder_path.name if folder_path else file_path.name[:-9]
         file_path.write_text(f"---\nname: {name}\n---\n")
-    return Skill(file_path=file_path, folder_path=folder_path)
+    return Skill(
+        file_path=file_path,
+        folder_path=folder_path,
+        source=LocalSource(file_path.parent),
+    )
 
 
 class TestBuildSourceToTargetMap(unittest.TestCase):
