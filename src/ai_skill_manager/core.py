@@ -2,130 +2,152 @@
 
 import hashlib
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from .commands.discover.api import STRATEGIES
-
-from .config import load_config
-from .commands.discover.models.skill_mapping import SkillMapping
-from .commands.discover.core.auto import AutoDiscovery
 from .adapters.link_updater import LinkUpdater
-from .utils import is_managed, tag_managed, compute_hash, read_managed_state, write_managed_state
+from .config import load_config
+from .discovery import Source, discover
+from .models.skill import Skill
+from .utils import compute_hash, is_managed, read_managed_state, tag_managed, write_managed_state
 
-def build_source_to_target_map(mappings: List[SkillMapping]) -> Dict[Path, Path]:
+
+@dataclass
+class _SyncSkill:
+    """Internal wrapper pairing a discovered Skill with its target name."""
+
+    skill: Skill
+    target_name: str
+
+
+def build_source_to_target_map(
+    sync_skills: List[_SyncSkill], target_dir: Path
+) -> Dict[Path, Path]:
     """Build map from source file path to target file path."""
     result = {}
-    for mapping in mappings:
-        if mapping.is_flat:
-            result[mapping.source_path] = mapping.target_path / 'SKILL.md'
+    for sync_skill in sync_skills:
+        skill = sync_skill.skill
+        skill_target_dir = target_dir / sync_skill.target_name
+        if skill.is_flat():
+            result[skill.file_path] = skill_target_dir / "SKILL.md"
         else:
-            skill_md = mapping.source_skill_md
-            for src_file in mapping.source_path.rglob('*'):
+            source_dir = skill.folder_path
+            skill_md = skill.file_path
+            for src_file in source_dir.rglob("*"):
                 if src_file.is_file():
-                    rel = src_file.relative_to(mapping.source_path)
-                    # The main skill markdown may be renamed to SKILL.md on copy.
-                    if skill_md is not None and src_file == skill_md.resolve():
-                        result[src_file] = mapping.target_path / 'SKILL.md'
+                    rel = src_file.relative_to(source_dir)
+                    if src_file == skill_md.resolve():
+                        result[src_file] = skill_target_dir / "SKILL.md"
                     else:
-                        result[src_file] = mapping.target_path / rel
+                        result[src_file] = skill_target_dir / rel
     return result
 
 
-def collect_source_files(mappings: List[SkillMapping]) -> set:
+def collect_source_files(sync_skills: List[_SyncSkill]) -> set:
     """Collect all source file paths."""
     files = set()
-    for mapping in mappings:
-        if mapping.is_flat:
-            files.add(mapping.source_path)
+    for sync_skill in sync_skills:
+        skill = sync_skill.skill
+        if skill.is_flat():
+            files.add(skill.file_path)
         else:
-            files.update(mapping.source_path.rglob('*'))
+            files.update(skill.folder_path.rglob("*"))
     return {p for p in files if p.is_file()}
 
 
-def compute_skill_hash(mapping: SkillMapping) -> str:
+def compute_skill_hash(sync_skill: _SyncSkill) -> str:
     """Compute hash of a skill source."""
-    if mapping.is_flat:
-        return compute_hash(mapping.source_path)
+    skill = sync_skill.skill
+    if skill.is_flat():
+        return compute_hash(skill.file_path)
     h = hashlib.sha256()
-    for file_path in sorted(mapping.source_path.rglob('*')):
+    for file_path in sorted(skill.folder_path.rglob("*")):
         if file_path.is_file():
-            rel = str(file_path.relative_to(mapping.source_path))
+            rel = str(file_path.relative_to(skill.folder_path))
             h.update(rel.encode())
             h.update(compute_hash(file_path).encode())
     return h.hexdigest()
 
 
-def _copy_directory_skill(mapping: SkillMapping) -> None:
+def _copy_directory_skill(sync_skill: _SyncSkill, target_dir: Path) -> None:
     """Copy a directory skill, renaming the source skill markdown to SKILL.md."""
-    source_dir = mapping.source_path
-    target_dir = mapping.target_path
-    skill_md = mapping.source_skill_md
+    source_dir = sync_skill.skill.folder_path
+    target_dir = target_dir / sync_skill.target_name
+    skill_md = sync_skill.skill.file_path
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    for src_file in sorted(source_dir.rglob('*')):
+    for src_file in sorted(source_dir.rglob("*")):
         if not src_file.is_file():
             continue
         rel = src_file.relative_to(source_dir)
-        if skill_md is not None and src_file == skill_md.resolve():
-            dst = target_dir / 'SKILL.md'
+        if src_file == skill_md.resolve():
+            dst = target_dir / "SKILL.md"
         else:
             dst = target_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_file, dst)
 
 
-def copy_skill(mapping: SkillMapping, dry_run: bool, adapters: Optional[List] = None) -> None:
+def copy_skill(
+    sync_skill: _SyncSkill, target_dir: Path, dry_run: bool, adapters: Optional[List] = None
+) -> None:
     """Copy a skill from source to target."""
     if dry_run:
         return
 
-    if mapping.target_path.exists():
-        shutil.rmtree(mapping.target_path)
+    skill_target_dir = target_dir / sync_skill.target_name
+    if skill_target_dir.exists():
+        shutil.rmtree(skill_target_dir)
 
-    if mapping.is_flat:
-        mapping.target_path.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(mapping.source_path, mapping.target_path / 'SKILL.md')
+    skill = sync_skill.skill
+    if skill.is_flat():
+        skill_target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(skill.file_path, skill_target_dir / "SKILL.md")
     else:
-        _copy_directory_skill(mapping)
+        _copy_directory_skill(sync_skill, target_dir)
 
-    tag_managed(mapping.target_path)
+    tag_managed(skill_target_dir)
 
     state = {
-        'hash': compute_skill_hash(mapping),
-        'adapters': [
-            {'name': adapter.__class__.__name__, 'version': getattr(adapter, 'version', 1)}
+        "hash": compute_skill_hash(sync_skill),
+        "adapters": [
+            {"name": adapter.__class__.__name__, "version": getattr(adapter, "version", 1)}
             for adapter in (adapters or [])
         ],
     }
-    write_managed_state(mapping.target_path, state)
+    write_managed_state(skill_target_dir, state)
 
 
-def should_copy_skill(mapping: SkillMapping, adapters: List, force: bool = False) -> bool:
+def should_copy_skill(
+    sync_skill: _SyncSkill, target_dir: Path, adapters: List, force: bool = False
+) -> bool:
     """Check if skill needs to be copied based on hash and adapter versions."""
     if force:
         return True
-    if not is_managed(mapping.target_path):
+
+    skill_target_dir = target_dir / sync_skill.target_name
+    if not is_managed(skill_target_dir):
         return True
 
-    state = read_managed_state(mapping.target_path)
+    state = read_managed_state(skill_target_dir)
     if state is None:
         return True
 
-    current_hash = compute_skill_hash(mapping)
-    if state.get('hash') != current_hash:
+    current_hash = compute_skill_hash(sync_skill)
+    if state.get("hash") != current_hash:
         return True
 
     current_adapters = sorted(
         [
-            {'name': adapter.__class__.__name__, 'version': getattr(adapter, 'version', 1)}
+            {"name": adapter.__class__.__name__, "version": getattr(adapter, "version", 1)}
             for adapter in adapters
         ],
-        key=lambda x: x['name'],
+        key=lambda x: x["name"],
     )
     previous_adapters = sorted(
-        state.get('adapters', []),
-        key=lambda x: x.get('name', ''),
+        state.get("adapters", []),
+        key=lambda x: x.get("name", ""),
     )
     if current_adapters != previous_adapters:
         return True
@@ -151,129 +173,131 @@ class SkillSync:
         self,
         config_file: Path,
         target_dir: Optional[Path] = None,
-        on_conflict: str = 'error',
+        on_conflict: str = "error",
         remove_orphans: bool = True,
         dry_run: bool = False,
         force: bool = False,
     ):
         self.config_file = Path(config_file).resolve()
         self.config_dir = self.config_file.parent
-        self.target_dir = target_dir or (self.config_dir / '.agents' / 'skills')
+        self.target_dir = target_dir or (self.config_dir / ".agents" / "skills")
         self.on_conflict = on_conflict
         self.remove_orphans = remove_orphans
         self.dry_run = dry_run
         self.force = force
-        self.mappings: List[SkillMapping] = []
+        self.skills: List[_SyncSkill] = []
 
-    def _resolve_conflicts(self, mappings: List[SkillMapping]) -> List[SkillMapping]:
+    def _resolve_conflicts(self, sync_skills: List[_SyncSkill]) -> List[_SyncSkill]:
         """Handle skill name conflicts."""
-        name_to_mapping: Dict[str, SkillMapping] = {}
+        name_to_sync_skill: Dict[str, _SyncSkill] = {}
 
-        for mapping in mappings:
-            if mapping.skill_name in name_to_mapping:
-                if self.on_conflict == 'error':
-                    existing = name_to_mapping[mapping.skill_name].source_path
+        for sync_skill in sync_skills:
+            target_name = sync_skill.target_name
+            if target_name in name_to_sync_skill:
+                if self.on_conflict == "error":
+                    existing = name_to_sync_skill[target_name].skill.file_path
                     raise ValueError(
-                        f"CONFLICT: Skill '{mapping.skill_name}' from {existing} "
-                        f"and {mapping.source_path}"
+                        f"CONFLICT: Skill '{target_name}' from {existing} "
+                        f"and {sync_skill.skill.file_path}"
                     )
                 # last_wins: overwrite
 
-            name_to_mapping[mapping.skill_name] = mapping
+            name_to_sync_skill[target_name] = sync_skill
 
-        return list(name_to_mapping.values())
+        return list(name_to_sync_skill.values())
 
     def sync(self) -> dict:
         """Run full synchronization."""
         config = load_config(self.config_file)
-        settings = config.get('settings', {})
-        sources = config.get('sources', [])
+        settings = config.get("settings", {})
+        sources = config.get("sources", [])
 
         # Override from config
-        if 'target' in settings and not self.target_dir:
-            self.target_dir = self.config_dir / settings['target']
-        if 'on_conflict' in settings:
-            self.on_conflict = settings['on_conflict']
-        if 'remove_orphans' in settings:
-            self.remove_orphans = settings['remove_orphans']
-        if settings.get('dry_run', False):
+        if "target" in settings and not self.target_dir:
+            self.target_dir = self.config_dir / settings["target"]
+        if "on_conflict" in settings:
+            self.on_conflict = settings["on_conflict"]
+        if "remove_orphans" in settings:
+            self.remove_orphans = settings["remove_orphans"]
+        if settings.get("dry_run", False):
             self.dry_run = True
 
         # Discover skills from all sources
-        all_mappings: List[SkillMapping] = []
-        strategies = []
+        all_sync_skills: List[_SyncSkill] = []
 
-        try:
-            for src in sources:
-                src_type = src.get('type', 'auto')
-                strategy_class = STRATEGIES.get(src_type, AutoDiscovery)
+        for src in sources:
+            src_type = src.get("type", "auto")
+            src_path = src.get("path", "")
+            if src_type != "github":
+                src_path = str(self.config_dir / src_path)
 
-                if src_type == 'github':
-                    repo_url = src.get('path', '')
-                    tree = src.get('tree', 'master')
-                    subpath = src.get('subpath', 'skills')
-                    strategy = strategy_class(
-                        repo_url, self.target_dir, tree=tree, subpath=subpath
+            source = Source(
+                type=src_type,
+                path=src_path,
+                tree=src.get("tree", "master"),
+                subpath=src.get("subpath"),
+            )
+            discovered = discover([source])
+
+            override_name = src.get("name")
+            for skill in discovered:
+                target_name = override_name if override_name is not None else skill.name
+                if target_name is None:
+                    raise ValueError(
+                        f"Skill {skill.file_path} has no 'name' in frontmatter and no override"
                     )
-                else:
-                    src_path = self.config_dir / src.get('path', '.')
-                    strategy = strategy_class(src_path, self.target_dir)
+                all_sync_skills.append(_SyncSkill(skill=skill, target_name=target_name))
 
-                discovered = strategy.discover()
-                strategies.append(strategy)
+        # Resolve conflicts
+        self.skills = self._resolve_conflicts(all_sync_skills)
 
-                # Apply explicit name override
-                if 'name' in src and discovered:
-                    for mapping in discovered:
-                        mapping.skill_name = src['name']
+        # Build maps
+        source_to_target = build_source_to_target_map(self.skills, self.target_dir)
+        all_source_files = collect_source_files(self.skills)
 
-                all_mappings.extend(discovered)
+        # Prepare adapters
+        target_names = {s.skill.file_path: s.target_name for s in self.skills}
+        updater = LinkUpdater(
+            [s.skill for s in self.skills],
+            self.target_dir,
+            source_to_target,
+            all_source_files,
+            target_names=target_names,
+            dry_run=self.dry_run,
+        )
+        adapters = [updater]
 
-            # Resolve conflicts
-            self.mappings = self._resolve_conflicts(all_mappings)
+        # Ensure target exists
+        if not self.dry_run:
+            self.target_dir.mkdir(parents=True, exist_ok=True)
 
-            # Build maps
-            source_to_target = build_source_to_target_map(self.mappings)
-            all_source_files = collect_source_files(self.mappings)
+        # Copy skills
+        skipped = 0
+        for sync_skill in self.skills:
+            skill_target_dir = self.target_dir / sync_skill.target_name
+            if skill_target_dir.exists() and not is_managed(skill_target_dir):
+                continue  # Skip non-managed existing skills
+            if not should_copy_skill(sync_skill, self.target_dir, adapters, force=self.force):
+                skipped += 1
+                continue
+            copy_skill(sync_skill, self.target_dir, self.dry_run, adapters=adapters)
 
-            # Prepare adapters
-            updater = LinkUpdater(self.mappings, source_to_target, all_source_files, self.dry_run)
-            adapters = [updater]
+        # Fix links
+        fixes = updater.adapt_all(self.target_dir)
 
-            # Ensure target exists
-            if not self.dry_run:
-                self.target_dir.mkdir(parents=True, exist_ok=True)
+        fix_summary = {}
+        for fix in fixes:
+            fix_summary[fix["status"]] = fix_summary.get(fix["status"], 0) + 1
 
-            # Copy skills
-            skipped = 0
-            for mapping in self.mappings:
-                if mapping.target_path.exists() and not is_managed(mapping.target_path):
-                    continue  # Skip non-managed existing skills
-                if not should_copy_skill(mapping, adapters, force=self.force):
-                    skipped += 1
-                    continue
-                copy_skill(mapping, self.dry_run, adapters=adapters)
+        # Remove orphans
+        if self.remove_orphans:
+            valid_names = {s.target_name for s in self.skills}
+            remove_orphans(self.target_dir, valid_names, self.dry_run)
 
-            # Fix links
-            fixes = updater.adapt_all(self.target_dir)
-
-            fix_summary = {}
-            for fix in fixes:
-                fix_summary[fix['status']] = fix_summary.get(fix['status'], 0) + 1
-
-            # Remove orphans
-            if self.remove_orphans:
-                valid_names = {m.skill_name for m in self.mappings}
-                remove_orphans(self.target_dir, valid_names, self.dry_run)
-
-            return {
-                'synced_count': len(self.mappings) - skipped,
-                'skipped_count': skipped,
-                'fix_summary': fix_summary,
-                'fixes': fixes,
-                'dry_run': self.dry_run,
-            }
-        finally:
-            for strategy in strategies:
-                if hasattr(strategy, 'cleanup'):
-                    strategy.cleanup()
+        return {
+            "synced_count": len(self.skills) - skipped,
+            "skipped_count": skipped,
+            "fix_summary": fix_summary,
+            "fixes": fixes,
+            "dry_run": self.dry_run,
+        }

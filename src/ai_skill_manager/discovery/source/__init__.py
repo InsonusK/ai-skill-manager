@@ -1,16 +1,13 @@
 """Skill discovery strategies."""
 
-from ..models.skill_mapping import SkillMapping
-
-from .base import DiscoveryStrategy
 from .auto import AutoDiscovery
-from .flat import FlatDiscovery
+from .base import DiscoveryStrategy
 from .directory import DirectoryDiscovery
+from .flat import FlatDiscovery
 from .github import GitHubDiscovery
 
 __all__ = [
-    "SkillMapping",
-    "DiscoveryStrategy", 
+    "DiscoveryStrategy",
     "AutoDiscovery",
     "FlatDiscovery",
     "DirectoryDiscovery",

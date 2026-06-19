@@ -11,16 +11,16 @@ from pathlib import Path
 from typing import List
 
 from ...config import load_config
-from .models.skill_mapping import SkillMapping
-from .api import (
-    DEFAULT_CONFIG,
-    DEFAULT_TARGET,
-    discover_from_config,
-    discover_single_source,
-    resolve_target,
-    STRATEGIES
-)
-from .formatter import format_mappings
+from ...discovery import Source, STRATEGIES, discover
+from ...models.skill import Skill
+from .formatter import format_skills
+
+DEFAULT_CONFIG = "ai-skills.yaml"
+#: Default config file name. / Имя файла конфигурации по умолчанию.
+
+DEFAULT_TARGET = ".agents/skills"
+#: Default target directory (kept for CLI help compatibility).
+#: Целевая директория по умолчанию (оставлена для совместимости справки CLI).
 
 
 def add_parser(subparsers):
@@ -36,7 +36,7 @@ def add_parser(subparsers):
     """
     parser = subparsers.add_parser(
         "discover",
-        help="Discover skills and print mappings / Обнаружить навыки и вывести сопоставления",
+        help="Discover skills and print them / Обнаружить навыки и вывести их",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -57,11 +57,6 @@ def add_parser(subparsers):
         "-p",
         "--path",
         help="Source path or GitHub repo URL / Путь к источнику или URL репозитория GitHub",
-    )
-    parser.add_argument(
-        "--target",
-        help=f"Override target directory (default: {DEFAULT_TARGET}) / "
-             f"Переопределить целевую директорию (по умолчанию: {DEFAULT_TARGET})",
     )
     parser.add_argument(
         "--tree",
@@ -86,16 +81,42 @@ def add_parser(subparsers):
     return parser
 
 
-def _discover(args) -> List[SkillMapping]:
-    """Resolve CLI arguments to a list of skill mappings.
+def _build_sources_from_config(config_path: Path) -> List[Source]:
+    """Convert config sources into universal Source objects."""
+    config = load_config(config_path)
+    config_dir = config_path.parent
+    sources: List[Source] = []
 
-    Преобразует аргументы CLI в список сопоставлений навыков.
+    for src in config.get("sources", []):
+        src_type = src.get("type", "auto")
+        src_path = src.get("path", "")
+
+        if src_type != "github":
+            src_path = str(config_dir / src_path)
+
+        sources.append(
+            Source(
+                type=src_type,
+                path=src_path,
+                tree=src.get("tree", "master"),
+                subpath=src.get("subpath"),
+                name=src.get("name"),
+            )
+        )
+
+    return sources
+
+
+def _discover(args) -> List[Skill]:
+    """Resolve CLI arguments to a list of skills.
+
+    Преобразует аргументы CLI в список навыков.
 
     Args:
         args: Parsed argparse namespace. / Разобранное пространство имён argparse.
 
     Returns:
-        Discovered skill mappings. / Обнаруженные сопоставления навыков.
+        Discovered skills. / Обнаруженные навыки.
 
     Raises:
         FileNotFoundError: If the specified config file does not exist.
@@ -109,39 +130,34 @@ def _discover(args) -> List[SkillMapping]:
         config_path = Path(args.config).resolve()
         if not config_path.exists():
             raise FileNotFoundError(f"Config not found: {config_path}")
-        target_dir = resolve_target(
-            config_path.parent,
-            load_config(config_path).get("settings", {}),
-            args.target,
-        )
-        return discover_from_config(config_path, target_dir)
+        return discover(_build_sources_from_config(config_path))
 
     if args.type:
         # Single source mode: type + path.
         # Режим одного источника: тип + путь.
-        target_dir = (
-            Path(args.target).resolve()
-            if args.target
-            else Path(DEFAULT_TARGET).resolve()
-        )
-        return discover_single_source(
-            args.type,
-            args.path,
-            target_dir,
-            tree=args.tree,
-            subpath=args.subpath,
+        if not args.path:
+            raise ValueError("--path is required when using --type")
+
+        subpath = args.subpath
+        if args.type == "github" and subpath is None:
+            subpath = "skills"
+
+        return discover(
+            [
+                Source(
+                    type=args.type,
+                    path=args.path,
+                    tree=args.tree,
+                    subpath=subpath,
+                )
+            ]
         )
 
     # Default: try ai-skills.yaml in the current directory.
     # По умолчанию: пробуем ai-skills.yaml в текущей директории.
     config_path = Path(DEFAULT_CONFIG).resolve()
     if config_path.exists():
-        target_dir = resolve_target(
-            config_path.parent,
-            load_config(config_path).get("settings", {}),
-            args.target,
-        )
-        return discover_from_config(config_path, target_dir)
+        return discover(_build_sources_from_config(config_path))
 
     raise ValueError(
         "No config file specified and no source type provided.\n"
@@ -163,8 +179,8 @@ def run(args):
         logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
     try:
-        mappings = _discover(args)
-        print(format_mappings(mappings))
+        skills = _discover(args)
+        print(format_skills(skills))
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
         sys.exit(1)

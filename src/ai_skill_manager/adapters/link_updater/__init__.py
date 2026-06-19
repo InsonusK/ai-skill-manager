@@ -19,9 +19,9 @@ Wiki links may include optional header and custom name:
 import logging
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
+from ai_skill_manager.models.skill import Skill
 
 from .base import (
     AdaptContext,
@@ -39,7 +39,7 @@ from .wiki_relative import WikiLinkByRelativePathAdapter
 logger = logging.getLogger(__name__)
 
 MD_LINK_RE = re.compile(r'!?\[([^\]]*)\]\(([^\s\)"]*)\)')
-WIKI_LINK_RE = re.compile(r'\[\[([^\]]+)\]\]')
+WIKI_LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 __all__ = [
     "AdaptContext",
@@ -65,12 +65,16 @@ class LinkUpdater:
 
     def __init__(
         self,
-        mappings: List[SkillMapping],
+        skills: List[Skill],
+        target_dir: Path,
         source_to_target: dict[Path, Path],
         all_source_files: set[Path],
+        target_names: Optional[Dict[Path, str]] = None,
         dry_run: bool = False,
     ):
-        self.mappings = {m.skill_name: m for m in mappings}
+        self._skills = skills
+        self.target_names = target_names or {}
+        self.target_dir = target_dir
         self.source_to_target = source_to_target
         self.all_source_files = all_source_files
         self.dry_run = dry_run
@@ -81,24 +85,32 @@ class LinkUpdater:
         self.source_to_skill: dict[Path, SkillInfo] = {}
         self.target_to_skill: dict[Path, SkillInfo] = {}
 
-        for mapping in mappings:
-            skill_info = parse_skill_info(mapping)
+        for skill in skills:
+            target_name = self.target_names.get(skill.file_path, skill.name)
+            skill_info = parse_skill_info(skill, target_name=target_name)
             if skill_info:
-                self.skill_infos[mapping.skill_name] = skill_info
+                self.skill_infos[target_name] = SkillInfo(
+                    name=skill_info.name,
+                    uid=skill_info.uid,
+                    target_path=target_dir / target_name,
+                    source_path=skill_info.source_path,
+                    is_flat=skill_info.is_flat,
+                )
 
         # Map each source file to its skill
         for src_file in all_source_files:
-            for mapping in mappings:
-                skill_info = self.skill_infos.get(mapping.skill_name)
+            for skill in skills:
+                target_name = self.target_names.get(skill.file_path, skill.name)
+                skill_info = self.skill_infos.get(target_name)
                 if not skill_info:
                     continue
-                if mapping.is_flat:
-                    if src_file == mapping.source_path:
+                if skill.is_flat():
+                    if src_file == skill.file_path:
                         self.source_to_skill[src_file] = skill_info
                         break
                 else:
                     try:
-                        src_file.relative_to(mapping.source_path)
+                        src_file.relative_to(skill.folder_path)
                         self.source_to_skill[src_file] = skill_info
                         break
                     except ValueError:
@@ -126,16 +138,17 @@ class LinkUpdater:
             return skill_info
 
         # Fallback: infer from target path structure
-        for mapping in self.mappings.values():
-            skill_info = self.skill_infos.get(mapping.skill_name)
+        for skill in self._skills:
+            target_name = self.target_names.get(skill.file_path, skill.name)
+            skill_info = self.skill_infos.get(target_name)
             if not skill_info:
                 continue
-            if mapping.is_flat:
-                if filepath == mapping.target_path / 'SKILL.md':
+            if skill.is_flat():
+                if filepath == self.target_dir / target_name / "SKILL.md":
                     return skill_info
             else:
                 try:
-                    filepath.relative_to(mapping.target_path)
+                    filepath.relative_to(self.target_dir / target_name)
                     return skill_info
                 except ValueError:
                     continue
@@ -151,14 +164,14 @@ class LinkUpdater:
             full = match.group(0)
             text = match.group(1)
             path = match.group(2)
-            is_image = full.startswith('!')
+            is_image = full.startswith("!")
 
             # Skip pure anchor links and empty links
-            if not path or path.startswith('#'):
+            if not path or path.startswith("#"):
                 continue
 
-            if '#' in path:
-                path_clean, fragment = path.split('#', 1)
+            if "#" in path:
+                path_clean, fragment = path.split("#", 1)
                 fragment = f"#{fragment}"
             else:
                 path_clean = path
@@ -166,7 +179,7 @@ class LinkUpdater:
 
             links.append((match.start(), Link(
                 full_match=full,
-                link_type='markdown',
+                link_type="markdown",
                 text=text,
                 target=path_clean,
                 fragment=fragment,
@@ -179,14 +192,14 @@ class LinkUpdater:
             inner = match.group(1)
 
             # Parse wiki syntax: target#fragment|text or target|text or target#fragment or target
-            if '|' in inner:
-                left, custom_text = inner.rsplit('|', 1)
+            if "|" in inner:
+                left, custom_text = inner.rsplit("|", 1)
             else:
                 left = inner
                 custom_text = None
 
-            if '#' in left:
-                target, fragment = left.split('#', 1)
+            if "#" in left:
+                target, fragment = left.split("#", 1)
                 fragment = f"#{fragment}"
             else:
                 target = left
@@ -196,7 +209,7 @@ class LinkUpdater:
 
             links.append((match.start(), Link(
                 full_match=full,
-                link_type='wiki',
+                link_type="wiki",
                 text=display_text,
                 target=target,
                 fragment=fragment,
@@ -218,7 +231,7 @@ class LinkUpdater:
             logger.warning(
                 "Link %s in %s matches multiple adapters (%s), leaving unchanged",
                 link.full_match, context.filepath,
-                ', '.join(a.__class__.__name__ for a in matching)
+                ", ".join(a.__class__.__name__ for a in matching)
             )
             self.fixes.append({
                 "file": str(context.filepath),
@@ -265,7 +278,7 @@ class LinkUpdater:
             all_source_files=self.all_source_files,
             target_to_skill=self.target_to_skill,
             source_to_skill=self.source_to_skill,
-            mappings=self.mappings,
+            skills=self.skill_infos,
         )
 
         links = self._parse_links(content)
@@ -283,7 +296,7 @@ class LinkUpdater:
             last_end = pos + len(link.full_match)
 
         parts.append(content[last_end:])
-        new_content = ''.join(parts)
+        new_content = "".join(parts)
 
         if new_content != original and not self.dry_run:
             filepath.write_text(new_content, encoding="utf-8")

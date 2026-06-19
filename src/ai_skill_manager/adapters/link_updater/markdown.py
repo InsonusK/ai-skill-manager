@@ -19,7 +19,7 @@ class MarkdownLinkAdapter(LinkTypeAdapter):
 
     def adapt(self, link: Link, context: AdaptContext) -> Optional[AdaptResult]:
         source_dir = find_source_dir_for_file(
-            context.filepath, context.file_skill, context.mappings
+            context.filepath, context.file_skill, context.skills
         )
         if not source_dir:
             return None

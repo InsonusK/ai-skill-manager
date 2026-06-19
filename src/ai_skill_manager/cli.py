@@ -23,7 +23,7 @@ def main():
         prog='ai-skill-manager',
         description='AI skills manager CLI / CLI менеджера AI-навыков',
     )
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers:argparse._SubParsersAction[argparse.ArgumentParser] = parser.add_subparsers(dest='command', required=True)
 
     # Register subcommand parsers.
     # Регистрируем парсеры подкоманд.

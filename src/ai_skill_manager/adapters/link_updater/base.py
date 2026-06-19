@@ -5,11 +5,11 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Literal, Optional
 
 import yaml
 
-from ai_skill_manager.commands.discover.models.skill_mapping import SkillMapping
+from ai_skill_manager.models.skill import Skill
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class SkillInfo:
     """Information about a skill extracted from its frontmatter."""
+
     name: str
     uid: str
     target_path: Path
@@ -27,8 +28,9 @@ class SkillInfo:
 @dataclass
 class Link:
     """Represents a parsed link found in markdown content."""
+
     full_match: str
-    link_type: Literal['markdown', 'wiki']
+    link_type: Literal["markdown", "wiki"]
     text: str
     target: str
     fragment: str
@@ -38,18 +40,20 @@ class Link:
 @dataclass
 class AdaptContext:
     """Context passed to link adapters during adaptation."""
+
     filepath: Path
     file_skill: Optional[SkillInfo]
     source_to_target: Dict[Path, Path]
     all_source_files: set[Path]
     target_to_skill: Dict[Path, SkillInfo]
     source_to_skill: Dict[Path, SkillInfo]
-    mappings: Dict[str, SkillMapping]
+    skills: Dict[str, SkillInfo]
 
 
 @dataclass
 class AdaptResult:
     """Result of a successful link adaptation."""
+
     text: str
     status: str = "fixed"
 
@@ -75,34 +79,30 @@ class LinkTypeAdapter(ABC):
         pass
 
 
-def parse_skill_info(mapping: SkillMapping) -> Optional[SkillInfo]:
+def parse_skill_info(skill: Skill, target_name: Optional[str] = None) -> Optional[SkillInfo]:
     """Parse name and uid from a skill's SKILL.md frontmatter.
 
-    Always returns a SkillInfo for valid mappings, using fallback values
+    Always returns a SkillInfo for valid skills, using fallback values
     when frontmatter is missing or incomplete.
     """
-    if mapping.source_skill_md is not None:
-        skill_md = mapping.source_skill_md
-    elif mapping.is_flat:
-        skill_md = mapping.source_path
-    else:
-        skill_md = mapping.source_path / 'SKILL.md'
+    skill_md = skill.file_path
+    name = target_name if target_name is not None else skill.name
+    if name is None:
+        name = skill_md.name[:-9] if skill.is_flat() else skill_md.parent.name
 
-    name = mapping.skill_name
     uid = None
 
     if skill_md.exists():
         try:
-            content = skill_md.read_text(encoding='utf-8')
-            if content.startswith('---'):
-                end = content.find('\n---', 3)
+            content = skill_md.read_text(encoding="utf-8")
+            if content.startswith("---"):
+                end = content.find("\n---", 3)
                 if end == -1:
-                    end = content.find('\r\n---', 3)
+                    end = content.find("\r\n---", 3)
                 if end != -1:
                     frontmatter = yaml.safe_load(content[3:end])
                     if isinstance(frontmatter, dict):
-                        name = frontmatter.get('name', name)
-                        uid = frontmatter.get('uid')
+                        uid = frontmatter.get("uid")
         except Exception as e:
             logger.warning("Failed to parse skill info from %s: %s", skill_md, e)
 
@@ -116,33 +116,34 @@ def parse_skill_info(mapping: SkillMapping) -> Optional[SkillInfo]:
     return SkillInfo(
         name=name,
         uid=uid,
-        target_path=mapping.target_path,
-        source_path=mapping.source_path,
-        is_flat=mapping.is_flat,
+        target_path=Path(".nonexistent"),  # set by caller
+        source_path=skill.file_path,
+        is_flat=skill.is_flat(),
     )
 
 
 def find_source_dir_for_file(
     filepath: Path,
     file_skill: Optional[SkillInfo],
-    mappings: Dict[str, SkillMapping],
+    skills: Dict[str, SkillInfo],
 ) -> Optional[Path]:
     """Determine the source directory corresponding to a target file."""
     if not file_skill:
         return None
 
-    mapping = mappings.get(file_skill.name)
-    if not mapping:
+    skill = skills.get(file_skill.name)
+    if not skill:
         return None
 
-    if mapping.is_flat:
-        return mapping.source_path.parent
+    source_dir = skill.source_path.parent
+    if skill.is_flat:
+        return source_dir
     else:
         try:
-            rel = filepath.relative_to(mapping.target_path)
-            return mapping.source_path / rel.parent
+            rel = filepath.relative_to(skill.target_path)
+            return source_dir / rel.parent
         except ValueError:
-            return mapping.source_path
+            return source_dir
 
 
 def format_managed_link(
@@ -158,7 +159,7 @@ def format_managed_link(
 
     if target_skill and target_skill != context.file_skill and not is_image:
         # Cross-skill link -> skill link format
-        header = fragment.lstrip('#')
+        header = fragment.lstrip("#")
         if header:
             link_url = f"{target_skill.name}|uid: {target_skill.uid}|#{header}"
         else:

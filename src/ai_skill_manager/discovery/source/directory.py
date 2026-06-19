@@ -6,8 +6,7 @@ Finds directories that contain a file named {directory_name}.skill.md.
 from pathlib import Path
 from typing import List
 
-from . import SkillMapping
-
+from ...models.skill import Skill
 from .base import DiscoveryStrategy
 from ._common import discover_directory_skill
 
@@ -15,7 +14,7 @@ from ._common import discover_directory_skill
 class DirectoryDiscovery(DiscoveryStrategy):
     """Find directory skills (subdirs with {dir_name}.skill.md)."""
 
-    def discover(self) -> List[SkillMapping]:
+    def discover(self) -> List[Skill]:
         """Find all directory skills under source_path."""
         if not self.source_path.exists():
             return []
@@ -27,11 +26,9 @@ class DirectoryDiscovery(DiscoveryStrategy):
         skill_md = discover_directory_skill(self.source_path)
         if skill_md is not None:
             return [
-                self._create_mapping(
-                    self.source_path,
-                    self.source_path.name,
-                    is_flat=False,
-                    source_skill_md=skill_md,
+                self._create_skill(
+                    file_path=skill_md,
+                    folder_path=self.source_path,
                 )
             ]
 
@@ -43,11 +40,9 @@ class DirectoryDiscovery(DiscoveryStrategy):
             skill_md = discover_directory_skill(subdir)
             if skill_md is not None:
                 results.append(
-                    self._create_mapping(
-                        subdir,
-                        subdir.name,
-                        is_flat=False,
-                        source_skill_md=skill_md,
+                    self._create_skill(
+                        file_path=skill_md,
+                        folder_path=subdir,
                     )
                 )
 

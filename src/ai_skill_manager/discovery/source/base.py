@@ -3,8 +3,9 @@
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional
-from ..models.skill_mapping import SkillMapping
+from typing import List
+
+from ...models.skill import Skill
 
 logger = logging.getLogger(__name__)
 
@@ -22,29 +23,23 @@ def skill_name_from_file(path: Path) -> str:
 class DiscoveryStrategy(ABC):
     """Abstract base for skill discovery strategies."""
 
-    def __init__(self, source_path: Path, target_dir: Path):
+    def __init__(self, source_path: Path):
         if not source_path.exists():
             logger.error("source_path not found: %s", source_path)
         self.source_path = source_path.resolve()
-        self.target_dir = target_dir
 
     @abstractmethod
-    def discover(self) -> List[SkillMapping]:
-        """Discover skills and return list of mappings."""
+    def discover(self) -> List[Skill]:
+        """Discover skills and return list of Skill objects."""
         pass
 
-    def _create_mapping(
+    def _create_skill(
         self,
-        source: Path,
-        name: str,
-        is_flat: bool,
-        source_skill_md: Optional[Path] = None,
-    ) -> SkillMapping:
-        """Helper to create a SkillMapping with resolved target path."""
-        return SkillMapping(
-            source_path=source,
-            target_path=self.target_dir / name,
-            skill_name=name,
-            is_flat=is_flat,
-            source_skill_md=source_skill_md,
+        file_path: Path,
+        folder_path: Path | None = None,
+    ) -> Skill:
+        """Helper to create a Skill from its markdown file and optional folder."""
+        return Skill(
+            file_path=file_path,
+            folder_path=folder_path,
         )

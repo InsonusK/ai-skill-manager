@@ -14,8 +14,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Union
 
-from . import SkillMapping
-
+from ...models.skill import Skill
 from .auto import AutoDiscovery
 from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
 
@@ -86,18 +85,16 @@ class GitHubDiscovery(DiscoveryStrategy):
     def __init__(
         self,
         source_path,
-        target_dir: Path,
         tree: str = "master",
         subpath: Union[str, List[str]] = "skills",
     ):
         # source_path is the repo URL (str or Path-like); avoid base resolve()
         self.repo_url = str(source_path)
-        self.target_dir = target_dir
         self.tree = tree
         self.subpath = subpath
         self._extracted_dir: Optional[Path] = None
 
-    def discover(self) -> List[SkillMapping]:
+    def discover(self) -> List[Skill]:
         """Download repo, extract, and discover skills."""
         owner, repo = _parse_github_url(self.repo_url)
 
@@ -113,7 +110,7 @@ class GitHubDiscovery(DiscoveryStrategy):
                 else [self.subpath]
             )
 
-            all_mappings: List[SkillMapping] = []
+            all_skills: List[Skill] = []
             for sp in subpaths:
                 scan_path = repo_root / sp
                 if not scan_path.exists():
@@ -122,20 +119,17 @@ class GitHubDiscovery(DiscoveryStrategy):
 
                 if scan_path.is_file():
                     if is_skill_md(scan_path):
-                        all_mappings.append(
-                            self._create_mapping(
-                                scan_path,
-                                skill_name_from_file(scan_path),
-                                is_flat=True,
-                                source_skill_md=scan_path,
+                        all_skills.append(
+                            self._create_skill(
+                                file_path=scan_path,
                             )
                         )
                     continue
 
-                strategy = AutoDiscovery(scan_path, self.target_dir)
-                all_mappings.extend(strategy.discover())
+                strategy = AutoDiscovery(scan_path)
+                all_skills.extend(strategy.discover())
 
-            return all_mappings
+            return all_skills
         finally:
             archive_path.unlink(missing_ok=True)
 

@@ -8,16 +8,15 @@ Recursively scans a directory:
 from pathlib import Path
 from typing import List
 
-from . import SkillMapping
-
-from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
+from ...models.skill import Skill
+from .base import DiscoveryStrategy, is_skill_md
 from ._common import discover_directory_skill
 
 
 class AutoDiscovery(DiscoveryStrategy):
     """Auto-detect skill type for each directory/file."""
 
-    def discover(self) -> List[SkillMapping]:
+    def discover(self) -> List[Skill]:
         """Recursively discover all skills."""
         if not self.source_path.exists():
             return []
@@ -27,20 +26,17 @@ class AutoDiscovery(DiscoveryStrategy):
 
         return self._scan_directory(self.source_path)
 
-    def _handle_file(self, filepath: Path) -> List[SkillMapping]:
+    def _handle_file(self, filepath: Path) -> List[Skill]:
         """Handle a single file."""
         if is_skill_md(filepath):
             return [
-                self._create_mapping(
-                    filepath,
-                    skill_name_from_file(filepath),
-                    is_flat=True,
-                    source_skill_md=filepath,
+                self._create_skill(
+                    file_path=filepath,
                 )
             ]
         return []
 
-    def _scan_directory(self, directory: Path) -> List[SkillMapping]:
+    def _scan_directory(self, directory: Path) -> List[Skill]:
         """Recursively scan directory for skills."""
         results = []
 
@@ -48,22 +44,17 @@ class AutoDiscovery(DiscoveryStrategy):
         skill_md = discover_directory_skill(directory)
         if skill_md is not None:
             return [
-                self._create_mapping(
-                    directory,
-                    directory.name,
-                    is_flat=False,
-                    source_skill_md=skill_md,
+                self._create_skill(
+                    file_path=skill_md,
+                    folder_path=directory,
                 )
             ]
 
         # Flat: collect *.skill.md files directly in this directory.
         for skill_file in sorted(directory.glob("*.skill.md")):
             results.append(
-                self._create_mapping(
-                    skill_file,
-                    skill_name_from_file(skill_file),
-                    is_flat=True,
-                    source_skill_md=skill_file,
+                self._create_skill(
+                    file_path=skill_file,
                 )
             )
 
