@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 from ...models.skill import Skill
+from ...models.skill_format import SkillFormat
 from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
 
 
@@ -23,6 +24,7 @@ class FlatDiscovery(DiscoveryStrategy):
                 return [
                     self._create_skill(
                         file_path=self.source_path,
+                        format=SkillFormat.HumanFlat,
                     )
                 ]
             return []
@@ -32,6 +34,7 @@ class FlatDiscovery(DiscoveryStrategy):
             results.append(
                 self._create_skill(
                     file_path=skill_file,
+                    format=SkillFormat.HumanFlat,
                 )
             )
 

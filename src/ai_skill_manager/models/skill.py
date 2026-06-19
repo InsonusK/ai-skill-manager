@@ -4,11 +4,14 @@ from typing import Optional
 
 import yaml
 
+from .skill_format import SkillFormat
+
 
 @dataclass(frozen=True)
 class Skill:
     file_path: Path
     folder_path: Path | None
+    format: SkillFormat | None = None
 
     def is_flat(self) -> bool:
         return self.folder_path is None

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from ...models.skill import Skill
+from ...models.skill_format import SkillFormat
 from .auto import AutoDiscovery
 from .base import DiscoveryStrategy, is_skill_md, skill_name_from_file
 
@@ -122,6 +123,7 @@ class GitHubDiscovery(DiscoveryStrategy):
                         all_skills.append(
                             self._create_skill(
                                 file_path=scan_path,
+                                format=SkillFormat.HumanFlat,
                             )
                         )
                     continue

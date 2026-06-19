@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List
 
 from ...models.skill import Skill
+from ...models.skill_format import SkillFormat
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,11 @@ class DiscoveryStrategy(ABC):
         self,
         file_path: Path,
         folder_path: Path | None = None,
+        format: SkillFormat | None = None,
     ) -> Skill:
         """Helper to create a Skill from its markdown file and optional folder."""
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
+            format=format,
         )

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 from ...models.skill import Skill
+from ...models.skill_format import SkillFormat
 from .base import DiscoveryStrategy
 from ._common import discover_directory_skill
 
@@ -29,6 +30,7 @@ class DirectoryDiscovery(DiscoveryStrategy):
                 self._create_skill(
                     file_path=skill_md,
                     folder_path=self.source_path,
+                    format=SkillFormat.HumanDir,
                 )
             ]
 
@@ -43,6 +45,7 @@ class DirectoryDiscovery(DiscoveryStrategy):
                     self._create_skill(
                         file_path=skill_md,
                         folder_path=subdir,
+                        format=SkillFormat.HumanDir,
                     )
                 )
 
