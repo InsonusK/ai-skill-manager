@@ -5,7 +5,9 @@ Selects exactly one matching rule for a link and applies it.
 
 from typing import List, Optional
 
-from .base import Context, Link
+from .models.Link import Link
+
+from .base import LinkContext
 from .rules import LinkRule, MarkdawnRelativeRule, WikilinkAbsoluteRule, WikilinkRelativeRule
 
 
@@ -25,12 +27,12 @@ class LinkMapper:
             MarkdawnRelativeRule(),
         ]
 
-    def map(self, link: Link, context: Context) -> str:
+    def map(self, link: Link, context: LinkContext) -> str:
         """Apply the single matching rule to ``link``.
 
         Args:
             link: The parsed link to adapt.
-            context: Adaptation context.
+            context: Link adaptation context.
 
         Returns:
             The replacement link string.

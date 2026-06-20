@@ -2,7 +2,9 @@
 
 from abc import ABC, abstractmethod
 
-from ..base import Context, Link
+from ..models.Link import Link
+
+from ..base import LinkContext
 
 
 class LinkRule(ABC):
@@ -17,7 +19,7 @@ class LinkRule(ABC):
         pass
 
     @abstractmethod
-    def apply(self, link: Link, context: Context) -> str:
+    def apply(self, link: Link, context: LinkContext) -> str:
         """Adapt the link to the target format.
 
         Returns the replacement link string.

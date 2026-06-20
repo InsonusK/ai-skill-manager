@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from ..base import Context, Link, format_link, resolve_target
+from ..models.Link import Link
+
+from ..base import LinkContext, format_link, resolve_target
 from .absRule import LinkRule
 
 
@@ -20,7 +22,7 @@ class WikilinkAbsoluteRule(LinkRule):
         target = link.target
         return "/" in target and not target.startswith(("./", "../"))
 
-    def apply(self, link: Link, context: Context) -> str:
+    def apply(self, link: Link, context: LinkContext) -> str:
         target_file = resolve_target(context.repo_root / link.target, context)
         if not target_file:
             raise RuntimeError(f"target file does not exist: {link.target}")

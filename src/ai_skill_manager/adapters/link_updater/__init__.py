@@ -7,10 +7,15 @@ Rules:
 - Broken links -> left as-is, reported in validation
 
 Supported link types:
-- Markdown relative links: ``[text](./relative/path)``
+- Markdown relative links: ``[text](./relative/path)`` and ``[text](../relative/path)``
 - Wiki absolute links: ``[[absolute/path|text]]`` from the skills repo root
-- Wiki relative links: ``[[./relative/path|text]]`` from the current file
+- Wiki relative links: ``[[./relative/path|text]]`` and ``[[../relative/path|text]]`` from the current file
 - Plain wiki links by file name: ``[[file name|text]]`` -> forbidden
+
+Context hierarchy:
+- :class:`FileContext` carries the :class:`Skill` (and therefore its ``Source``).
+- :class:`LinkContext` inherits from :class:`FileContext` and adds the concrete
+  file being processed plus the registries needed to resolve links.
 """
 
 import logging
@@ -18,12 +23,15 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .models.Link import Link, LinkLocation
 from ai_skill_manager.models.skill import Skill
+
+from .service.LinkFactory import LinkFactory
 
 from .base import (
     AdaptResult,
-    Context,
-    Link,
+    FileContext,
+    LinkContext,
     ReplaceResult,
     SkillInfo,
     parse_skill_info,
@@ -36,8 +44,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "AdaptResult",
-    "Context",
+    "FileContext",
     "Link",
+    "LinkContext",
+    "LinkFactory",
+    "LinkLocation",
     "LinkMapError",
     "LinkMapper",
     "LinkReplacer",
@@ -82,6 +93,13 @@ class LinkUpdater:
         self.source_to_skill: dict[Path, SkillInfo] = {}
         self.target_to_skill: dict[Path, SkillInfo] = {}
         self.target_to_source: dict[Path, Path] = {v: k for k, v in source_to_target.items()}
+        self._skill_by_name: dict[str, Skill] = {}
+        self._skill_by_source_path: dict[Path, Skill] = {}
+
+        for skill in skills:
+            target_name = self.target_names.get(skill.file_path, skill.name)
+            self._skill_by_name[target_name] = skill
+            self._skill_by_source_path[skill.file_path] = skill
 
         for skill in skills:
             target_name = self.target_names.get(skill.file_path, skill.name)
@@ -143,9 +161,34 @@ class LinkUpdater:
 
         return None
 
-    def _build_context(self, filepath: Path) -> Context:
+    def _find_skill_object_for_file(self, filepath: Path) -> Optional[Skill]:
+        """Find the original Skill object for a target file."""
+        skill_info = self._find_skill_for_file(filepath)
+        if skill_info:
+            return self._skill_by_name.get(skill_info.name)
+
+        # Fallback: infer from target path structure
+        for skill in self._skills:
+            target_name = self.target_names.get(skill.file_path, skill.name)
+            skill_info = self.skill_infos.get(target_name)
+            if not skill_info:
+                continue
+            if skill.is_flat():
+                if filepath == self.target_dir / target_name / "SKILL.md":
+                    return skill
+            else:
+                try:
+                    filepath.relative_to(self.target_dir / target_name)
+                    return skill
+                except ValueError:
+                    continue
+
+        return None
+
+    def _build_context(self, filepath: Path) -> LinkContext:
         """Build the adaptation context for a file."""
-        return Context(
+        return LinkContext(
+            skill=self._find_skill_object_for_file(filepath),
             filepath=filepath,
             file_skill=self._find_skill_for_file(filepath),
             repo_root=self.target_dir,
@@ -163,7 +206,7 @@ class LinkUpdater:
             return
 
         context = self._build_context(filepath)
-        result = self.replacer.replace(filepath, context)
+        result = self.replacer.replace(context)
 
         if not self.dry_run:
             os.replace(str(result.new_path), str(filepath))

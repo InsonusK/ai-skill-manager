@@ -4,8 +4,9 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal, Optional
+from typing import Dict, Optional
 
+from .models.Link import Link
 import yaml
 
 from ai_skill_manager.models.skill import Skill
@@ -24,21 +25,20 @@ class SkillInfo:
     is_flat: bool
 
 
-@dataclass(frozen=True)
-class Link:
-    """Represents a parsed link found in markdown content."""
+@dataclass
+class FileContext:
+    """Context for a single skill (source)."""
 
-    full: str
-    kind: Literal["markdown", "wiki"]
-    text: str
-    target: str
-    fragment: str
-    is_image: bool
+    skill: Optional[Skill]
 
 
 @dataclass
-class Context:
-    """Context passed to link rules during adaptation."""
+class LinkContext(FileContext):
+    """Context passed to link rules during adaptation.
+
+    Inherits the skill from :class:`FileContext` and adds the concrete file
+    being processed plus the registry mappings needed to resolve links.
+    """
 
     filepath: Path
     file_skill: Optional[SkillInfo]
@@ -110,7 +110,7 @@ def parse_skill_info(skill: Skill, target_name: Optional[str] = None) -> Optiona
     )
 
 
-def resolve_target(path: Path, context: Context) -> Optional[Path]:
+def resolve_target(path: Path, context: LinkContext) -> Optional[Path]:
     """Resolve a path to a managed target file.
 
     Tries the path as-is, with a ``.md`` extension, and as a directory
@@ -132,7 +132,7 @@ def resolve_target(path: Path, context: Context) -> Optional[Path]:
     return None
 
 
-def format_link(link: Link, target_file: Path, context: Context) -> str:
+def format_link(link: Link, target_file: Path, context: LinkContext) -> str:
     """Format a link to a managed target file."""
     target_skill = context.target_to_skill.get(target_file)
     prefix = "!" if link.is_image else ""

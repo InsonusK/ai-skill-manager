@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from ..base import Context, Link, format_link, resolve_target
+from ..models.Link import Link
+
+from ..base import LinkContext, format_link, resolve_target
 from .absRule import LinkRule
 
 
@@ -17,7 +19,7 @@ class WikilinkRelativeRule(LinkRule):
             return False
         return link.target.startswith(("./", "../"))
 
-    def apply(self, link: Link, context: Context) -> str:
+    def apply(self, link: Link, context: LinkContext) -> str:
         source_file = context.target_to_source.get(context.filepath, context.filepath)
         target_file = resolve_target(source_file.parent / link.target, context)
         if not target_file:
