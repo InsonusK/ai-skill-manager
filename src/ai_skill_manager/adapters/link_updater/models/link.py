@@ -3,8 +3,10 @@
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from .link_location import LinkLocation
 from .link_kind import LinkKind
+from .link_location import LinkLocation
+
+
 @dataclass(frozen=True)
 class Link:
     """Represents a parsed link found in markdown content.
@@ -13,9 +15,10 @@ class Link:
         raw: The exact link text as it appears in the source.
         path: The link target path without the URL fragment.
         text: The display text of the link.
-        kind: Whether the link is a markdown or wiki link.
+        kind: Whether the link is an OS absolute, repo absolute or relative path.
+        format: Whether the link was written as markdown or wiki link.
         context: Where the link was found in the source text.
-        fragment: The optional ``#fragment`` part of the link target.
+        header: The optional ``#fragment`` part of the link target.
         is_image: ``True`` for image links (``![...](...)``).
     """
 
