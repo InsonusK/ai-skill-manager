@@ -1,6 +1,5 @@
 ---
-name: Implementation plan metadata
-version: 1.0.0
+name: implementition-plan-metadata
 description: Which metadata must be added into implementation plan
 ---
 

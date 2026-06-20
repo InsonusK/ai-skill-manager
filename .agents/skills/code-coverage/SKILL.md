@@ -1,5 +1,5 @@
 ---
-name: Code coverage
+name: code-coverage
 description: How many codes must be codered by unittest
 ---
 
