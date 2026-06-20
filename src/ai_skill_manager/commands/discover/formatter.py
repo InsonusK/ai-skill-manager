@@ -10,7 +10,7 @@ for console output.
 from pathlib import Path
 from typing import List
 
-from ...models.skill import Skill
+from ...models.skill import Skill, SkillFormat
 from ...models.source import LocalSource
 
 
@@ -28,6 +28,7 @@ def format_skills(skills: List[Skill]) -> str:
         >>> format_skills([Skill(
         ...     file_path=Path("guide.skill.md"),
         ...     folder_path=None,
+        ...     format=SkillFormat.HumanFlat,
         ...     source=LocalSource(Path(".")),
         ... )])
         '1. guide | flat | guide.skill.md\n    File: ...'

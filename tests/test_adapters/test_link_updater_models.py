@@ -4,16 +4,23 @@ import pytest
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater.models.FileContext import FileContext
-from ai_skill_manager.models import LocalSource, Skill
+from ai_skill_manager.models import LocalSource, Skill, SkillFormat
 
 
 def _skill(file_path: Path, folder_path: Path | None = None) -> Skill:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if not file_path.exists():
         file_path.write_text("---\nname: test\n---\n")
+    if folder_path is None:
+        skill_format = SkillFormat.HumanFlat
+    elif file_path.name == "SKILL.md":
+        skill_format = SkillFormat.Agent
+    else:
+        skill_format = SkillFormat.HumanDir
     return Skill(
         file_path=file_path,
         folder_path=folder_path,
+        format=skill_format,
         source=LocalSource(folder_path if folder_path else file_path.parent),
     )
 

@@ -10,11 +10,15 @@ from .source import Source
 
 @dataclass(frozen=True)
 class Skill:
+    """Represents a discovered skill on disk.
+
+    Представляет обнаруженный навык на диске.
+    """
+
     file_path: Path
     folder_path: Path | None
     source: Source
-    #TODO: make format is required
-    format: SkillFormat | None = None
+    format: SkillFormat  # Required skill format. / Обязательный формат навыка.
 
     def is_flat(self) -> bool:
         return self.folder_path is None

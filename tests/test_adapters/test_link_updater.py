@@ -16,7 +16,7 @@ from ai_skill_manager.adapters.link_updater.rules import (
     WikilinkAbsoluteRule,
     WikilinkRelativeRule,
 )
-from ai_skill_manager.models import LocalSource, Skill
+from ai_skill_manager.models import LocalSource, Skill, SkillFormat
 
 
 def _derive_name(file_path: Path) -> str:
@@ -37,9 +37,16 @@ def _skill(file_path: Path, folder_path: Path | None = None) -> Skill:
     else:
         original = f"---\nname: {name}\n---\n"
     file_path.write_text(original)
+    if folder_path is None:
+        skill_format = SkillFormat.HumanFlat
+    elif file_path.name == "SKILL.md":
+        skill_format = SkillFormat.Agent
+    else:
+        skill_format = SkillFormat.HumanDir
     return Skill(
         file_path=file_path,
         folder_path=folder_path,
+        format=skill_format,
         source=LocalSource(folder_path if folder_path else file_path.parent),
     )
 
@@ -971,7 +978,12 @@ class TestLinkReplacer(unittest.TestCase):
         guide_dir.mkdir()
         guide_md = guide_dir / "SKILL.md"
         guide_md.write_text("---\nname: guide\n---\n# Guide\nSee [other](../other/SKILL.md).")
-        guide_skill = Skill(file_path=guide_md, folder_path=guide_dir, source=source)
+        guide_skill = Skill(
+            file_path=guide_md,
+            folder_path=guide_dir,
+            format=SkillFormat.Agent,
+            source=source,
+        )
 
         other_dir = self.tmpdir / "other"
         other_dir.mkdir()
@@ -996,7 +1008,12 @@ class TestLinkReplacer(unittest.TestCase):
 
         guide_md = self.tmpdir / "guide.skill.md"
         guide_md.write_text("---\nname: guide\n---\n# Guide")
-        guide_skill = Skill(file_path=guide_md, folder_path=None, source=source)
+        guide_skill = Skill(
+            file_path=guide_md,
+            folder_path=None,
+            format=SkillFormat.HumanFlat,
+            source=source,
+        )
 
         replacer = LinkReplacer()
         results = replacer.replace_skill(guide_skill)
