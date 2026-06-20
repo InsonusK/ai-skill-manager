@@ -9,10 +9,11 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from .models.Link import Link
+from .models.link import Link
 from .service.LinkFactory import LinkFactory
 
-from .base import FileContext, LinkContext, ReplaceResult, SkillInfo, parse_skill_info
+from .base import LinkContext, ReplaceResult, SkillInfo, parse_skill_info
+from .models.file_context import FileContext as FileContextModel
 from .map import LinkMapError, LinkMapper
 from ...models.source import LocalSource
 
@@ -37,8 +38,10 @@ class LinkReplacer:
         """
         filepath = context.filepath
         content = filepath.read_text(encoding="utf-8")
-        factory = LinkFactory(filepath=filepath, skill=context.skill)
-        links = factory.create_links(content)
+        factory = LinkFactory()
+        links = factory.create_links(
+            FileContextModel(path=filepath, skill=context.skill, content=content)
+        )
 
         parts: List[str] = []
         last_end = 0
@@ -145,9 +148,9 @@ class LinkReplacer:
             if file_path.suffix != ".md":
                 continue
 
-            file_context = FileContext(skill=skill)
+            file_context = FileContextModel(path=file_path, skill=skill)
             link_context = LinkContext(
-                **file_context.__dict__,
+                skill=file_context.skill,
                 filepath=file_path,
                 file_skill=source_to_skill.get(file_path),
                 repo_root=repo_root,

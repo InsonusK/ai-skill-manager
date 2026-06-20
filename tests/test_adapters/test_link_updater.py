@@ -6,8 +6,10 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater import LinkUpdater
-from ai_skill_manager.adapters.link_updater.models.Link import Link, LinkLocation
-from ai_skill_manager.adapters.link_updater.base import FileContext, LinkContext, SkillInfo
+from ai_skill_manager.adapters.link_updater.models.link import Link
+from ai_skill_manager.adapters.link_updater.base import LinkContext, SkillInfo
+from ai_skill_manager.adapters.link_updater.models.link_location import LinkLocation
+from ai_skill_manager.adapters.link_updater.models.file_context import FileContext
 from ai_skill_manager.adapters.link_updater.map import LinkMapError, LinkMapper
 from ai_skill_manager.adapters.link_updater.replace import LinkReplacer
 from ai_skill_manager.adapters.link_updater.service.LinkFactory import LinkFactory
@@ -755,9 +757,20 @@ class TestLinkUpdater(unittest.TestCase):
 
 
 class TestLinkFactory(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+        self.skill_md = self.tmpdir / "guide.skill.md"
+        self.skill = _skill(self.skill_md)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _context(self, content: str) -> FileContext:
+        return FileContext(path=self.skill_md, skill=self.skill, content=content)
+
     def test_creates_markdown_link(self):
-        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
-        links = factory.create_links("See [text](./file.md#section).")
+        factory = LinkFactory()
+        links = factory.create_links(self._context("See [text](./file.md#section)."))
 
         self.assertEqual(len(links), 1)
         link = links[0]
@@ -767,15 +780,17 @@ class TestLinkFactory(unittest.TestCase):
         self.assertEqual(link.target, "./file.md")
         self.assertEqual(link.text, "text")
         self.assertEqual(link.kind, "markdown")
-        self.assertEqual(link.fragment, "#section")
+        self.assertEqual(link.header, "#section")
         self.assertFalse(link.is_image)
-        self.assertEqual(link.context.filepath, Path("/tmp/guide/SKILL.md"))
+        self.assertEqual(link.context.filepath, self.skill_md)
         self.assertEqual(link.context.start, 4)
         self.assertEqual(link.context.end, 29)
 
     def test_creates_wiki_link_with_custom_text(self):
-        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
-        links = factory.create_links("See [[../other/SKILL.md|Other Skill]].")
+        factory = LinkFactory()
+        links = factory.create_links(
+            self._context("See [[../other/SKILL.md|Other Skill]].")
+        )
 
         self.assertEqual(len(links), 1)
         link = links[0]
@@ -783,12 +798,12 @@ class TestLinkFactory(unittest.TestCase):
         self.assertEqual(link.path, "../other/SKILL.md")
         self.assertEqual(link.text, "Other Skill")
         self.assertEqual(link.kind, "wiki")
-        self.assertEqual(link.fragment, "")
+        self.assertEqual(link.header, "")
         self.assertFalse(link.is_image)
 
     def test_creates_image_link(self):
-        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
-        links = factory.create_links("![alt](./img.png)")
+        factory = LinkFactory()
+        links = factory.create_links(self._context("![alt](./img.png)"))
 
         self.assertEqual(len(links), 1)
         link = links[0]
@@ -798,8 +813,8 @@ class TestLinkFactory(unittest.TestCase):
         self.assertTrue(link.is_image)
 
     def test_returns_links_in_source_order(self):
-        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
-        links = factory.create_links("[a](./a.md) [[b]] [c](./c.md)")
+        factory = LinkFactory()
+        links = factory.create_links(self._context("[a](./a.md) [[b]] [c](./c.md)"))
 
         self.assertEqual(len(links), 3)
         self.assertEqual(links[0].text, "a")
@@ -807,8 +822,8 @@ class TestLinkFactory(unittest.TestCase):
         self.assertEqual(links[2].text, "c")
 
     def test_no_links_returns_empty_list(self):
-        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
-        links = factory.create_links("# No links here.")
+        factory = LinkFactory()
+        links = factory.create_links(self._context("# No links here."))
 
         self.assertEqual(links, [])
 
@@ -821,7 +836,7 @@ class TestLinkMapper(unittest.TestCase):
             kind="markdown",
             text="text",
             path="./file.md",
-            fragment="",
+            header="",
             is_image=False,
             context=LinkLocation(
                 filepath=Path("/tmp/guide/SKILL.md"),
@@ -853,7 +868,7 @@ class TestLinkMapper(unittest.TestCase):
             kind="wiki",
             text="plain",
             path="plain",
-            fragment="",
+            header="",
             is_image=False,
             context=LinkLocation(
                 filepath=Path("/tmp/guide/SKILL.md"),
@@ -890,7 +905,7 @@ class TestLinkMapper(unittest.TestCase):
             kind="markdown",
             text="text",
             path="./file.md",
-            fragment="",
+            header="",
             is_image=False,
             context=LinkLocation(
                 filepath=Path("/tmp/guide/SKILL.md"),

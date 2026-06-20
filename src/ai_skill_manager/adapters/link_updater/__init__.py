@@ -23,7 +23,9 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .models.Link import Link, LinkLocation
+from .models.link_location import LinkLocation
+
+from .models.link import Link
 from ai_skill_manager.models.skill import Skill
 
 from .service.LinkFactory import LinkFactory
@@ -38,7 +40,14 @@ from .base import (
 )
 from .map import LinkMapError, LinkMapper
 from .replace import LinkReplacer
-from .rules import LinkRule, MarkdawnRelativeRule, WikilinkAbsoluteRule, WikilinkRelativeRule
+from .rules import (
+    LinkRule,
+    MarkdawnLinkRule,
+    MarkdawnRelativeRule,
+    WikilinkAbsoluteRule,
+    WikilinkRelativeRule,
+    WikilinkRule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +63,9 @@ __all__ = [
     "LinkReplacer",
     "LinkRule",
     "LinkUpdater",
+    "MarkdawnLinkRule",
     "MarkdawnRelativeRule",
+    "WikilinkRule",
     "ReplaceResult",
     "SkillInfo",
     "WikilinkAbsoluteRule",

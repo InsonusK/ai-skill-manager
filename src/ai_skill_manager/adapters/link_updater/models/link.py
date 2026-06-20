@@ -1,29 +1,10 @@
 """Models for parsed markdown links."""
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Literal, Optional
 
-from ai_skill_manager.models.skill import Skill
-
-
-@dataclass(frozen=True)
-class LinkLocation:
-    """Where a link was found in the source text.
-
-    Attributes:
-        filepath: Path to the file containing the link.
-        skill: The skill the file belongs to, if known.
-        start: Character offset where the link starts in the content.
-        end: Character offset where the link ends in the content.
-    """
-
-    filepath: Path
-    skill: Optional[Skill]
-    start: int
-    end: int
-
-
+from .link_location import LinkLocation
+from .link_kind import LinkKind
 @dataclass(frozen=True)
 class Link:
     """Represents a parsed link found in markdown content.
@@ -41,9 +22,10 @@ class Link:
     raw: str
     path: str
     text: str
-    kind: Literal["markdown", "wiki"]
+    kind: LinkKind
+    format: Literal["markdown", "wiki"]
     context: LinkLocation
-    fragment: str = ""
+    header: Optional[str] = None
     is_image: bool = False
 
     @property

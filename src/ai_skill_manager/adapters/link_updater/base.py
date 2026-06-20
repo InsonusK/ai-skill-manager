@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-from .models.Link import Link
+from .models.link import Link
 import yaml
 
 from ai_skill_manager.models.skill import Skill
@@ -139,9 +139,9 @@ def format_link(link: Link, target_file: Path, context: LinkContext) -> str:
 
     if target_skill and target_skill != context.file_skill and not link.is_image:
         url = f"skill: {target_skill.name}"
-        if link.fragment:
-            url += link.fragment
+        if link.header:
+            url += link.header
         return f"{prefix}[{link.text}]({url})"
 
     rel = os.path.relpath(target_file, context.filepath.parent).replace(os.sep, "/")
-    return f"{prefix}[{link.text}]({rel}{link.fragment})"
+    return f"{prefix}[{link.text}]({rel}{link.header})"

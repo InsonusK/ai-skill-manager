@@ -5,10 +5,10 @@ Selects exactly one matching rule for a link and applies it.
 
 from typing import List, Optional
 
-from .models.Link import Link
+from .models.link import Link
 
 from .base import LinkContext
-from .rules import LinkRule, MarkdawnRelativeRule, WikilinkAbsoluteRule, WikilinkRelativeRule
+from .rules import LinkRule, MarkdawnLinkRule, WikilinkRule
 
 
 class LinkMapError(Exception):
@@ -22,9 +22,8 @@ class LinkMapper:
 
     def __init__(self, rules: Optional[List[LinkRule]] = None):
         self.rules = rules or [
-            WikilinkAbsoluteRule(),
-            WikilinkRelativeRule(),
-            MarkdawnRelativeRule(),
+            WikilinkRule(),
+            MarkdawnLinkRule(),
         ]
 
     def map(self, link: Link, context: LinkContext) -> str:
@@ -52,4 +51,4 @@ class LinkMapper:
                 f"ambiguous link matched multiple rules ({names}): {link.full}"
             )
 
-        return matched[0].apply(link, context)
+        return matched[0].to_skill_format(link, context)
