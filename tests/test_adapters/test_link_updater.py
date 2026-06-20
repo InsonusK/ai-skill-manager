@@ -6,9 +6,11 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.adapters.link_updater import LinkUpdater
-from ai_skill_manager.adapters.link_updater.base import Context, Link, SkillInfo
+from ai_skill_manager.adapters.link_updater.models.Link import Link, LinkLocation
+from ai_skill_manager.adapters.link_updater.base import FileContext, LinkContext, SkillInfo
 from ai_skill_manager.adapters.link_updater.map import LinkMapError, LinkMapper
 from ai_skill_manager.adapters.link_updater.replace import LinkReplacer
+from ai_skill_manager.adapters.link_updater.service.LinkFactory import LinkFactory
 from ai_skill_manager.adapters.link_updater.rules import (
     MarkdawnRelativeRule,
     WikilinkAbsoluteRule,
@@ -745,11 +747,84 @@ class TestLinkUpdater(unittest.TestCase):
         self.assertEqual(len(broken), 1)
 
 
+class TestLinkFactory(unittest.TestCase):
+    def test_creates_markdown_link(self):
+        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
+        links = factory.create_links("See [text](./file.md#section).")
+
+        self.assertEqual(len(links), 1)
+        link = links[0]
+        self.assertEqual(link.raw, "[text](./file.md#section)")
+        self.assertEqual(link.full, "[text](./file.md#section)")
+        self.assertEqual(link.path, "./file.md")
+        self.assertEqual(link.target, "./file.md")
+        self.assertEqual(link.text, "text")
+        self.assertEqual(link.kind, "markdown")
+        self.assertEqual(link.fragment, "#section")
+        self.assertFalse(link.is_image)
+        self.assertEqual(link.context.filepath, Path("/tmp/guide/SKILL.md"))
+        self.assertEqual(link.context.start, 4)
+        self.assertEqual(link.context.end, 29)
+
+    def test_creates_wiki_link_with_custom_text(self):
+        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
+        links = factory.create_links("See [[../other/SKILL.md|Other Skill]].")
+
+        self.assertEqual(len(links), 1)
+        link = links[0]
+        self.assertEqual(link.raw, "[[../other/SKILL.md|Other Skill]]")
+        self.assertEqual(link.path, "../other/SKILL.md")
+        self.assertEqual(link.text, "Other Skill")
+        self.assertEqual(link.kind, "wiki")
+        self.assertEqual(link.fragment, "")
+        self.assertFalse(link.is_image)
+
+    def test_creates_image_link(self):
+        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
+        links = factory.create_links("![alt](./img.png)")
+
+        self.assertEqual(len(links), 1)
+        link = links[0]
+        self.assertEqual(link.raw, "![alt](./img.png)")
+        self.assertEqual(link.path, "./img.png")
+        self.assertEqual(link.text, "alt")
+        self.assertTrue(link.is_image)
+
+    def test_returns_links_in_source_order(self):
+        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
+        links = factory.create_links("[a](./a.md) [[b]] [c](./c.md)")
+
+        self.assertEqual(len(links), 3)
+        self.assertEqual(links[0].text, "a")
+        self.assertEqual(links[1].text, "b")
+        self.assertEqual(links[2].text, "c")
+
+    def test_no_links_returns_empty_list(self):
+        factory = LinkFactory(filepath=Path("/tmp/guide/SKILL.md"))
+        links = factory.create_links("# No links here.")
+
+        self.assertEqual(links, [])
+
+
 class TestLinkMapper(unittest.TestCase):
     def test_single_matching_rule(self):
         mapper = LinkMapper()
-        link = Link(full="[text](./file.md)", kind="markdown", text="text", target="./file.md", fragment="", is_image=False)
-        context = Context(
+        link = Link(
+            raw="[text](./file.md)",
+            kind="markdown",
+            text="text",
+            path="./file.md",
+            fragment="",
+            is_image=False,
+            context=LinkLocation(
+                filepath=Path("/tmp/guide/SKILL.md"),
+                skill=None,
+                start=0,
+                end=18,
+            ),
+        )
+        context = LinkContext(
+            skill=None,
             filepath=Path("/tmp/guide/SKILL.md"),
             file_skill=None,
             repo_root=Path("/tmp"),
@@ -766,8 +841,22 @@ class TestLinkMapper(unittest.TestCase):
 
     def test_no_matching_rule_raises(self):
         mapper = LinkMapper()
-        link = Link(full="[[plain]]", kind="wiki", text="plain", target="plain", fragment="", is_image=False)
-        context = Context(
+        link = Link(
+            raw="[[plain]]",
+            kind="wiki",
+            text="plain",
+            path="plain",
+            fragment="",
+            is_image=False,
+            context=LinkLocation(
+                filepath=Path("/tmp/guide/SKILL.md"),
+                skill=None,
+                start=0,
+                end=9,
+            ),
+        )
+        context = LinkContext(
+            skill=None,
             filepath=Path("/tmp/guide/SKILL.md"),
             file_skill=None,
             repo_root=Path("/tmp"),
@@ -789,8 +878,22 @@ class TestLinkMapper(unittest.TestCase):
             def apply(self, link, context):
                 return ""
         mapper = LinkMapper(rules=[FakeRule(), FakeRule()])
-        link = Link(full="[text](./file.md)", kind="markdown", text="text", target="./file.md", fragment="", is_image=False)
-        context = Context(
+        link = Link(
+            raw="[text](./file.md)",
+            kind="markdown",
+            text="text",
+            path="./file.md",
+            fragment="",
+            is_image=False,
+            context=LinkLocation(
+                filepath=Path("/tmp/guide/SKILL.md"),
+                skill=None,
+                start=0,
+                end=18,
+            ),
+        )
+        context = LinkContext(
+            skill=None,
             filepath=Path("/tmp/guide/SKILL.md"),
             file_skill=None,
             repo_root=Path("/tmp"),
@@ -818,7 +921,8 @@ class TestLinkReplacer(unittest.TestCase):
         md.write_text("# Guide\nSee [other](./other.md).")
 
         replacer = LinkReplacer()
-        context = Context(
+        context = LinkContext(
+            skill=None,
             filepath=md,
             file_skill=None,
             repo_root=self.tmpdir,
@@ -829,7 +933,7 @@ class TestLinkReplacer(unittest.TestCase):
             target_to_skill={},
             source_to_skill={},
         )
-        result = replacer.replace(md, context)
+        result = replacer.replace(context)
 
         self.assertTrue(result.new_path.exists())
         self.assertNotEqual(result.new_path, md)
@@ -842,7 +946,8 @@ class TestLinkReplacer(unittest.TestCase):
         md.write_text("# Guide\nSee [example](https://example.com).")
 
         replacer = LinkReplacer()
-        context = Context(
+        context = LinkContext(
+            skill=None,
             filepath=md,
             file_skill=None,
             repo_root=self.tmpdir,
@@ -853,10 +958,51 @@ class TestLinkReplacer(unittest.TestCase):
             target_to_skill={},
             source_to_skill={},
         )
-        result = replacer.replace(md, context)
+        result = replacer.replace(context)
 
         self.assertIn("https://example.com", result.new_path.read_text())
         self.assertEqual(len(result.fixes), 0)
+
+    def test_replace_skill_local_source(self):
+        """replace_skill processes all markdown files of a local skill."""
+        source = LocalSource(path=self.tmpdir)
+
+        guide_dir = self.tmpdir / "guide"
+        guide_dir.mkdir()
+        guide_md = guide_dir / "SKILL.md"
+        guide_md.write_text("---\nname: guide\n---\n# Guide\nSee [other](../other/SKILL.md).")
+        guide_skill = Skill(file_path=guide_md, folder_path=guide_dir, source=source)
+
+        other_dir = self.tmpdir / "other"
+        other_dir.mkdir()
+        other_md = other_dir / "SKILL.md"
+        other_md.write_text("---\nname: other\n---\n# Other")
+
+        replacer = LinkReplacer()
+        results = replacer.replace_skill(guide_skill)
+
+        self.assertEqual(len(results), 1)
+        result = results[0]
+        self.assertTrue(result.new_path.exists())
+        content = result.new_path.read_text()
+        self.assertNotIn("../other/SKILL.md", content)
+        self.assertIn("[other](skill: other)", content)
+        self.assertEqual(len(result.fixes), 1)
+        self.assertEqual(result.fixes[0]["status"], "fixed")
+
+    def test_replace_skill_flat_local_source(self):
+        """replace_skill works for flat skills."""
+        source = LocalSource(path=self.tmpdir)
+
+        guide_md = self.tmpdir / "guide.skill.md"
+        guide_md.write_text("---\nname: guide\n---\n# Guide")
+        guide_skill = Skill(file_path=guide_md, folder_path=None, source=source)
+
+        replacer = LinkReplacer()
+        results = replacer.replace_skill(guide_skill)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].fixes, [])
 
 
 if __name__ == "__main__":

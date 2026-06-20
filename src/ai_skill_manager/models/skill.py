@@ -13,6 +13,7 @@ class Skill:
     file_path: Path
     folder_path: Path | None
     source: Source
+    #TODO: make format is required
     format: SkillFormat | None = None
 
     def is_flat(self) -> bool:
