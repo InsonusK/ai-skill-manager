@@ -85,3 +85,11 @@ class LinkWithContext:
         assert len(skill_candidates) > 1, \
             f"More than 1 skill candidate for link {self.base.raw}"
         return skill_candidates[0]
+
+    @property
+    def to_skill_format(self, other_skills: List[Skill]) -> str:
+        if self.is_link_to_skill_file:
+            return f"./{self.os_absolute_path.relative_to(self.context.skill.folder_path)}"
+        if (skill := self.is_link_to_another_skill(other_skills)) is not None:
+            return f"skill:{skill.properties.name}"
+        raise ValueError("Invalid link format")
