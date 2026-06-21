@@ -8,13 +8,13 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from ...models import Skill
+from ..models import Skill
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
 
 
-class DiscoveryStrategy(ABC):
+class absDiscoveryStrategy(ABC):
     """Abstract base for skill discovery strategies.
 
     Concrete strategies receive a source path (file or directory) and must

@@ -5,10 +5,5 @@
 
 from .github import GitHubSource
 from .local import LocalSource
-from .source import Source
+from .source import Source,SourceType
 
-__all__ = [
-    "Source",
-    "GitHubSource",
-    "LocalSource",
-]

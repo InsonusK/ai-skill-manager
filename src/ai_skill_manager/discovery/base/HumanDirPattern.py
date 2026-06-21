@@ -6,7 +6,7 @@
 from pathlib import Path
 from typing import Optional
 
-from ....models import Skill, SkillFormat, Source
+from ...models import Skill, SkillFormat, Source
 from .SkillPattern import SkillPattern
 
 

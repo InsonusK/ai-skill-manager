@@ -20,13 +20,13 @@ Directory patterns (detected on directories):
 from pathlib import Path
 from typing import List, Optional
 
-from ...models import Skill, Source
-from ...models.source import LocalSource
+from ..models import Skill, Source
+from ..models.source import LocalSource
 from .base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
-from .DiscoveryStrategy import DiscoveryStrategy
+from .abs_discovery_strategy import absDiscoveryStrategy
 
 
-class AutoDiscovery(DiscoveryStrategy):
+class AutoDiscovery(absDiscoveryStrategy):
     """Recursively auto-detect skills of any supported format.
 
     Рекурсивно автоматически обнаруживает навыки любого поддерживаемого формата.
@@ -41,7 +41,7 @@ class AutoDiscovery(DiscoveryStrategy):
     _DIR_PATTERNS: List[SkillPattern] = [AgentPattern(), HumanDirPattern()]
 
     def __init__(
-        self, source_path: Path, source: Optional[Source] = None
+        self, source_path: Path, source: Source
     ):
         """Initialize auto-discovery.
 

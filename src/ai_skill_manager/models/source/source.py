@@ -4,8 +4,8 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
-
+from enum import Enum
+from typing import Any, Dict, Literal
 
 class Source(ABC):
     """Abstract representation of a skill source.

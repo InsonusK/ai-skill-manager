@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.core import copy_skill
-from ai_skill_manager.discovery.source.github import (
+from ai_skill_manager.discovery.github import (
     GitHubDiscovery,
     _find_extracted_root,
     _parse_github_url,

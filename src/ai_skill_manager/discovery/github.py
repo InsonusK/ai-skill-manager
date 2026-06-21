@@ -17,10 +17,10 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Union
 
-from ...models import Skill
-from ...models.source import GitHubSource
+from ..models import Skill
+from ..models.source import GitHubSource
 from .auto import AutoDiscovery
-from .DiscoveryStrategy import DiscoveryStrategy
+from .abs_discovery_strategy import absDiscoveryStrategy
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ def _find_extracted_root(extract_to: Path) -> Path:
     return entries[0]
 
 
-class GitHubDiscovery(DiscoveryStrategy):
+class GitHubDiscovery(absDiscoveryStrategy):
     """Discover skills from a GitHub repository.
 
     Downloads the repo archive for the specified tree/branch, extracts it,

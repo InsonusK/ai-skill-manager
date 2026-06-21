@@ -15,7 +15,7 @@ class LinkFactory:
     
     def __init__(self, rules:List[absLinkBuilder] = DEFAULT_RULES):
         self.__search_rules:List[absLinkBuilder] = rules
-        
+    
     def create_links(self, file: FileContext) -> List[Link]:
         """Parse all links from ``file`` and return them in source order."""
         content_context = ContentContext(file)

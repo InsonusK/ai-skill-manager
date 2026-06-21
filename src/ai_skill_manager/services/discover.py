@@ -1,24 +1,12 @@
-"""Discovery public API.
-
-Provides a single entry point to discover skills from a list of sources.
-Discovery only finds skills; it does not decide where to copy them.
-
-Предоставляет единую точку входа для обнаружения навыков из списка
-источников. Discovery только ищет навыки, но не определяет, куда их
-копировать.
-"""
 
 from pathlib import Path
 from typing import List, Sequence
 
-from ..models.skill import Skill
-from .models import Source
-from .source import AutoDiscovery, GitHubDiscovery
+from ..models import GitHubSource, LocalSource, Skill,Source
+from ..discovery import AutoDiscovery,GitHubDiscovery
 
 STRATEGIES = {
     "auto": AutoDiscovery,
-    "flat": AutoDiscovery,
-    "directory": AutoDiscovery,
     "github": GitHubDiscovery,
 }
 
@@ -38,19 +26,20 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
     """
     all_skills: List[Skill] = []
     for src in sources:
-        strategy_class = STRATEGIES.get(src.type)
-        if strategy_class is None:
-            raise ValueError(f"Unknown source type: {src.type}")
-
-        if src.type == "github":
+        if isinstance(src, GitHubSource):            
             subpath_value = src.subpath if src.subpath is not None else "skills"
             strategy = GitHubDiscovery(
-                src.path,
+                src.repo_url,
                 tree=src.tree,
                 subpath=subpath_value,
             )
+        elif isinstance(src, LocalSource):
+            strategy = AutoDiscovery(
+                source_path=Path(src.path).resolve(),
+                source=src
+            )
         else:
-            strategy = strategy_class(Path(src.path).resolve())
+            raise ValueError(f"Unknown type {src.source_type}")
 
         all_skills.extend(strategy.discover())
 

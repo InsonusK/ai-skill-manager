@@ -1,19 +1,6 @@
-"""Skill discovery module.
+"""Skill discovery strategies."""
 
-Public API for discovering skills from local directories or GitHub
-repositories. Discovery returns ``Skill`` objects and does not handle
-sync/copy concerns.
+from .auto import AutoDiscovery
+from .abs_discovery_strategy import absDiscoveryStrategy
+from .github import GitHubDiscovery
 
-Публичный API для обнаружения навыков из локальных директорий или
-репозиториев GitHub. Discovery возвращает объекты ``Skill`` и не
-занимается синхронизацией/копированием.
-"""
-
-from .api import STRATEGIES, discover
-from .models import Source
-
-__all__ = [
-    "Source",
-    "STRATEGIES",
-    "discover",
-]

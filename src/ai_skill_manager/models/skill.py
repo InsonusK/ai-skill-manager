@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -20,49 +20,49 @@ class Skill:
     source: Source
     format: SkillFormat  # Required skill format. / Обязательный формат навыка.
 
+    _headers: Dict[str,Any] = field(init=False, default=None)
+
+    @property
+    def headers(self)->Dict[str,Any]:
+        if self._headers is None:
+            headers = self._parse_frontmatter(self.file_path)
+            object.__setattr__(self, "_headers", headers)
+        return self._headers
+    
     def is_flat(self) -> bool:
         return self.folder_path is None
 
     @property
     def name(self) -> Optional[str]:
-        """Read the ``name`` property from the SKILL.md YAML frontmatter.
-
-        Returns ``None`` if frontmatter is missing or the ``name`` key is
-        absent. No fallback is applied; a future validator will enforce
-        correct skill metadata.
-
-        Возвращает свойство ``name`` из YAML frontmatter файла SKILL.md.
-        Возвращает ``None``, если frontmatter отсутствует или в нём нет
-        ключа ``name``. Fallback не применяется; корректность метаданных
-        навыка будет проверяться отдельным валидатором.
+        name = self.headers.get("name")
+        if name is None or not isinstance(name, str):
+            return None
+        return name
+    
+    @staticmethod
+    def _parse_frontmatter(file_path: Path) -> dict[str, Any] | None:
         """
-        if not self.file_path.exists():
-            return None
-
-        try:
-            content = self.file_path.read_text(encoding="utf-8")
-        except Exception:
-            return None
-
+        EN: Parse YAML frontmatter from a markdown file.
+            Returns the parsed YAML dict, or None if no frontmatter found.
+        RU: Распарсить YAML frontmatter из markdown-файла.
+            Вернуть распарсенный YAML dict или None, если frontmatter не найден.
+        """
+        content = file_path.read_text(encoding="utf-8")
         if not content.startswith("---"):
             return None
 
-        end = content.find("\n---", 3)
-        if end == -1:
-            end = content.find("\r\n---", 3)
-        if end == -1:
+        # EN: Find the closing --- after the opening one.
+        # RU: Найти закрывающий --- после открывающего.
+        rest = content[3:]
+        end_idx = rest.find("---")
+        if end_idx == -1:
+            return None
+
+        frontmatter_text = rest[:end_idx].strip()
+        if not frontmatter_text:
             return None
 
         try:
-            frontmatter = yaml.safe_load(content[3:end])
-        except Exception:
-            return None
-
-        if not isinstance(frontmatter, dict):
-            return None
-
-        name = frontmatter.get("name")
-        if name is None or not isinstance(name, str):
-            return None
-
-        return name
+            return yaml.safe_load(frontmatter_text) or {}
+        except yaml.YAMLError:
+            raise ValueError(f"Failed to parse YAML frontmatter in {file_path}")

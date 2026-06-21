@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.models import GitHubSource, LocalSource, Skill, SkillFormat, Source
-from ai_skill_manager.discovery.source.auto import AutoDiscovery
+from ai_skill_manager.discovery.auto import AutoDiscovery
 
 
 class TestSource(unittest.TestCase):
