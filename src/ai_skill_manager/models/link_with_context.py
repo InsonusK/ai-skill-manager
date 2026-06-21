@@ -5,6 +5,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional
 
 from ..entities import Link, LinkKind, Skill, SkillFile
 from .link_location import LinkLocation
@@ -47,12 +48,12 @@ class LinkWithContext:
             link_candidates) == 1, f"Link {self.base.raw} has more than 1 candidate in skill file {self.context.file.path}"
 
     @staticmethod
-    def build(skill: Skill, file: SkillFile,link: Link) -> LinkWithContext:
-        lc = LinkLocation(file,skill)
+    def build(skill: Skill, file: SkillFile, link: Link) -> LinkWithContext:
+        lc = LinkLocation(file, skill)
         return LinkWithContext(link, lc)
 
     @property
-    def os_absolute_path(self) -> Path|None:
+    def os_absolute_path(self) -> Path | None:
         if self.base.kind == LinkKind.web:
             return None
         elif self.base.kind == LinkKind.os_absolute:
@@ -63,3 +64,24 @@ class LinkWithContext:
             return (self.context.skill.source_path / self.base.path).resolve()
         else:
             raise ValueError(f"Unknown LinkKind: {self.base.kind}")
+
+    @property
+    def is_link_to_skill_file(self) -> bool:
+        if self.context.skill.format.is_flat:
+            return self.os_absolute_path == self.context.skill.file_path
+
+        if not self.context.skill.format.is_dir:
+            return False
+
+        assert self.context.skill.folder_path is not None, "None folder path in dir skill"
+
+        return self.os_absolute_path.is_relative_to(self.context.skill.folder_path)
+
+    def is_link_to_another_skill(self, other_skills: List[Skill]) -> Optional[Skill]:
+        skill_candidates = [
+            skill for skill in other_skills if self.os_absolute_path == skill.file_path]
+        if len(skill_candidates) == 0:
+            return None
+        assert len(skill_candidates) > 1, \
+            f"More than 1 skill candidate for link {self.base.raw}"
+        return skill_candidates[0]

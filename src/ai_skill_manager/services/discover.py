@@ -2,8 +2,8 @@
 from pathlib import Path
 from typing import List, Sequence
 
-from ..models import GitHubSource, LocalSource, Skill,Source
-from ..discovery import AutoDiscovery,GitHubDiscovery
+from ..entities import GitHubSource, LocalSource, Skill,Source
+from ..discovery.skill import AutoDiscovery,GitHubDiscovery
 
 STRATEGIES = {
     "auto": AutoDiscovery,

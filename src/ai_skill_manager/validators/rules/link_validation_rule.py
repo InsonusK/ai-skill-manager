@@ -17,9 +17,10 @@ class LinkValidationRule(absValidationRule):
     Проверяет, что каждая ссылка ведёт либо на другой скилл, либо на файл
     внутри своей директории скилла.
     """
-    def version(self)->str:
+
+    def version(self) -> str:
         return "1.0.0"
-    
+
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
         """Validate links for all provided skills.
 
@@ -59,17 +60,10 @@ class LinkValidationRule(absValidationRule):
                 },
             )
 
-        if link.context.skill.format.is_dir:
-            assert link.context.skill.folder_path is not None, "None folder path in dir skill"
-            if link.os_absolute_path.is_relative_to(link.context.skill.folder_path):
-                return None
-            
-        elif link.context.skill.format.is_flat:
-            if link.os_absolute_path == link.context.skill.file_path:
-                return None
-
-        if any(skill.file_path == link.os_absolute_path
-               for skill in skills):
+        if link.is_link_to_skill_file:
+            return None
+        
+        if link.is_link_to_another_skill(skills) is not None:
             return None
 
         return ValidationError(
