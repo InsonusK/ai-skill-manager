@@ -1,7 +1,7 @@
 from abc import ABC,abstractmethod
 from typing import Dict, List
 
-from ...models.skill import Skill
+from ...entities.skill import Skill
 from ..models.validation_result import ValidationResult
 
 class absValidationRule(ABC):

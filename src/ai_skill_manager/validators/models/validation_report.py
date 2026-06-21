@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict
 
-from ...models.skill import Skill
+from ...entities.skill import Skill
 from ..rules import absValidationRule
 from .validation_result import ValidationResult
 from .validation_severity import ValidationSeverity

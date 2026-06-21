@@ -1,7 +1,7 @@
 from typing import Dict, Optional
 from xml.dom import ValidationErr
 from .abs_validation_rule import Skill, absValidationRule, ValidationResult, List
-from ...models import SkillFormat
+from ...entities import SkillFormat
 from ..models import ValidationSeverity,ValidationError
 
 class NameValidationRule(absValidationRule):
