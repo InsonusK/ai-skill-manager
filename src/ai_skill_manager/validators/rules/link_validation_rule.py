@@ -17,7 +17,9 @@ class LinkValidationRule(absValidationRule):
     Проверяет, что каждая ссылка ведёт либо на другой скилл, либо на файл
     внутри своей директории скилла.
     """
-
+    def version(self)->str:
+        return "1.0.0"
+    
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
         """Validate links for all provided skills.
 

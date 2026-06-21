@@ -5,6 +5,9 @@ from ...entities import SkillFormat
 from ..models import ValidationSeverity,ValidationError
 
 class NameValidationRule(absValidationRule):
+    def version(self)->str:
+        return "1.0.0"
+    
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
         results = {}
         for skill in skills:

@@ -6,6 +6,9 @@ from ..models.validation_result import ValidationResult
 
 class absValidationRule(ABC):
     @property
+    def version(self)->str:
+        return ""
+    @property
     def name(self)->str:
         return self.__class__.__name__
     
