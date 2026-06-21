@@ -20,9 +20,9 @@ Directory patterns (detected on directories):
 from pathlib import Path
 from typing import List, Optional
 
-from ...models import Skill, Source
-from ...models.source import LocalSource
-from ..base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
+from ...entities import Skill, Source
+from ...entities.source import LocalSource
+from .base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
 from .abs_discovery_strategy import absDiscoveryStrategy
 
 
@@ -34,11 +34,11 @@ class AutoDiscovery(absDiscoveryStrategy):
 
     # Flat patterns are applied to files directly inside a scanned directory.
     # Плоские паттерны применяются к файлам непосредственно внутри сканируемой директории.
-    _FLAT_PATTERNS: List[SkillPattern] = [HumanFlatPattern()]
+    _FLAT_PATTERNS: List[SkillPattern] = [HumanFlatPattern]
 
     # Directory patterns are applied to the directory itself.
     # Директориальные паттерны применяются к самой директории.
-    _DIR_PATTERNS: List[SkillPattern] = [AgentPattern(), HumanDirPattern()]
+    _DIR_PATTERNS: List[SkillPattern] = [AgentPattern, HumanDirPattern]
 
     def __init__(
         self, source_path: Path, source: Source
@@ -54,7 +54,14 @@ class AutoDiscovery(absDiscoveryStrategy):
                 умолчанию LocalSource для ``source_path``.
         """
         super().__init__(source_path)
-        self._source = source if source is not None else LocalSource(self.source_path)
+        self._source = source if source is not None else LocalSource(
+            self.source_path)
+        
+        self._flat_patterns:List[SkillPattern] = [pattern(source, source_path)
+                               for pattern in self._FLAT_PATTERNS]
+        self._dir_patterns:List[SkillPattern] = [pattern(source, source_path)
+                              for pattern in self._DIR_PATTERNS]
+        
 
     def discover(self) -> List[Skill]:
         """Recursively discover all skills at the source path.
@@ -91,8 +98,8 @@ class AutoDiscovery(absDiscoveryStrategy):
         """
         return [
             skill
-            for pattern in self._FLAT_PATTERNS
-            if (skill := pattern.match(path, self._source)) is not None
+            for pattern in self._flat_patterns
+            if (skill := pattern.match(path)) is not None
         ]
 
     def _match_directory_patterns(self, path: Path) -> List[Skill]:
@@ -108,7 +115,7 @@ class AutoDiscovery(absDiscoveryStrategy):
         """
         return [
             skill
-            for pattern in self._DIR_PATTERNS
+            for pattern in self._dir_patterns
             if (skill := pattern.match(path, self._source)) is not None
         ]
 
@@ -212,7 +219,8 @@ class AutoDiscovery(absDiscoveryStrategy):
 
         # One directory pattern plus multiple flat files: conflict.
         # Один директориальный паттерн плюс несколько плоских файлов: конфликт.
-        raise ValueError(f"Skill definition conflict in directory: {directory}")
+        raise ValueError(
+            f"Skill definition conflict in directory: {directory}")
 
     def _recurse_subdirectories(self, directory: Path) -> List[Skill]:
         """Scan all subdirectories recursively.

@@ -1,6 +1,6 @@
 """Factory for creating :class:`Link` objects from markdown content."""
 from typing import List
-from ....models.link import Link
+from ....entities.link import Link
 from .builder import absLinkBuilder, WikilinkBuilder, MarkdownLinkBuilder
 
 LINK_SEARCH_RULES: List[absLinkBuilder] = [

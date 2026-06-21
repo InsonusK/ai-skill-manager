@@ -3,7 +3,7 @@
 from abc import ABC
 from typing import List, Tuple
 
-from .....models import Link, LinkKind
+from .....entities import Link, LinkKind
 
 
 class absLinkBuilder(ABC):

@@ -1,6 +1,6 @@
 import re
 from typing import List
-from .....models.link import Link
+from .....entities.link import Link
 from .abs_link_builder import absLinkBuilder
 
 MD_LINK_RE = re.compile(r'!?\[([^\]]*)\]\(([^\s\)"]*)\)')

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ....models import Skill, SkillFormat, Source
+from ....entities import Skill, SkillFormat, Source
 
 
 class SkillPattern(ABC):
@@ -20,6 +20,10 @@ class SkillPattern(ABC):
     Подклассы реализуют правила сопоставления для одного формата навыка,
     например файлы ``*.skill.md`` или директории, содержащие ``SKILL.md``.
     """
+
+    def __init__(self, source: Source, source_path: Path):
+        self._source = source
+        self._source_path = source_path
 
     @property
     @abstractmethod
@@ -36,7 +40,7 @@ class SkillPattern(ABC):
 
     @abstractmethod
     def match(
-        self, path: Path, source: Source
+        self, path: Path
     ) -> Optional[Skill]:
         """Return a Skill if the path matches this pattern.
 
