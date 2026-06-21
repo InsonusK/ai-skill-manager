@@ -29,9 +29,13 @@ class Skill:
             object.__setattr__(self, "_headers", headers)
         return self._headers
     
+    @property
     def is_flat(self) -> bool:
         return self.folder_path is None
-
+    @property
+    def is_dir(self)->bool:
+        return not self.is_flat
+    
     @property
     def name(self) -> Optional[str]:
         name = self.headers.get("name")

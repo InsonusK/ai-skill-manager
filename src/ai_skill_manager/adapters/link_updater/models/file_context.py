@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from ....models import Skill
 
@@ -11,8 +10,7 @@ class FileContext:
 
     Attributes:
         path: Path to the file on disk.
-        skill: The skill the file belongs to, if known.
-        content: Optional file content. When omitted, content is read from disk.
+        skill: The skill the file belongs to.
     """
 
     path: Path
