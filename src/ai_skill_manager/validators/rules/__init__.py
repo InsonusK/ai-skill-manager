@@ -1,6 +1,6 @@
 from typing import List
 
-from .base import absRule
+from .abs_validation_rule import absValidationRule
+from .name_validator import NameValidationRule
 
-
-DEFAULT_RULES:List[absRule] = []
+DEFAULT_RULES:List[absValidationRule] = [NameValidationRule()]

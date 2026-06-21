@@ -1,5 +1,5 @@
 from typing import Dict, List
-from ..rules import absRule
+from ..rules import absValidationRule
 from ...models.skill import Skill
 from .validation_result import ValidationResult
 from dataclasses import dataclass
@@ -7,7 +7,7 @@ from .validation_severity import ValidationSeverity
 
 @dataclass(slots=True)
 class ValidationReport:
-    result: Dict[Skill,Dict[absRule, ValidationResult]] = {}
+    result: Dict[Skill,Dict[absValidationRule, ValidationResult]] = {}
     @property
     def has_errors(self)->bool:
         return any(
@@ -17,7 +17,7 @@ class ValidationReport:
         )
     
     @property
-    def errors(self) -> Dict[Skill,Dict[absRule, ValidationResult]]:
+    def errors(self) -> Dict[Skill,Dict[absValidationRule, ValidationResult]]:
         _return = {}
         for skill, rule_results in self.result.items():
             skill_errors = {}
