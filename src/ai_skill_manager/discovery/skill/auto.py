@@ -20,9 +20,9 @@ Directory patterns (detected on directories):
 from pathlib import Path
 from typing import List, Optional
 
-from ..models import Skill, Source
-from ..models.source import LocalSource
-from .base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
+from ...models import Skill, Source
+from ...models.source import LocalSource
+from ..base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
 from .abs_discovery_strategy import absDiscoveryStrategy
 
 

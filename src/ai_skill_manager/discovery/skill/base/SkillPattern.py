@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ...models import Skill, SkillFormat, Source
+from ....models import Skill, SkillFormat, Source
 
 
 class SkillPattern(ABC):

@@ -5,7 +5,9 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple
+
+from ..discovery.link.factory.link_factory import search_links_in_content
 
 from .link import Link
 
@@ -42,11 +44,14 @@ class SkillFile:
             Распарсенные ссылки в порядке следования в исходнике.
         """
         if self._links is None:
-            from ..adapters.link_updater.factory.link_factory import LinkFactory
-
             object.__setattr__(
                 self,
                 "_links",
-                tuple(LinkFactory().create_links_for_path(self.path)),
+                tuple(search_links_in_content(self.content)),
             )
         return self._links
+
+    @property
+    def content(self)->str:
+        """Return the file content, reading from disk when not provided."""
+        return self.path.read_text(encoding="utf-8")

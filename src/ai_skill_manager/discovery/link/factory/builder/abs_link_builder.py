@@ -3,11 +3,11 @@
 from abc import ABC
 from typing import List, Tuple
 
-from ...models import ContentContext, Link, LinkKind
+from .....models import Link, LinkKind
 
 
 class absLinkBuilder(ABC):
-    def search(self, content: ContentContext) -> List[Link]:
+    def search(self, content: str) -> List[Link]:
         ...
 
     def _split_fragment(self, path: str) -> Tuple[str, str]:
@@ -27,9 +27,15 @@ class absLinkBuilder(ABC):
             return LinkKind.os_absolute
         elif self._is_repo_absolute(path):
             return LinkKind.repo_absolute
+        elif self._is_http_link(path):
+            return LinkKind.web
         else:
             raise ValueError(f"Cann't define kind of path:{path}")
-
+        
+    def _is_http_link(self, path:str)->bool:
+        lower = path.lower()
+        return lower.startswith(("http://", "https://", "mailto:", "ftp://", "file://"))
+    
     def _is_relative(self, path: str) -> bool:
         """Return True for links starting with ``./`` or ``../``."""
         return path.startswith(("./", "../"))

@@ -17,8 +17,8 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Union
 
-from ..models import Skill
-from ..models.source import GitHubSource
+from ...models import Skill
+from ...models.source import GitHubSource
 from .auto import AutoDiscovery
 from .abs_discovery_strategy import absDiscoveryStrategy
 
