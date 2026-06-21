@@ -13,15 +13,28 @@ class ValidationResult:
         return ValidationResult([single_error])        
     
     @property
-    def has_erros(self)->bool:
+    def has_errors(self) -> bool:
         return any(
             er.severity == ValidationSeverity.ERROR
             for er in self.errors
         )
-        
+
     @property
-    def has_warnings(self)->bool:
+    def has_warnings(self) -> bool:
         return any(
             er.severity == ValidationSeverity.WARNING
             for er in self.errors
         )
+
+    @property
+    def severity(self) -> ValidationSeverity:
+        """Return the aggregated severity for this result.
+
+        Returns ``ERROR`` if any error is present, ``WARNING`` if only warnings
+        are present, otherwise ``SUCCESS``.
+        """
+        if self.has_errors:
+            return ValidationSeverity.ERROR
+        if self.has_warnings:
+            return ValidationSeverity.WARNING
+        return ValidationSeverity.SUCCESS

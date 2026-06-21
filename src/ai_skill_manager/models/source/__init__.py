@@ -5,5 +5,4 @@
 
 from .github import GitHubSource
 from .local import LocalSource
-from .source import Source,SourceType
-
+from .source import Source

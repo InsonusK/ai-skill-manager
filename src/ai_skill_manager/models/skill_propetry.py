@@ -15,8 +15,14 @@ class SkillProperty:
         return self.__property_dict
     
     @property
-    def name(self)->Optional[str]:
-        return self.all.get("name", None)            
+    def name(self) -> Optional[str]:
+        properties = self.all
+        if properties is None:
+            return None
+        value = properties.get("name", None)
+        if not isinstance(value, str):
+            return None
+        return value
         
     @staticmethod
     def _parse_frontmatter(file_path: Path) -> dict[str, Any] | None:
@@ -26,7 +32,11 @@ class SkillProperty:
         RU: Распарсить YAML frontmatter из markdown-файла.
             Вернуть распарсенный YAML dict или None, если frontmatter не найден.
         """
-        content = file_path.read_text(encoding="utf-8")
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except (FileNotFoundError, IsADirectoryError, PermissionError):
+            return None
+
         if not content.startswith("---"):
             return None
 
@@ -42,6 +52,11 @@ class SkillProperty:
             return None
 
         try:
-            return yaml.safe_load(frontmatter_text) or {}
+            parsed = yaml.safe_load(frontmatter_text)
         except yaml.YAMLError:
-            raise ValueError(f"Failed to parse YAML frontmatter in {file_path}")
+            return None
+
+        if not isinstance(parsed, dict):
+            return None
+
+        return parsed

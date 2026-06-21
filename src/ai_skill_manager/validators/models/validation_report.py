@@ -1,13 +1,16 @@
-from typing import Dict, List
-from ..rules import absValidationRule
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Dict
+
 from ...models.skill import Skill
+from ..rules import absValidationRule
 from .validation_result import ValidationResult
-from dataclasses import dataclass
 from .validation_severity import ValidationSeverity
+
 
 @dataclass(slots=True)
 class ValidationReport:
-    result: Dict[Skill,Dict[absValidationRule, ValidationResult]] = {}
+    result: Dict[Skill, Dict[absValidationRule, ValidationResult]] = field(default_factory=dict)
     @property
     def has_errors(self)->bool:
         return any(
