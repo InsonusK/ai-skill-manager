@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum
 
 
@@ -23,3 +24,10 @@ class SkillFormat(Enum):
     - Название директории {skill name}.skill
     - Название скила = {skill name}
     """
+    
+    @property
+    def is_flat(self)->bool:
+        return self == SkillFormat.HumanFlat
+    @property
+    def is_dir(self)->bool:
+        return not self.is_flat

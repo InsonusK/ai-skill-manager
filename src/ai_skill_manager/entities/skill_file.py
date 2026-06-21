@@ -29,10 +29,16 @@ class SkillFile:
     """
 
     path: Path
+    """
+    absolute path to skill file
+    """
     _links: Tuple[Link] = field(
         default=None, init=False, repr=False, compare=False, hash=False
     )
-
+    def __post_init__(self):
+        assert self.path.is_absolute(), f"Skill file path must be absolute. Current value: {self.path}"
+        assert self.path.is_file(), f"Skill file path must lead to file. Now it leads to {self.path}"
+                
     @property
     def links(self) -> Tuple[Link]:
         """Return all parsed links in this file.

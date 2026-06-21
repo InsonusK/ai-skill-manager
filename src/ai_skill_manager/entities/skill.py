@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 from .skill_file import SkillFile
 from .skill_format import SkillFormat
 from .skill_propetry import SkillProperty
-from .source import Source
+from .source.source import Source
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,11 @@ class Skill:
     """
 
     file_path: Path
+    """absolute Path to skill main file"""
     folder_path: Path | None
+    """absolute Path to skill folder"""
+    source_path: Path
+    """absolute Path to source folder"""
     source: Source
     format: SkillFormat  # Required skill format. / Обязательный формат навыка.
     properties: SkillProperty = field(init=False)
@@ -26,6 +30,19 @@ class Skill:
     def __post_init__(self):
         # Обход frozen через object.__setattr__
         object.__setattr__(self, "properties", SkillProperty(self.file_path))
+        assert self.file_path.is_absolute(
+        ), f"File_path must be absolute format. Current value: {self.file_path}"
+        assert self.file_path.is_file(
+        ), f"File_path must lead to file. Now it leads to {self.file_path}"
+        if self.format.is_dir:
+            assert self.folder_path.is_absolute(
+            ), f"Folder_path must be absolute format. Current value: {self.folder_path}"
+            assert self.folder_path.is_dir(
+            ), f"Folder_path must lead to folder. Now it leads to {self.folder_path}"
+        assert self.source_path.is_absolute(
+        ), f"SourceSpath must be in absolute format. Current value: {self.source_path}"
+        assert self.source_path.is_dir(
+        ), f"Source_path must lead to folder. Now it leads to {self.source_path}"
 
     @property
     def name(self) -> Optional[str]:

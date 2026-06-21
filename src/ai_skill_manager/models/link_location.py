@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from .file_context import FileContext,Skill
-
+from ..entities import SkillFile,Skill
 
 @dataclass(frozen=True)
 class LinkLocation:
@@ -13,16 +12,15 @@ class LinkLocation:
         end: Character offset where the link ends in the content.
     """
 
-    file: FileContext
-    start: int
-    end: int
-
+    file: SkillFile
+    skill: Skill
+    
     @property
     def filepath(self) -> Path:
         """Backward-compatible alias for :attr:`file.path`."""
         return self.file.path
-
-    @property
-    def skill(self) -> Skill:
-        """Backward-compatible alias for :attr:`file.skill`."""
-        return self.file.skill
+    
+    def __post_init__(self):
+        skill_files = [file for file in self.skill.files if file == self.file]
+        assert len(skill_files)>0, f"File {self.file.path} doesn't find in files of skill {self.skill.file_path}"
+        assert len(skill_files)==1, f"File {self.file.path} has more than 1 candidate in files of skill {self.skill.file_path}"
