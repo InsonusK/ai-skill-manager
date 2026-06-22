@@ -4,9 +4,20 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Optional
-
+from .entities import Skill
 MANAGER_TAG_FILE = ".ai-skills-managed"
 
+def compute_skill_hash(skill: Skill) -> str:
+    """Compute hash of a skill source."""
+    if skill.is_flat():
+        return compute_hash(skill.file_path)
+    h = hashlib.sha256()
+    for file_path in sorted([f.path for f in skill.files]):
+        if file_path.is_file():
+            rel = str(file_path.relative_to(skill.folder_path))
+            h.update(rel.encode())
+            h.update(compute_hash(file_path).encode())
+    return h.hexdigest()
 
 def compute_hash(filepath: Path) -> str:
     """Compute SHA256 hash of a file."""

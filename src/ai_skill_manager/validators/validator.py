@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from .models.validation_report import Skill, ValidationReport,Dict,ValidationResult
 from .rules import absValidationRule, DEFAULT_RULES,List
 
@@ -8,6 +10,9 @@ class Validator:
         assert len(rule_names) == len(set(rule_names)), "Rules must have unique names"
         self.__rules = rule_list
         
+    @property
+    def registered_rules_name_version(self) -> List[Tuple[str, str]]:
+        return [(rule.name, rule.version) for rule in self.__rules]
     
     def validate(self, skills:List[Skill])->ValidationReport:
         report_dict: Dict[Skill,Dict[absValidationRule, ValidationResult]] = {}

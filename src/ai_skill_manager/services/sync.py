@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import List, Optional, Sequence, Type
 
+from ..utils import compute_skill_hash, write_managed_state
+
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
 from ..entities import LocalSource, Skill, Source
@@ -18,7 +20,7 @@ from .discover import discover
 def run_sync(
     sources: Sequence[Source],
     target_dir: Path,
-    adapters: Optional[Sequence[Type[absAdapter]]] = None,
+    adapters: Optional[Sequence[Type[absAdapter]]] = None
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
 
@@ -49,25 +51,42 @@ def run_sync(
 
     adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
     adapter = Adapter(adapter_list)
-    
+
     copied_skills: List[Skill] = []
     links_replaced = 0
+    validator_versions = [
+        {"name": registered_rule[0], "version": registered_rule[1]}
+        for registered_rule in validator.registered_rules_name_version
+    ]
+    adapters_version = [
+        {"name": registered_adapter[0],
+         "version": registered_adapter[1]}
+        for registered_adapter in adapter.registered_adapters_name_version
+    ]
     for skill in skills:
         name = skill.properties.name
         if name is None:
-            raise ValueError(f"Skill {skill.file_path} has no 'name' in frontmatter")
+            raise ValueError(
+                f"Skill {skill.file_path} has no 'name' in frontmatter")
 
         skill_target_dir = target_dir / name
         if skill.is_flat():
             new_skill = _copy_flat_skill(skill, skill_target_dir)
         else:
             new_skill = _copy_dir_skill(skill, skill_target_dir)
-        
+
         adapter_msg = adapter.adapt(skill, new_skill)
         links_replaced += adapter_msg.get(LinkAdapter.name(), 0)
-        
-        copied_skills.append(new_skill)
 
+        state = {
+            "hash": compute_skill_hash(new_skill),
+            "validators": validator_versions,
+            "adapters": adapters_version
+        }
+        write_managed_state(skill_target_dir, state)
+
+        copied_skills.append(new_skill)
+        
     return {
         "skills_count": len(skills),
         "target_dir": str(target_dir),

@@ -2,7 +2,7 @@ from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
 from .models.adapter_message import AdapterMessage
-from typing import Dict
+from typing import Dict, Tuple
 
 
 class Adapter:
@@ -16,6 +16,10 @@ class Adapter:
         self.__ac = absAdapter.Context(skills)
         self.__adapters = [adapter_cls(self.__ac)
                            for adapter_cls in adapter_list]
+
+    @property
+    def registered_adapters_name_version(self) -> List[Tuple[str, str]]:
+        return [(adapter.name(), adapter.version()) for adapter in self.__adapters]
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> Dict[str, AdapterMessage]:
         results = {}
