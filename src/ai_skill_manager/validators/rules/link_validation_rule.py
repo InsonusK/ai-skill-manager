@@ -2,11 +2,9 @@
 
 Правило валидации ссылок внутри скиллов.
 """
-
-from pathlib import Path
 from typing import Dict, List, Optional
 from ...models import LinkWithContext
-from ...entities import LinkKind, Skill, Link
+from ...entities import LinkKind, Skill
 from ..models import ValidationError, ValidationResult, ValidationSeverity
 from .abs_validation_rule import absValidationRule
 
@@ -97,12 +95,13 @@ class LinkValidationRule(absValidationRule):
         # Внутренние ссылки должны иметь разрешимый абсолютный путь ОС.
         if link.os_absolute_path is None:
             return ValidationError(
-                message="Link {link_raw} ({start}-{end}) doesn't have absolute OS path",
+                message="Link {link_raw}\nfile {file}\nPos ({start}-{end}): doesn't have absolute OS path",
                 severity=ValidationSeverity.ERROR,
                 params={
                     "link_raw": link.base.raw,
                     "start": link.base.start,
-                    "end": link.base.end
+                    "end": link.base.end,
+                    "file": link.context.file.path
                 },
             )
 
@@ -119,11 +118,12 @@ class LinkValidationRule(absValidationRule):
         # Anything else is a dangling link.
         # Всё остальное — висячая ссылка.
         return ValidationError(
-            message="Link {link_raw} ({start}-{end}) doesn't lead to subfiles or other skills",
+            message="Link {link_raw}\nfile {file}\nPos ({start}-{end}): doesn't lead to subfiles or other skills",
             severity=ValidationSeverity.ERROR,
             params={
                 "link_raw": link.base.raw,
                 "start": link.base.start,
-                "end": link.base.end
+                "end": link.base.end,
+                "file": link.context.file.path
             },
         )
