@@ -1,12 +1,17 @@
-"""Tests for ai_skill_manager models."""
+"""Tests for ai_skill_manager entities/models."""
 
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.models import GitHubSource, LocalSource, Skill, SkillFormat, Source
-from ai_skill_manager.discovery.auto import AutoDiscovery
+from ai_skill_manager.entities import GitHubSource, LocalSource, Skill, SkillFormat, Source
+from ai_skill_manager.discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.entities.skill_propetry import SkillProperty
+from ai_skill_manager.entities.source import LocalSource as LocalSourceCls
+
+
+MOCK_DIR = Path(__file__).parent / "mock" / "test_models"
 
 
 class TestSource(unittest.TestCase):
@@ -48,23 +53,28 @@ class TestSkillSourceLink(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
+    def _copy_mock(self, name: str) -> Path:
+        src = MOCK_DIR / name
+        dst = self.tmpdir / name
+        shutil.copytree(src, dst)
+        return dst
+
     def test_skill_has_optional_source(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n# Guide")
-        source = LocalSource(path=self.tmpdir)
+        md = self._copy_mock("name_value") / "guide.skill.md"
+        source = LocalSource(path=md.parent)
 
         skill = Skill(
             file_path=md,
             folder_path=None,
             format=SkillFormat.HumanFlat,
             source=source,
+            source_path=md.parent,
         )
 
         self.assertEqual(skill.source, source)
 
     def test_skill_requires_source(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n# Guide")
+        md = self._copy_mock("name_value") / "guide.skill.md"
 
         with self.assertRaises(TypeError):
             Skill(
@@ -74,23 +84,22 @@ class TestSkillSourceLink(unittest.TestCase):
             )
 
     def test_skill_requires_format(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n# Guide")
-        source = LocalSource(path=self.tmpdir)
+        md = self._copy_mock("name_value") / "guide.skill.md"
+        source = LocalSource(path=md.parent)
 
         with self.assertRaises(TypeError):
-            Skill(file_path=md, folder_path=None, source=source)
+            Skill(file_path=md, folder_path=None, source=source, source_path=md.parent)
 
     def test_autodiscovery_attaches_local_source(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n# Guide")
+        root = self._copy_mock("autodiscovery")
+        source = LocalSource(path=root)
 
-        strategy = AutoDiscovery(self.tmpdir)
+        strategy = AutoDiscovery(source_path=root, source=source)
         skills = strategy.discover()
 
         self.assertEqual(len(skills), 1)
-        self.assertIsInstance(skills[0].source, LocalSource)
-        self.assertEqual(skills[0].source.path, self.tmpdir)
+        self.assertIsInstance(skills[0].source, LocalSourceCls)
+        self.assertEqual(skills[0].source.path, root)
 
 
 class TestSkillName(unittest.TestCase):
@@ -100,31 +109,35 @@ class TestSkillName(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
+    def _copy_mock(self, name: str) -> Path:
+        src = MOCK_DIR / name
+        dst = self.tmpdir / name
+        shutil.copytree(src, dst)
+        return dst
+
     def _skill(self, file_path: Path) -> Skill:
         return Skill(
             file_path=file_path,
             folder_path=None,
             format=SkillFormat.HumanFlat,
-            source=LocalSource(path=self.tmpdir),
+            source=LocalSource(path=file_path.parent),
+            source_path=file_path.parent,
         )
 
     def test_name_returns_none_when_file_missing(self):
-        skill = self._skill(self.tmpdir / "missing.skill.md")
-        self.assertIsNone(skill.name)
+        prop = SkillProperty(self.tmpdir / "missing.skill.md")
+        self.assertIsNone(prop.name)
 
     def test_name_returns_none_without_frontmatter(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("# Guide")
+        md = self._copy_mock("name_no_frontmatter") / "guide.skill.md"
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_none_with_missing_terminator(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n")
+        md = self._copy_mock("name_missing_terminator") / "guide.skill.md"
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_none_with_invalid_yaml(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: [\n---\n# Guide")
+        md = self._copy_mock("name_invalid_yaml") / "guide.skill.md"
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_none_when_frontmatter_is_not_dict(self):
@@ -133,21 +146,21 @@ class TestSkillName(unittest.TestCase):
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_none_when_name_is_missing(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\n---\n# Guide")
+        md = self._copy_mock("name_missing") / "guide.skill.md"
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_none_when_name_is_not_string(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: 123\n---\n# Guide")
+        md = self._copy_mock("name_not_string") / "guide.skill.md"
         self.assertIsNone(self._skill(md).name)
 
     def test_name_returns_value_from_frontmatter(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n# Guide")
+        md = self._copy_mock("name_value") / "guide.skill.md"
         self.assertEqual(self._skill(md).name, "guide")
 
     def test_name_reads_crlf_frontmatter(self):
-        md = self.tmpdir / "guide.skill.md"
-        md.write_bytes(b"---\r\nname: guide\r\n---\r\n# Guide")
+        md = self._copy_mock("name_crlf") / "guide.skill.md"
         self.assertEqual(self._skill(md).name, "guide")
+
+
+if __name__ == "__main__":
+    unittest.main()

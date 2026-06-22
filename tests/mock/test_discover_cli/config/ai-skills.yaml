@@ -1,0 +1,4 @@
+sources:
+  - path: ./skills
+settings:
+  target: ./target

@@ -17,10 +17,10 @@ class NameValidationRule(absValidationRule):
 
             if skill.format == SkillFormat.Agent:
                 if (error := self.__validate_agent(skill)) is not None:
-                    results[skill] = error
+                    results[skill] = ValidationResult.single(error)
             elif skill.format == SkillFormat.HumanFlat:
                 if (error := self.__validate_human_flat(skill)) is not None:
-                    results[skill] = error
+                    results[skill] = ValidationResult.single(error)
             elif skill.format == SkillFormat.HumanDir:
                 errors = []
                 if (error := self.__validate_human_flat(skill)) is not None:

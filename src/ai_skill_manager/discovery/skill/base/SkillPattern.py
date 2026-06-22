@@ -23,7 +23,10 @@ class SkillPattern(ABC):
 
     def __init__(self, source: Source, source_path: Path):
         self._source = source
-        self._source_path = source_path
+        # Skills always store a directory as their source_path. If a file path
+        # is passed (e.g. GitHub subpath pointing to a single skill file), use
+        # the containing directory.
+        self._source_path = source_path.parent if source_path.is_file() else source_path
 
     @property
     @abstractmethod
