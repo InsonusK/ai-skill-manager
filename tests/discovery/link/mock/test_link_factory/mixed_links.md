@@ -4,3 +4,4 @@
 [web](https://example.com)
 ![image](./img.png)
 [[wiki link|text]]
+---

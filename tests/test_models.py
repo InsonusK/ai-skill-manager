@@ -36,7 +36,7 @@ class TestSource(unittest.TestCase):
                 "type": "github",
                 "repo_url": "https://github.com/owner/repo",
                 "tree": "main",
-                "subpath": "skills",
+                "subpath": ["skills"],
             },
         )
 

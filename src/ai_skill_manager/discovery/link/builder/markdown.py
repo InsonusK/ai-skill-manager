@@ -11,7 +11,7 @@ Builds :class:`Link` objects from Markdown-style references such as
 import re
 from typing import List
 
-from .....entities.link import Link
+from ....entities.link import Link
 from .abs_link_builder import absLinkBuilder
 
 # Regex for Markdown links: optional "!", text in brackets, path in parentheses.

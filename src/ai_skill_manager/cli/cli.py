@@ -27,7 +27,7 @@ def main():
     )
     # EN: Require a subcommand; ``dest`` lets us know which one was chosen.
     # RU: Требуем подкоманду; ``dest`` позволяет узнать, какая выбрана.
-    subparsers:argparse._SubParsersAction[argparse.ArgumentParser] = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest='command', required=True)
 
     # Register subcommand parsers.
     # Регистрируем парсеры подкоманд.

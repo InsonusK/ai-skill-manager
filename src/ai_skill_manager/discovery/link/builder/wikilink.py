@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from .....entities.link import Link
+from ....entities.link import Link
 from .abs_link_builder import absLinkBuilder
 
 # Regex for wiki links: optional "!", content inside double brackets.

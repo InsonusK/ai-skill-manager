@@ -10,7 +10,7 @@ Provides shared helpers for classifying link paths and splitting fragments.
 from abc import ABC
 from typing import List, Tuple
 
-from .....entities import Link, LinkKind
+from ....entities import Link, LinkKind
 
 
 class absLinkBuilder(ABC):

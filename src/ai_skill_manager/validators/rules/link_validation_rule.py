@@ -97,10 +97,10 @@ class LinkValidationRule(absValidationRule):
         # Внутренние ссылки должны иметь разрешимый абсолютный путь ОС.
         if link.os_absolute_path is None:
             return ValidationError(
-                message="Link {link_raw} ({start}-{ent}) doesn't have absolute OS path",
+                message="Link {link_raw} ({start}-{end}) doesn't have absolute OS path",
                 severity=ValidationSeverity.ERROR,
                 params={
-                    "link_raw": link.raw,
+                    "link_raw": link.base.raw,
                     "start": link.base.start,
                     "end": link.base.end
                 },
@@ -119,10 +119,10 @@ class LinkValidationRule(absValidationRule):
         # Anything else is a dangling link.
         # Всё остальное — висячая ссылка.
         return ValidationError(
-            message="Link {link_raw} ({start}-{ent}) doesn't lead to subfiles or other skills",
+            message="Link {link_raw} ({start}-{end}) doesn't lead to subfiles or other skills",
             severity=ValidationSeverity.ERROR,
             params={
-                "link_raw": link.raw,
+                "link_raw": link.base.raw,
                 "start": link.base.start,
                 "end": link.base.end
             },

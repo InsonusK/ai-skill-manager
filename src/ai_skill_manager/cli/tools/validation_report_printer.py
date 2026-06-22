@@ -20,7 +20,7 @@ def print_validation_report(report: ValidationReport):
         for skill, rule_errors in report.result.items():
             skill_branch = source_branch.add(f"{skill.name}\n{skill.file_path}")
             for rule, result in rule_errors.items():
-                rule_branch = skill_branch.add(f"[green]{rule.name} {rule.version}[/green]: {len(result.errors)} errors(s)")
+                rule_branch = skill_branch.add(f"[green]{rule.name} {rule.version}[/green]: {len(result.errors)} error(s)")
                 for error in result.errors:
                     rule_branch.add(f"[red]{error}[/red]")
     console.print(tree)

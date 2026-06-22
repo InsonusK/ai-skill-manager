@@ -7,7 +7,7 @@ Factory for creating :class:`Link` objects from markdown content.
 
 from typing import List
 
-from ....entities.link import Link
+from ...entities.link import Link
 from .builder import absLinkBuilder, MarkdownLinkBuilder, WikilinkBuilder
 
 # Registry of link builders used to scan content.

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple
 
-from ..discovery.link.factory.link_factory import search_links_in_content
+from ..discovery.link import search_links_in_content
 
 from .link import Link
 
