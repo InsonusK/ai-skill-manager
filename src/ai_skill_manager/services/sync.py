@@ -20,7 +20,10 @@ from .discover import discover
 def run_sync(
     sources: Sequence[Source],
     target_dir: Path,
-    adapters: Optional[Sequence[Type[absAdapter]]] = None
+    adapters: Optional[Sequence[Type[absAdapter]]] = None,
+    dry_run: bool = False,
+    cleanup_orphans: bool = True,
+    on_conflict: str = "error",
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
 
@@ -34,6 +37,12 @@ def run_sync(
         adapters: Adapter classes to apply after copying.
             По умолчанию используется :data:`DEFAULT_RULES`.
             Классы адаптеров, применяемые после копирования.
+        dry_run: If ``True``, do not write any changes.
+            Если ``True``, не записывать изменения.
+        cleanup_orphans: If ``True``, remove orphan skills from target.
+            Если ``True``, удалять осиротевшие скиллы из целевой директории.
+        on_conflict: Conflict resolution strategy (``error`` or ``last_wins``).
+            Стратегия разрешения конфликтов (``error`` или ``last_wins``).
 
     Returns:
         Summary dict with counts and the target directory.
@@ -41,12 +50,35 @@ def run_sync(
     """
     skills = discover(sources)
 
+    if on_conflict not in ("error", "last_wins"):
+        raise ValueError(f"Invalid on_conflict value: {on_conflict}")
+
+    seen_names: set = set()
+    for skill in skills:
+        name = skill.properties.name
+        if name in seen_names:
+            if on_conflict == "error":
+                raise ValueError(
+                    f"CONFLICT: multiple skills have the same name '{name}'")
+            # last_wins: continue and let the last skill overwrite the previous one.
+            continue
+        seen_names.add(name)
+
     validator = Validator()
     validation_report = validator.validate(skills)
     if validation_report.has_errors:
         raise ValidationFailedError(validation_report)
 
     target_dir = Path(target_dir).resolve()
+
+    if dry_run:
+        return {
+            "skills_count": len(skills),
+            "target_dir": str(target_dir),
+            "links_replaced": 0,
+            "dry_run": True,
+        }
+
     target_dir.mkdir(parents=True, exist_ok=True)
 
     copied_skills: List[Skill] = []
@@ -95,7 +127,8 @@ def run_sync(
         }
         write_managed_state(new_skill.folder_path, state)
 
-    remove_orphans(target_dir, copied_skills)
+    if cleanup_orphans:
+        remove_orphans(target_dir, copied_skills)
 
     return {
         "skills_count": len(skills),

@@ -10,8 +10,8 @@ for console output.
 from pathlib import Path
 from typing import List
 
-from ...models.skill import Skill, SkillFormat
-from ...models.source import LocalSource
+from ...entities.skill import Skill, SkillFormat
+from ...entities.source import LocalSource
 
 
 def format_skills(skills: List[Skill]) -> str:

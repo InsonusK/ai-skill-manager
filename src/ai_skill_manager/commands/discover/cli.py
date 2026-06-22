@@ -10,9 +10,10 @@ import sys
 from pathlib import Path
 from typing import List
 
-from ...config import load_config
-from ...discovery import Source, STRATEGIES, discover
-from ...models.skill import Skill
+from ...config import build_sources_from_config
+from ...entities import GitHubSource, LocalSource, Source
+from ...services.discover import STRATEGIES, discover
+from ...entities.skill import Skill
 from .formatter import format_skills
 
 DEFAULT_CONFIG = "ai-skills.yaml"
@@ -81,32 +82,6 @@ def add_parser(subparsers):
     return parser
 
 
-def _build_sources_from_config(config_path: Path) -> List[Source]:
-    """Convert config sources into universal Source objects."""
-    config = load_config(config_path)
-    config_dir = config_path.parent
-    sources: List[Source] = []
-
-    for src in config.get("sources", []):
-        src_type = src.get("type", "auto")
-        src_path = src.get("path", "")
-
-        if src_type != "github":
-            src_path = str(config_dir / src_path)
-
-        sources.append(
-            Source(
-                type=src_type,
-                path=src_path,
-                tree=src.get("tree", "master"),
-                subpath=src.get("subpath"),
-                name=src.get("name"),
-            )
-        )
-
-    return sources
-
-
 def _discover(args) -> List[Skill]:
     """Resolve CLI arguments to a list of skills.
 
@@ -130,7 +105,7 @@ def _discover(args) -> List[Skill]:
         config_path = Path(args.config).resolve()
         if not config_path.exists():
             raise FileNotFoundError(f"Config not found: {config_path}")
-        return discover(_build_sources_from_config(config_path))
+        return discover(build_sources_from_config(config_path))
 
     if args.type:
         # Single source mode: type + path.
@@ -142,22 +117,22 @@ def _discover(args) -> List[Skill]:
         if args.type == "github" and subpath is None:
             subpath = "skills"
 
-        return discover(
-            [
-                Source(
-                    type=args.type,
-                    path=args.path,
-                    tree=args.tree,
-                    subpath=subpath,
-                )
-            ]
-        )
+        if args.type == "github":
+            source: Source = GitHubSource(
+                repo_url=args.path,
+                tree=args.tree,
+                subpath=subpath,
+            )
+        else:
+            source = LocalSource(path=Path(args.path))
+
+        return discover([source])
 
     # Default: try ai-skills.yaml in the current directory.
     # По умолчанию: пробуем ai-skills.yaml в текущей директории.
     config_path = Path(DEFAULT_CONFIG).resolve()
     if config_path.exists():
-        return discover(_build_sources_from_config(config_path))
+        return discover(build_sources_from_config(config_path))
 
     raise ValueError(
         "No config file specified and no source type provided.\n"

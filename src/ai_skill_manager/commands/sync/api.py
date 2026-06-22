@@ -10,10 +10,14 @@ No console output is produced here.
 from pathlib import Path
 from typing import Optional
 
-from ...core import SkillSync
+from ...config import build_sources_from_config, load_config
+from ...services.sync import run_sync as run_sync_service
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
+
+DEFAULT_TARGET = ".agents/skills"
+#: Default target directory. / Целевая директория по умолчанию.
 
 
 def run_sync(
@@ -42,29 +46,64 @@ def run_sync(
             Если ``True``, пропустить проверку хеша и версии.
 
     Returns:
-        Result dictionary from ``SkillSync.sync()``. / Словарь результата от ``SkillSync.sync()``.
+        Result dictionary from the sync service. / Словарь результата от сервиса синхронизации.
 
     Raises:
         FileNotFoundError: If the configuration file does not exist.
             / Если файл конфигурации не существует.
+        ValueError: If an invalid configuration is encountered.
+            / Если встречена некорректная конфигурация.
 
     Example:
         >>> from pathlib import Path
         >>> run_sync(Path("ai-skills.yaml"), dry_run=True)
-        {'synced_count': 0, 'skipped_count': 0, 'fix_summary': {}, 'fixes': [], 'dry_run': True}
+        {'skills_count': 0, 'target_dir': '...', 'links_replaced': 0, 'dry_run': True}
     """
     config_path = config_path.resolve()
     if not config_path.exists():
         raise FileNotFoundError(f"Config not found: {config_path}")
 
-    # Build the orchestrator with explicit CLI overrides.
-    # Создаём оркестратор с явными переопределениями из CLI.
-    sync = SkillSync(
-        config_file=config_path,
+    config = load_config(config_path)
+    settings = config.get("settings", {})
+
+    # Resolve target directory: CLI override > config > default.
+    # Определяем целевую директорию: CLI > конфиг > умолчание.
+    if target_dir is None:
+        target_dir = Path(settings.get("target", DEFAULT_TARGET))
+    if not target_dir.is_absolute():
+        target_dir = config_path.parent / target_dir
+    target_dir = target_dir.resolve()
+
+    # Resolve orphan removal: CLI override > config > default.
+    # Определяем удаление осиротевших навыков: CLI > конфиг > умолчание.
+    if remove_orphans is None:
+        remove_orphans = settings.get("remove_orphans", True)
+
+    # Build sources from the configuration file.
+    # Формируем источники из файла конфигурации.
+    sources = build_sources_from_config(config_path)
+
+    # Validate conflict strategy.
+    # Проверяем стратегию разрешения конфликтов.
+    if on_conflict not in ("error", "last_wins"):
+        raise ValueError(f"Invalid on_conflict value: {on_conflict}")
+
+    # The service handles conflict errors by raising ValueError.
+    # Conflict resolution beyond error reporting is not yet supported.
+    # Сервис обрабатывает конфликты, выбрасывая ValueError.
+    # Разрешение конфликтов кроме ошибки пока не поддерживается.
+    result = run_sync_service(
+        sources=sources,
         target_dir=target_dir,
-        on_conflict=on_conflict,
-        remove_orphans=remove_orphans if remove_orphans is not None else True,
         dry_run=dry_run,
-        force=force,
+        cleanup_orphans=remove_orphans,
+        on_conflict=on_conflict,
     )
-    return sync.sync()
+
+    # Preserve legacy fields for formatters and callers.
+    # Сохраняем устаревшие поля для форматёров и вызывающих сторон.
+    result.setdefault("dry_run", dry_run)
+    result.setdefault("skipped_count", 0)
+    result.setdefault("synced_count", result.get("skills_count", 0))
+
+    return result
