@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional, Sequence, Type
 
-from ..utils import compute_skill_hash, write_managed_state
+from ..utils import compute_skill_hash, is_managed, write_managed_state
 
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
@@ -49,20 +49,18 @@ def run_sync(
     target_dir = Path(target_dir).resolve()
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
-    adapter = Adapter(adapter_list)
-
     copied_skills: List[Skill] = []
     links_replaced = 0
     validator_versions = [
-        {"name": registered_rule[0], "version": registered_rule[1]}
+        {
+            "name": registered_rule[0],
+            "version": registered_rule[1]() if callable(registered_rule[1]) else registered_rule[1],
+        }
         for registered_rule in validator.registered_rules_name_version
     ]
-    adapters_version = [
-        {"name": registered_adapter[0],
-         "version": registered_adapter[1]}
-        for registered_adapter in adapter.registered_adapters_name_version
-    ]
+
+    adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
+
     for skill in skills:
         name = skill.properties.name
         if name is None:
@@ -75,23 +73,61 @@ def run_sync(
         else:
             new_skill = _copy_dir_skill(skill, skill_target_dir)
 
-        adapter_msg = adapter.adapt(skill, new_skill)
-        links_replaced += adapter_msg.get(LinkAdapter.name(), 0)
+        copied_skills.append(new_skill)
 
+    adapter = Adapter(copied_skills, adapter_list)
+    adapters_version = [
+        {"name": registered_adapter[0],
+         "version": registered_adapter[1]}
+        for registered_adapter in adapter.registered_adapters_name_version
+    ]
+    for old_skill, new_skill in zip(skills, copied_skills):
+        adapter_msg = adapter.adapt(old_skill, new_skill)
+        link_msg = adapter_msg.get(LinkAdapter.name())
+        if link_msg is not None:
+            links_replaced += link_msg.params.get("count", 0)
+
+    for new_skill in copied_skills:
         state = {
             "hash": compute_skill_hash(new_skill),
             "validators": validator_versions,
             "adapters": adapters_version
         }
-        write_managed_state(skill_target_dir, state)
+        write_managed_state(new_skill.folder_path, state)
 
-        copied_skills.append(new_skill)
-        
+    remove_orphans(target_dir, copied_skills)
+
     return {
         "skills_count": len(skills),
         "target_dir": str(target_dir),
         "links_replaced": links_replaced,
     }
+
+
+def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Path]:
+    """Remove previously copied skills that are no longer present in sources.
+
+    Удаляет ранее скопированные скиллы, которых больше нет в исходных источниках.
+    Учитываются только поддиректории целевой директории, помеченные файлом
+    ``.ai-skills-managed``.
+    """
+    target_dir = Path(target_dir).resolve()
+    copied_dirs = {
+        Path(skill.folder_path).resolve()
+        for skill in copied_skills
+        if skill.folder_path is not None
+    }
+    removed: List[Path] = []
+    for entry in target_dir.iterdir():
+        if not entry.is_dir():
+            continue
+        if not is_managed(entry):
+            continue
+        if entry in copied_dirs:
+            continue
+        shutil.rmtree(entry)
+        removed.append(entry)
+    return removed
 
 
 def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:

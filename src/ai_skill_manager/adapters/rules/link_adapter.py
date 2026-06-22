@@ -1,7 +1,8 @@
 from typing import List, Optional, Tuple
 
-from ...entities import Link, Skill, SkillFile
+from ...entities import Link, LinkKind, Skill, SkillFile
 from ...models import LinkWithContext
+from ..models.adapter_message import AdapterMessage
 from .abs_adapter import absAdapter
 
 
@@ -15,11 +16,12 @@ class LinkAdapter(absAdapter):
         """Adapter version for change detection."""
         return "1.0.0"
 
-    def adapt(self, old_skill: Skill, new_skill: Skill) -> None:
+    def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Rewrite links in ``skill`` files to the skill-link format.
 
         Переписывает ссылки в файлах ``skill`` в формат skill-link.
         """
+        self.links_replaced = 0
         other_skills = [s for s in self._adapter_context.skills if s is not old_skill]
         for skill_file in new_skill.files:
             content = skill_file.path.read_text(encoding="utf-8")
@@ -29,6 +31,10 @@ class LinkAdapter(absAdapter):
             if count:
                 skill_file.path.write_text(new_content, encoding="utf-8")
             self.links_replaced += count
+        return AdapterMessage(
+            message="Replaced {count} links",
+            params={"count": self.links_replaced},
+        )
 
     def _replace_links(
         self,
@@ -53,6 +59,8 @@ class LinkAdapter(absAdapter):
 
         for link in sorted_links:
             new_target = self._compute_new_target(link, skill_file, skill, other_skills)
+            if new_target is None:
+                continue
 
             prefix = "!" if link.is_image else ""
             new_raw = f"{prefix}[{link.text}]({new_target})"
@@ -78,6 +86,8 @@ class LinkAdapter(absAdapter):
             Новая цель ссылки или ``None``, если ссылку следует оставить без
             изменений (например, внешние URL).
         """
+        if link.kind == LinkKind.web:
+            return None
         link_context = LinkWithContext.build(skill, skill_file, link)
         new_target = link_context.to_skill_format(other_skills)
         if link.header:
