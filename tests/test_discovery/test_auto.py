@@ -1,237 +1,198 @@
 """Tests for AutoDiscovery strategy."""
 
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 
-from ai_skills_manager.discovery.auto import AutoDiscovery
-from ai_skills_manager.discovery.base import SkillMapping
+from ai_skill_manager.discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.entities.skill_format import SkillFormat
+from ai_skill_manager.entities.source import LocalSource
+
+
+MOCK_DIR = Path(__file__).parent / "mock" / "test_auto"
 
 
 class TestAutoDiscovery(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
-        self.target = self.tmpdir / 'target'
-        self.target.mkdir()
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
+    def _copy_mock(self, name: str) -> Path:
+        src = MOCK_DIR / name
+        dst = self.tmpdir / name
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        return dst
+
+    def _discover(self, path: Path) -> AutoDiscovery:
+        resolved = path.resolve()
+        source_path = resolved.parent if resolved.is_file() else resolved
+        source = LocalSource(path=source_path)
+        return AutoDiscovery(source_path=source_path, source=source)
+
     def test_empty_directory(self):
-        empty = self.tmpdir / 'empty'
-        empty.mkdir()
+        empty = self._copy_mock("empty_directory") / "empty"
 
-        strategy = AutoDiscovery(empty, self.target)
+        strategy = self._discover(empty)
         result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
-    def test_single_md_file(self):
-        md = self.tmpdir / 'guide.md'
-        md.write_text('# Guide')
+    def test_single_skill_file(self):
+        md = self._copy_mock("single_skill_file") / "guide.skill.md"
 
-        strategy = AutoDiscovery(md, self.target)
+        strategy = self._discover(md)
         result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'guide')
-        self.assertTrue(result[0].is_flat)
-        self.assertEqual(result[0].source_path, md)
-        self.assertEqual(result[0].target_path, self.target / 'guide')
+        self.assertEqual(result[0].name, "guide")
+        self.assertTrue(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanFlat)
+        self.assertEqual(result[0].file_path, md)
 
-    def test_non_md_file_ignored(self):
-        txt = self.tmpdir / 'readme.txt'
-        txt.write_text('readme')
+    def test_non_skill_file_ignored(self):
+        txt = self._copy_mock("non_skill_file_ignored") / "readme.txt"
 
-        strategy = AutoDiscovery(txt, self.target)
+        strategy = self._discover(txt)
         result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
-    def test_directory_with_skill_md(self):
-        skill_dir = self.tmpdir / 'web'
-        skill_dir.mkdir()
-        (skill_dir / 'SKILL.md').write_text('# Web')
+    def test_directory_skill(self):
+        skill_dir = self._copy_mock("directory_skill") / "web"
 
-        strategy = AutoDiscovery(skill_dir, self.target)
+        strategy = self._discover(skill_dir)
         result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'web')
-        self.assertFalse(result[0].is_flat)
-        self.assertEqual(result[0].target_path, self.target / 'web')
+        self.assertEqual(result[0].name, "web")
+        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanDir)
+        self.assertEqual(result[0].folder_path, skill_dir)
+
+    def test_agent_skill(self):
+        skill_dir = self._copy_mock("agent_skill") / "agent"
+
+        strategy = self._discover(skill_dir)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "agent")
+        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.Agent)
+        self.assertEqual(result[0].file_path, skill_dir / "SKILL.md")
+
+    def test_conflicting_skill_markers_raises(self):
+        skill_dir = self._copy_mock("conflicting_skill_markers_raises") / "conflict"
+
+        strategy = self._discover(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
 
     def test_flat_directory(self):
-        flat = self.tmpdir / 'guides'
-        flat.mkdir()
-        (flat / 'a.md').write_text('# A')
-        (flat / 'b.md').write_text('# B')
+        flat = self._copy_mock("flat_directory") / "guides"
 
-        strategy = AutoDiscovery(flat, self.target)
+        strategy = self._discover(flat)
         result = strategy.discover()
 
         self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
-        self.assertEqual(names, {'a', 'b'})
-        for mapping in result:
-            self.assertTrue(mapping.is_flat)
-
-    def test_flat_directory_ignores_non_md(self):
-        flat = self.tmpdir / 'guides'
-        flat.mkdir()
-        (flat / 'guide.md').write_text('# Guide')
-        (flat / 'readme.txt').write_text('readme')
-
-        strategy = AutoDiscovery(flat, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'guide')
-
-    def test_nested_flat_in_subdir(self):
-        root = self.tmpdir / 'skills'
-        root.mkdir()
-        sub = root / 'frontend'
-        sub.mkdir()
-        (sub / 'react.md').write_text('# React')
-
-        strategy = AutoDiscovery(root, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'frontend-react')
-        self.assertTrue(result[0].is_flat)
+        names = {r.name for r in result}
+        self.assertEqual(names, {"a", "b"})
+        for skill in result:
+            self.assertTrue(skill.is_flat())
 
     def test_nested_directory_skill(self):
-        root = self.tmpdir / 'skills'
-        root.mkdir()
-        sub = root / 'backend'
-        sub.mkdir()
-        (sub / 'SKILL.md').write_text('# Backend')
+        root = self._copy_mock("nested_directory_skill") / "skills"
 
-        strategy = AutoDiscovery(root, self.target)
+        strategy = self._discover(root)
         result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'backend')
-        self.assertFalse(result[0].is_flat)
+        self.assertEqual(result[0].name, "backend")
+        self.assertFalse(result[0].is_flat())
 
     def test_mixed_flat_and_directory(self):
-        root = self.tmpdir / 'mixed'
-        root.mkdir()
-        (root / 'top.md').write_text('# Top')
+        root = self._copy_mock("mixed")
 
-        sub1 = root / 'web'
-        sub1.mkdir()
-        (sub1 / 'SKILL.md').write_text('# Web')
-
-        sub2 = root / 'guides'
-        sub2.mkdir()
-        (sub2 / 'a.md').write_text('# A')
-
-        strategy = AutoDiscovery(root, self.target)
+        strategy = self._discover(root)
         result = strategy.discover()
 
-        names = {r.skill_name for r in result}
-        self.assertEqual(names, {'top', 'web', 'guides-a'})
+        names = {r.name for r in result}
+        self.assertEqual(names, {"guide", "web", "a"})
 
-        by_name = {r.skill_name: r for r in result}
-        self.assertTrue(by_name['top'].is_flat)
-        self.assertFalse(by_name['web'].is_flat)
-        self.assertTrue(by_name['guides-a'].is_flat)
+        by_name = {r.name: r for r in result}
+        self.assertTrue(by_name["guide"].is_flat())
+        self.assertFalse(by_name["web"].is_flat())
+        self.assertTrue(by_name["a"].is_flat())
 
-    def test_deep_nesting(self):
-        root = self.tmpdir / 'deep'
-        root.mkdir()
-        l1 = root / 'level1'
-        l1.mkdir()
-        l2 = l1 / 'level2'
-        l2.mkdir()
-        (l2 / 'skill.md').write_text('# Deep')
+    def test_nested_flat_in_subdir(self):
+        root = self._copy_mock("nested_flat_in_subdir") / "skills"
 
-        strategy = AutoDiscovery(root, self.target)
+        strategy = self._discover(root)
         result = strategy.discover()
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'level1-level2-skill')
+        self.assertEqual(result[0].name, "react")
+        self.assertTrue(result[0].is_flat())
 
-    def test_nonexistent_path(self):
-        missing = self.tmpdir / 'missing'
+    def test_directory_skill_with_extra_skill_md_raises(self):
+        skill_dir = self._copy_mock("directory_with_extra_skill_md_raises") / "web"
 
-        strategy = AutoDiscovery(missing, self.target)
+        strategy = self._discover(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_human_dir_and_matching_flat_file_takes_directory(self):
+        """If {dir}.skill.md is both a flat and directory pattern, prefer directory."""
+        skill_dir = self._copy_mock("human_dir_and_matching_flat_file_takes_directory") / "web"
+
+        strategy = self._discover(skill_dir)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "web")
+        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].format, SkillFormat.HumanDir)
+
+    def test_agent_with_extra_flat_file_raises_conflict(self):
+        """Agent SKILL.md + unrelated *.skill.md is ambiguous."""
+        skill_dir = self._copy_mock("agent_with_extra_flat_file_raises_conflict") / "agent"
+
+        strategy = self._discover(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_agent_with_nested_skill_raises(self):
+        skill_dir = self._copy_mock("agent_with_nested_skill_raises") / "agent"
+
+        strategy = self._discover(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_multiple_directory_patterns_raises(self):
+        """Both SKILL.md and {dir}.skill.md in the same directory conflict."""
+        skill_dir = self._copy_mock("multiple_directory_patterns_raises") / "ambiguous"
+
+        strategy = self._discover(skill_dir)
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_missing_source_path_returns_empty(self):
+        """A missing source path produces an empty result."""
+        missing = self.tmpdir / "missing"
+        source = LocalSource(path=missing.resolve())
+        strategy = AutoDiscovery(source_path=missing.resolve(), source=source)
+
         result = strategy.discover()
 
         self.assertEqual(len(result), 0)
 
-    def test_directory_with_dir_name_skill_md(self):
-        skill_dir = self.tmpdir / 'web'
-        skill_dir.mkdir()
-        (skill_dir / 'web.skill.md').write_text('# Web')
 
-        strategy = AutoDiscovery(skill_dir, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'web')
-        self.assertFalse(result[0].is_flat)
-        self.assertEqual(result[0].target_path, self.target / 'web')
-
-    def test_flat_skill_md_file(self):
-        skill_file = self.tmpdir / 'guide.skill.md'
-        skill_file.write_text('# Guide')
-
-        strategy = AutoDiscovery(skill_file, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'guide')
-        self.assertTrue(result[0].is_flat)
-        self.assertEqual(result[0].source_path, skill_file)
-        self.assertEqual(result[0].target_path, self.target / 'guide')
-
-    def test_flat_directory_with_skill_md(self):
-        flat = self.tmpdir / 'guides'
-        flat.mkdir()
-        (flat / 'guide1.skill.md').write_text('# Guide1')
-        (flat / 'guide2.skill.md').write_text('# Guide2')
-
-        strategy = AutoDiscovery(flat, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
-        self.assertEqual(names, {'guide1', 'guide2'})
-        for mapping in result:
-            self.assertTrue(mapping.is_flat)
-
-    def test_mixed_md_and_skill_md_in_directory(self):
-        flat = self.tmpdir / 'guides'
-        flat.mkdir()
-        (flat / 'regular.md').write_text('# Regular')
-        (flat / 'special.skill.md').write_text('# Special')
-
-        strategy = AutoDiscovery(flat, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 2)
-        names = {r.skill_name for r in result}
-        self.assertEqual(names, {'regular', 'special'})
-
-    def test_nested_skill_md_in_subdir(self):
-        root = self.tmpdir / 'skills'
-        root.mkdir()
-        sub = root / 'frontend'
-        sub.mkdir()
-        (sub / 'react.skill.md').write_text('# React')
-
-        strategy = AutoDiscovery(root, self.target)
-        result = strategy.discover()
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].skill_name, 'frontend-react')
-        self.assertTrue(result[0].is_flat)
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from ai_skills_manager.utils import compute_hash, is_managed, tag_managed
+from ai_skill_manager.utils import compute_hash, is_managed, tag_managed
 
 
 class TestComputeHash(unittest.TestCase):
@@ -79,19 +79,19 @@ class TestManagedState(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_read_write_managed_state(self):
-        from ai_skills_manager.utils import read_managed_state, write_managed_state
+        from ai_skill_manager.utils import read_managed_state, write_managed_state
         state = {'hash': 'abc123', 'adapters': [{'name': 'LinkUpdater', 'version': 1}]}
         write_managed_state(self.tmpdir, state)
         self.assertEqual(read_managed_state(self.tmpdir), state)
 
     def test_read_managed_state_invalid_content(self):
-        from ai_skills_manager.utils import read_managed_state
+        from ai_skill_manager.utils import read_managed_state
         path = self.tmpdir / '.ai-skills-managed'
         path.write_text('not-json')
         self.assertIsNone(read_managed_state(self.tmpdir))
 
     def test_read_managed_state_missing_file(self):
-        from ai_skills_manager.utils import read_managed_state
+        from ai_skill_manager.utils import read_managed_state
         self.assertIsNone(read_managed_state(self.tmpdir))
 
 

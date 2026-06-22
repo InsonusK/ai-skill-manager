@@ -14,8 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-ai-skill-manager = "ai_skills_manager.cli:main"
-aism = "ai_skills_manager.cli:main"
+ai-skill-manager = "ai_skill_manager.cli:main"
+aism = "ai_skill_manager.cli:main"
 
 [project.optional-dependencies]
 dev = [
