@@ -23,4 +23,4 @@ class LinkKind(Enum):
     """Path from root of repository. / Путь от корня репозитория."""
 
     web = "web"
-    """Path to http links"""
+    """Web (http/https) link. / Ссылка в интернете (http/https)."""

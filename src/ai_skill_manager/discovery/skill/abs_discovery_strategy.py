@@ -1,6 +1,9 @@
 """Abstract base class for skill discovery strategies.
 
+Defines the interface that all discovery strategies must implement.
+
 Абстрактный базовый класс для стратегий обнаружения навыков.
+Определяет интерфейс, который должны реализовывать все стратегии обнаружения.
 """
 
 import logging
@@ -28,6 +31,8 @@ class absDiscoveryStrategy(ABC):
     def __init__(self, source_path: Path):
         """Initialize the strategy with a source path.
 
+        Initialize the strategy with a source path.
+
         Инициализировать стратегию путём к источнику.
 
         Args:
@@ -44,6 +49,8 @@ class absDiscoveryStrategy(ABC):
     @abstractmethod
     def discover(self) -> List[Skill]:
         """Discover skills and return a list of Skill objects.
+
+        Discover skills and return a list of Skill objects.
 
         Обнаружить навыки и вернуть список объектов Skill.
 

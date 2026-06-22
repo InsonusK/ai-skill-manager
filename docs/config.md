@@ -1,3 +1,19 @@
+---
+name: ai-skill-manager-config
+description: Configuration file reference for ai-skill-manager in English and Russian.
+metadata:
+  domain: documentation
+  tags:
+    - ai-skill-manager
+    - config
+    - yaml
+    - bilingual
+  responsibilities:
+    - document ai-skills.yaml structure
+    - describe sources, settings, and conflict resolution
+    - provide config examples
+---
+
 # Configuration / Конфигурация
 
 The configuration file controls where skills are discovered and how they are synchronized.
@@ -129,6 +145,25 @@ sources:
       - docs/guides.skill.md
 ```
 
+### Combining local and GitHub sources / Комбинирование локальных и GitHub-источников
+
+```yaml
+sources:
+  - path: ./my-skills
+    type: auto
+  - path: https://github.com/owner/shared-skills.git
+    type: github
+    tree: main
+    subpath:
+      - skills
+      - playbooks
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+```
+
 ## `settings` / Настройки
 
 Global settings that apply to the synchronization.
@@ -150,3 +185,16 @@ Global settings that apply to the synchronization.
 
 CLI flags (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`) override the config file values.
 Флаги CLI (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`) переопределяют значения из файла конфигурации.
+
+### Example with dry-run enabled / Пример с включённым сухим прогоном
+
+```yaml
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: last_wins
+  dry_run: true
+```
+
+Run `ai-skill-manager sync` to preview changes without modifying the target directory.
+Запустите `ai-skill-manager sync`, чтобы увидеть изменения без изменения целевой директории.

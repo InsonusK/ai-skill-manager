@@ -25,9 +25,12 @@ def add_parser(subparsers):
     """
     parser = subparsers.add_parser(
         "new",
-        help="Create a new skill",
+        help="Create a new skill / Создать новый навык",
     )
-    parser.add_argument("skill_name", help="Name of the new skill / Имя нового навыка")
+    parser.add_argument(
+        "skill_name",
+        help="Name of the new skill / Имя нового навыка",
+    )
     parser.add_argument(
         "path",
         help="Path to the folder where the skill will be created / "
@@ -40,6 +43,8 @@ def add_parser(subparsers):
         help="Skill type: flat (single SKILL.md file) or dir (skill folder with SKILL.md inside) / "
              "Тип навыка: flat (один файл SKILL.md) или dir (папка навыка с SKILL.md внутри)",
     )
+    # Wire the default command function for this subparser.
+    # Связываем функцию команды по умолчанию для этого подпарсера.
     parser.set_defaults(func=run)
     return parser
 

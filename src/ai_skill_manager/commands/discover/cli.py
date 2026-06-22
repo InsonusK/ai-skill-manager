@@ -78,6 +78,8 @@ def add_parser(subparsers):
         action="store_true",
         help="Enable debug logging / Включить подробное логирование",
     )
+    # Wire the default command function for this subparser.
+    # Связываем функцию команды по умолчанию для этого подпарсера.
     parser.set_defaults(func=run)
     return parser
 
@@ -113,10 +115,14 @@ def _discover(args) -> List[Skill]:
         if not args.path:
             raise ValueError("--path is required when using --type")
 
+        # GitHub sources default to the "skills" subpath unless overridden.
+        # Для источников GitHub по умолчанию используется подпуть "skills", если не переопределён.
         subpath = args.subpath
         if args.type == "github" and subpath is None:
             subpath = "skills"
 
+        # Build the appropriate source object based on the selected type.
+        # Формируем соответствующий объект источника в зависимости от выбранного типа.
         if args.type == "github":
             source: Source = GitHubSource(
                 repo_url=args.path,

@@ -22,16 +22,35 @@ class SkillPattern(ABC):
     """
 
     def __init__(self, source: Source, source_path: Path):
+        """Initialize the pattern with source metadata.
+
+        Initialize the pattern with source metadata.
+
+        Инициализировать паттерн метаданными источника.
+
+        Args:
+            source: Source metadata to attach to matched skills. /
+                Метаданные источника для прикрепления к совпавшим навыкам.
+            source_path: Base path of the source being scanned. If it points
+                to a single file, the parent directory is used instead. /
+                Базовый путь сканируемого источника. Если он указывает на
+                отдельный файл, используется родительская директория.
+        """
         self._source = source
         # Skills always store a directory as their source_path. If a file path
         # is passed (e.g. GitHub subpath pointing to a single skill file), use
         # the containing directory.
+        # Навыки всегда хранят директорию как source_path. Если передан путь к файлу
+        # (например, подпуть GitHub, указывающий на один файл навыка),
+        # используем содержащую директорию.
         self._source_path = source_path.parent if source_path.is_file() else source_path
 
     @property
     @abstractmethod
     def skill_format(self) -> SkillFormat:
         """Skill format produced by this pattern.
+
+        Skill format produced by this pattern.
 
         Формат навыка, который производит этот паттерн.
 
@@ -47,12 +66,12 @@ class SkillPattern(ABC):
     ) -> Optional[Skill]:
         """Return a Skill if the path matches this pattern.
 
+        Return a Skill if the path matches this pattern.
+
         Вернуть Skill, если путь соответствует этому паттерну.
 
         Args:
             path: Filesystem path to check. / Путь файловой системы для проверки.
-            source: Source metadata to attach to the skill. /
-                Метаданные источника для навыка.
 
         Returns:
             A :class:`Skill` instance if matched, otherwise ``None``. /

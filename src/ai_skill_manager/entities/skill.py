@@ -1,3 +1,8 @@
+"""Skill entity model.
+
+Модель сущности навыка.
+"""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -15,11 +20,11 @@ class Skill:
     """
 
     file_path: Path
-    """absolute Path to skill main file"""
+    """absolute Path to skill main file / абсолютный путь к основному файлу навыка"""
     folder_path: Path | None
-    """absolute Path to skill folder"""
+    """absolute Path to skill folder / абсолютный путь к директории навыка"""
     source_path: Path
-    """absolute Path to source folder"""
+    """absolute Path to source folder / абсолютный путь к директории источника"""
     source: Source
     format: SkillFormat  # Required skill format. / Обязательный формат навыка.
     properties: SkillProperty = field(init=False)
@@ -28,8 +33,16 @@ class Skill:
     )
 
     def __post_init__(self):
-        # Обход frozen через object.__setattr__
+        """Initialize derived attributes and validate paths.
+
+        Инициализирует производные атрибуты и проверяет пути.
+        """
+        # EN: Frozen dataclass requires object.__setattr__ for field assignment.
+        # RU: Для замороженного dataclass присвоение поля требует object.__setattr__.
         object.__setattr__(self, "properties", SkillProperty(self.file_path))
+
+        # EN: Validate that all stored paths have the expected shape.
+        # RU: Проверяем, что все сохранённые пути имеют ожидаемый вид.
         assert self.file_path.is_absolute(
         ), f"File_path must be absolute format. Current value: {self.file_path}"
         assert self.file_path.is_file(
@@ -64,11 +77,17 @@ class Skill:
         Результат кешируется. Для плоских скиллов это только markdown-файл
         скилла; для директорий также включаются все вложенные ``*.md`` файлы.
         """
+        # EN: Build the file list once and cache it inside the frozen dataclass.
+        # RU: Собираем список файлов один раз и кешируем внутри замороженного dataclass.
         if self._files is None:
             paths = [self.file_path]
             if self.folder_path is not None:
+                # EN: For directory skills include every nested markdown file.
+                # RU: Для директорийных навыков включаем все вложенные markdown-файлы.
                 paths.extend(sorted(self.folder_path.rglob("*.md")))
 
+            # EN: Deduplicate paths while preserving source order.
+            # RU: Убираем дубликаты путей, сохраняя порядок следования в источнике.
             seen: set[Path] = set()
             files: list[SkillFile] = []
             for p in paths:

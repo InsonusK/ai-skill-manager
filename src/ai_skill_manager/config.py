@@ -11,9 +11,16 @@ from .entities import GitHubSource, LocalSource, Source
 
 
 def load_config(config_path: Path) -> dict:
-    """Load YAML or JSON config file."""
+    """Load YAML or JSON config file.
+
+    Загружает файл конфигурации в формате YAML или JSON.
+    """
+    # EN: Read the whole configuration file as text.
+    # RU: Читаем весь файл конфигурации как текст.
     content = config_path.read_text(encoding='utf-8')
 
+    # EN: Use PyYAML for YAML files; fall back to JSON for everything else.
+    # RU: Используем PyYAML для YAML-файлов; для остальных — JSON.
     if config_path.suffix in ('.yaml', '.yml'):
         try:
             import yaml
@@ -35,14 +42,20 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
     Returns:
         List of Source objects. / Список объектов Source.
     """
+    # EN: Load the raw configuration and remember its directory for relative paths.
+    # RU: Загружаем сырую конфигурацию и запоминаем её директорию для относительных путей.
     config = load_config(config_path)
     config_dir = config_path.parent
     sources: List[Source] = []
 
+    # EN: Iterate over the configured sources and create typed Source instances.
+    # RU: Перебираем настроенные источники и создаём типизированные экземпляры Source.
     for src in config.get("sources", []):
         src_type = src.get("type", "auto")
         src_path = src.get("path", "")
 
+        # EN: GitHub sources are created from a repository URL and optional tree/subpath.
+        # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
         if src_type == "github":
             sources.append(
                 GitHubSource(
@@ -52,6 +65,8 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                 )
             )
         else:
+            # EN: Default to a local filesystem source resolved relative to the config file.
+            # RU: По умолчанию используем локальный источник, разрешённый относительно файла конфигурации.
             sources.append(
                 LocalSource(path=Path(config_dir / src_path))
             )

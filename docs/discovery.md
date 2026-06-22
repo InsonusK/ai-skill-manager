@@ -1,3 +1,19 @@
+---
+name: ai-skill-manager-discovery
+description: Discovery architecture and behavior for ai-skill-manager in English and Russian.
+metadata:
+  domain: documentation
+  tags:
+    - ai-skill-manager
+    - discovery
+    - architecture
+    - bilingual
+  responsibilities:
+    - explain AutoDiscovery and GitHubDiscovery
+    - document supported skill formats
+    - describe how to add a new skill format
+---
+
 # Discovery architecture / Архитектура обнаружения
 
 This document describes how `ai-skill-manager` discovers skills from local directories, files, and GitHub repositories.
@@ -106,6 +122,16 @@ The validation recursively scans the directory tree and raises:
   Если подпуть — файл `*.skill.md`, он считается навыком HumanFlat.
 - Missing subpaths are silently skipped.
   Отсутствующие подпути пропускаются без ошибки.
+
+### GitHub discovery example / Пример обнаружения из GitHub
+
+```bash
+ai-skill-manager discover -t github \
+  -p https://github.com/owner/skills-repo.git \
+  --tree main \
+  --subpath skills \
+  --subpath docs/quickstart.skill.md
+```
 
 ## Adding a new format / Добавление нового формата
 

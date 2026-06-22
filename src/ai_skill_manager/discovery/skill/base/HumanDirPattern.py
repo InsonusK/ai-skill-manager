@@ -13,13 +13,26 @@ from .SkillPattern import SkillPattern
 class HumanDirPattern(SkillPattern):
     """Detects directory human skills: ``{dir_name}.skill.md`` inside a directory.
 
+    Detects directory human skills: ``{dir_name}.skill.md`` inside a directory.
+
     Обнаруживает директориальные человеческие навыки:
     файл ``{dir_name}.skill.md`` внутри директории.
     """
 
     def __init__(self, source, source_path):
+        """Initialize the HumanDir pattern.
+
+        Initialize the HumanDir pattern.
+
+        Инициализировать паттерн HumanDir.
+
+        Args:
+            source: Source metadata for matched skills. /
+                Метаданные источника для совпавших навыков.
+            source_path: Base source path. / Базовый путь источника.
+        """
         super().__init__(source, source_path)
-        
+
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanDir
 
@@ -27,6 +40,8 @@ class HumanDirPattern(SkillPattern):
         self, path: Path
     ) -> Optional[Skill]:
         """Match a directory containing ``{dir_name}.skill.md``.
+
+        Match a directory containing ``{dir_name}.skill.md``.
 
         Сопоставить директорию, содержащую ``{dir_name}.skill.md``.
 

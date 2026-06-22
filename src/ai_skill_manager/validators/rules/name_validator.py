@@ -1,20 +1,54 @@
+"""Validation rule that checks skill names against file/folder names.
+
+Ensures the skill name declared in the front matter matches the file or
+folder name for each supported skill format.
+
+Правило валидации, проверяющее имя навыка на соответствие имени файла
+или папки.
+
+Гарантирует, что имя навыка, указанное в метаданных, совпадает с именем
+файла или папки для каждого поддерживаемого формата навыка.
+"""
+
 from typing import Dict, Optional
 from xml.dom import ValidationErr
 from .abs_validation_rule import Skill, absValidationRule, ValidationResult, List
 from ...entities import SkillFormat
-from ..models import ValidationSeverity,ValidationError
+from ..models import ValidationSeverity, ValidationError
+
 
 class NameValidationRule(absValidationRule):
-    def version(self)->str:
+    """Validates that a skill's declared name matches its file system name."""
+
+    def version(self) -> str:
+        """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"
-    
+
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
+        """Validate each skill's name depending on its format.
+
+        Проверяет имя каждого навыка в зависимости от его формата.
+
+        Args:
+            skills: Skills to validate.
+                / Навыки для валидации.
+
+        Returns:
+            Per-skill validation results.
+                / Результаты валидации по каждому навыку.
+        """
         results = {}
         for skill in skills:
+            # A skill must declare a name in its header properties.
+            # Навык должен объявлять имя в свойствах заголовка.
             if skill.properties.name is None:
-                results[skill] = ValidationResult.single(ValidationError("Name is not set in properties", ValidationSeverity.ERROR))
+                results[skill] = ValidationResult.single(
+                    ValidationError("Name is not set in properties", ValidationSeverity.ERROR)
+                )
                 continue
 
+            # Dispatch validation based on the skill format.
+            # Направляем валидацию в зависимости от формата навыка.
             if skill.format == SkillFormat.Agent:
                 if (error := self.__validate_agent(skill)) is not None:
                     results[skill] = ValidationResult.single(error)
@@ -22,6 +56,8 @@ class NameValidationRule(absValidationRule):
                 if (error := self.__validate_human_flat(skill)) is not None:
                     results[skill] = ValidationResult.single(error)
             elif skill.format == SkillFormat.HumanDir:
+                # Directory skills must satisfy both flat-like and directory checks.
+                # Навыки-директории должны удовлетворять как flat-проверкам, так и проверкам директории.
                 errors = []
                 if (error := self.__validate_human_flat(skill)) is not None:
                     errors.append(error)
@@ -30,17 +66,32 @@ class NameValidationRule(absValidationRule):
                 if len(errors) > 0:
                     results[skill] = ValidationResult(errors)
             else:
+                # Unknown format should never reach here; fail loudly if it does.
+                # Неизвестный формат не должен сюда попадать; если попал — выбрасываем ошибку.
                 raise ValueError(f"Unknown skill format {skill.format}")
         return results
-                    
-    def __validate_human_dir(self,skill:Skill)->Optional[ValidationError]:
+
+    def __validate_human_dir(self, skill: Skill) -> Optional[ValidationError]:
+        """Validate a directory-based human skill name.
+
+        Проверяет имя навыка в формате директории.
+
+        Returns:
+            A validation error if the folder name is invalid, otherwise ``None``.
+                / Ошибка валидации, если имя папки некорректно, иначе ``None``.
+        """
         folder_name = skill.folder_path.name
+
+        # Human directory skills must live in a ``*.skill`` folder.
+        # Навыки-директории human должны находиться в папке ``*.skill``.
         if not folder_name.endswith(".skill"):
             return ValidationError(
                 "Skill folder name doesn't ends on '.skill'",
-                ValidationSeverity.ERROR
+                ValidationSeverity.ERROR,
             )
-            
+
+        # Compare the folder name without the ``.skill`` suffix to the declared name.
+        # Сравниваем имя папки без суффикса ``.skill`` с объявленным именем.
         skill_name = folder_name[:-6]
         if skill_name != skill.properties.name:
             return ValidationError(
@@ -48,18 +99,31 @@ class NameValidationRule(absValidationRule):
                 ValidationSeverity.ERROR,
                 {
                     "folder_name": skill.folder_path.name,
-                    "skill_name": skill.properties.name
-                }
+                    "skill_name": skill.properties.name,
+                },
             )
-            
-    def __validate_human_flat(self,skill:Skill)->Optional[ValidationError]:
+
+    def __validate_human_flat(self, skill: Skill) -> Optional[ValidationError]:
+        """Validate a flat human skill file name.
+
+        Проверяет имя файла плоского human-навыка.
+
+        Returns:
+            A validation error if the file name is invalid, otherwise ``None``.
+                / Ошибка валидации, если имя файла некорректно, иначе ``None``.
+        """
         file_name = skill.file_path.name
+
+        # Flat human skills must use the ``.skill.md`` extension.
+        # Плоские human-навыки должны использовать расширение ``.skill.md``.
         if not file_name.endswith(".skill.md"):
             return ValidationError(
                 "Skill file name doesn't ends on '.skill.md'",
-                ValidationSeverity.ERROR
+                ValidationSeverity.ERROR,
             )
-            
+
+        # Compare the file name without the ``.skill.md`` suffix to the declared name.
+        # Сравниваем имя файла без суффикса ``.skill.md`` с объявленным именем.
         skill_name = file_name[:-9]
         if skill_name != skill.properties.name:
             return ValidationError(
@@ -67,17 +131,25 @@ class NameValidationRule(absValidationRule):
                 ValidationSeverity.ERROR,
                 {
                     "file_name": skill.file_path.name,
-                    "skill_name": skill.properties.name
-                }
+                    "skill_name": skill.properties.name,
+                },
             )
-            
+
     def __validate_agent(self, skill: Skill) -> Optional[ValidationError]:
+        """Validate an agent skill folder name.
+
+        Проверяет имя папки навыка-агента.
+
+        Returns:
+            A validation error if the folder name does not match, otherwise ``None``.
+                / Ошибка валидации, если имя папки не совпадает, иначе ``None``.
+        """
         if skill.folder_path.name != skill.properties.name:
             return ValidationError(
                 "Folder name ({folder_name}) != skill name in header properties ({skill_name})",
                 ValidationSeverity.ERROR,
                 {
                     "folder_name": skill.folder_path.name,
-                    "skill_name": skill.properties.name
-                }
+                    "skill_name": skill.properties.name,
+                },
             )

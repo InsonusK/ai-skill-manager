@@ -23,9 +23,17 @@ class LocalSource(Source):
 
     @property
     def source_type(self) -> str:
+        """Return the source type identifier ``local``.
+
+        Возвращает идентификатор типа источника ``local``.
+        """
         return "local"
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable dictionary with source metadata.
+
+        Возвращает сериализуемый словарь с метаданными источника.
+        """
         return {
             "type": self.source_type,
             "path": str(self.path),

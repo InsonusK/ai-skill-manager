@@ -29,16 +29,19 @@ class SkillFile:
     """
 
     path: Path
-    """
-    absolute path to skill file
-    """
+    """absolute path to skill file / абсолютный путь к файлу навыка"""
     _links: Tuple[Link] = field(
         default=None, init=False, repr=False, compare=False, hash=False
     )
+
     def __post_init__(self):
+        """Validate that the stored path is an absolute file path.
+
+        Проверяет, что сохранённый путь является абсолютным путём к файлу.
+        """
         assert self.path.is_absolute(), f"Skill file path must be absolute. Current value: {self.path}"
         assert self.path.is_file(), f"Skill file path must lead to file. Now it leads to {self.path}"
-                
+
     @property
     def links(self) -> Tuple[Link]:
         """Return all parsed links in this file.
@@ -49,6 +52,8 @@ class SkillFile:
             Parsed links in source order.
             Распарсенные ссылки в порядке следования в исходнике.
         """
+        # EN: Parse links lazily and cache them in the frozen dataclass.
+        # RU: Лениво парсим ссылки и кешируем их в замороженном dataclass.
         if self._links is None:
             object.__setattr__(
                 self,
@@ -58,6 +63,9 @@ class SkillFile:
         return self._links
 
     @property
-    def content(self)->str:
-        """Return the file content, reading from disk when not provided."""
+    def content(self) -> str:
+        """Return the file content, reading from disk when not provided.
+
+        Возвращает содержимое файла, читая его с диска при необходимости.
+        """
         return self.path.read_text(encoding="utf-8")

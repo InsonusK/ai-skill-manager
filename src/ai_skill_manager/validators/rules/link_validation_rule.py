@@ -19,15 +19,26 @@ class LinkValidationRule(absValidationRule):
     """
 
     def version(self) -> str:
+        """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"
 
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
         """Validate links for all provided skills.
 
         Валидирует ссылки для всех переданных скиллов.
+
+        Args:
+            skills: Skills to validate.
+                / Навыки для валидации.
+
+        Returns:
+            Per-skill validation results.
+                / Результаты валидации по каждому навыку.
         """
         results: Dict[Skill, ValidationResult] = {}
         for skill in skills:
+            # Collect all link errors for the current skill.
+            # Собираем все ошибки ссылок для текущего навыка.
             errors = self._validate_skill(skill, skills)
             if errors:
                 results[skill] = ValidationResult(errors)
@@ -37,10 +48,25 @@ class LinkValidationRule(absValidationRule):
         """Validate all links inside ``skill``.
 
         Валидирует все ссылки внутри ``skill``.
+
+        Args:
+            skill: Skill whose links are being checked.
+                / Навык, ссылки которого проверяются.
+            skills: All known skills, used to resolve inter-skill links.
+                / Все известные навыки, используются для разрешения межнавыковых ссылок.
+
+        Returns:
+            List of validation errors found in the skill.
+                / Список найденных ошибок валидации в навыке.
         """
         errors: List[ValidationError] = []
+
+        # Iterate over every file that belongs to the skill.
+        # Перебираем каждый файл, принадлежащий навыку.
         for skill_file in skill.files:
             for link in skill_file.links:
+                # Build the link context so we can inspect its target.
+                # Формируем контекст ссылки, чтобы можно было проверить её цель.
                 link_context = LinkWithContext.build(skill, skill_file, link)
 
                 if (error := self.__validate_link(link_context, skills)) is not None:
@@ -48,9 +74,27 @@ class LinkValidationRule(absValidationRule):
         return errors
 
     def __validate_link(self, link: LinkWithContext, skills: List[Skill]) -> Optional[ValidationError]:
+        """Validate a single link context.
+
+        Проверяет один контекст ссылки.
+
+        Args:
+            link: Link context to validate.
+                / Контекст ссылки для проверки.
+            skills: All known skills.
+                / Все известные навыки.
+
+        Returns:
+            A validation error if the link is invalid, otherwise ``None``.
+                / Ошибка валидации, если ссылка некорректна, иначе ``None``.
+        """
+        # External web links are always allowed.
+        # Внешние веб-ссылки всегда разрешены.
         if link.kind == LinkKind.web:
             return None
 
+        # Internal links must have a resolvable absolute OS path.
+        # Внутренние ссылки должны иметь разрешимый абсолютный путь ОС.
         if link.os_absolute_path is None:
             return ValidationError(
                 message="Link doesn't have absolute OS path: {link_raw}",
@@ -60,16 +104,22 @@ class LinkValidationRule(absValidationRule):
                 },
             )
 
+        # Links that point to a file inside the same skill are valid.
+        # Ссылки, указывающие на файл внутри того же навыка, считаются корректными.
         if link.is_link_to_skill_file:
             return None
-        
+
+        # Links that point to another known skill are valid.
+        # Ссылки, указывающие на другой известный навык, считаются корректными.
         if link.is_link_to_another_skill(skills) is not None:
             return None
 
+        # Anything else is a dangling link.
+        # Всё остальное — висячая ссылка.
         return ValidationError(
             message="Link {link_raw} doesn't lead to subfiles or other skills",
             severity=ValidationSeverity.ERROR,
             params={
-                    "link_raw": link.raw
+                "link_raw": link.raw
             },
         )

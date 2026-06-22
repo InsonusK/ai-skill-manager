@@ -76,6 +76,8 @@ def add_parser(subparsers):
         action="store_true",
         help="Enable debug logging / Включить подробное логирование",
     )
+    # Wire the default command function for this subparser.
+    # Связываем функцию команды по умолчанию для этого подпарсера.
     parser.set_defaults(func=run)
     return parser
 
@@ -93,6 +95,8 @@ def run(args):
         # Включаем подробное логирование во всём конвейере синхронизации.
         logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
+    # Resolve the configuration file path to an absolute path.
+    # Разрешаем путь к файлу конфигурации в абсолютный.
     config_path = Path(args.config).resolve()
 
     # Resolve conflicting orphan flags into a single boolean.

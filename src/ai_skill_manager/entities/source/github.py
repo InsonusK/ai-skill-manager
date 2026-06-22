@@ -27,9 +27,17 @@ class GitHubSource(Source):
 
     @property
     def source_type(self) -> str:
+        """Return the source type identifier ``github``.
+
+        Возвращает идентификатор типа источника ``github``.
+        """
         return "github"
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a serializable dictionary with source metadata.
+
+        Возвращает сериализуемый словарь с метаданными источника.
+        """
         return {
             "type": self.source_type,
             "repo_url": self.repo_url,

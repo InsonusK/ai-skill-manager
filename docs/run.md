@@ -1,3 +1,18 @@
+---
+name: ai-skill-manager-run
+description: CLI command reference for ai-skill-manager in English and Russian.
+metadata:
+  domain: documentation
+  tags:
+    - ai-skill-manager
+    - cli
+    - commands
+    - bilingual
+  responsibilities:
+    - document sync, discover, and new commands
+    - list options and examples for each command
+---
+
 # Running / Запуск
 
 The CLI is organized into subcommands. Each command has its own options and output format.
@@ -52,6 +67,10 @@ ai-skill-manager sync -c ./config/my-skills.yaml
 # Override target directory
 # Переопределить целевую директорию
 ai-skill-manager sync --target ./my-skills
+
+# Force full re-copy
+# Принудительно перекопировать все навыки
+ai-skill-manager sync -f
 ```
 
 ---
@@ -93,6 +112,14 @@ ai-skill-manager discover -t auto -p ./my-skills
 # Discover from GitHub
 # Обнаружить из GitHub
 ai-skill-manager discover -t github -p https://github.com/owner/skills-repo.git
+
+# Discover a specific subpath in a GitHub repo
+# Обнаружить конкретный подпуть в репозитории GitHub
+ai-skill-manager discover -t github \
+  -p https://github.com/owner/skills-repo.git \
+  --tree main \
+  --subpath skills \
+  --subpath docs/guides.skill.md
 ```
 
 ---

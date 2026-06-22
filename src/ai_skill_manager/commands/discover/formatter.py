@@ -38,6 +38,8 @@ def format_skills(skills: List[Skill]) -> str:
 
     lines = []
     for i, skill in enumerate(skills, start=1):
+        # Use a fallback name when the skill header does not declare one.
+        # Используем запасное имя, если заголовок навыка его не объявляет.
         name = skill.name or "(unnamed)"
         kind = "flat" if skill.is_flat() else "directory"
         lines.append(f"{i}. {name} | {kind} | {skill.file_path.name}")

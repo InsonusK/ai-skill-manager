@@ -27,6 +27,8 @@ def run_sync(
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
 
+    Discover, validate, copy and adapt all skills.
+
     Обнаруживает, валидирует, копирует и адаптирует все скиллы.
 
     Args:
@@ -50,9 +52,13 @@ def run_sync(
     """
     skills = discover(sources)
 
+    # Validate conflict resolution strategy before doing real work.
+    # Проверяем стратегию разрешения конфликтов перед выполнением основной работы.
     if on_conflict not in ("error", "last_wins"):
         raise ValueError(f"Invalid on_conflict value: {on_conflict}")
 
+    # Detect duplicate skill names according to the chosen conflict strategy.
+    # Обнаруживаем повторяющиеся имена навыков в соответствии с выбранной стратегией.
     seen_names: set = set()
     for skill in skills:
         name = skill.properties.name
@@ -61,9 +67,12 @@ def run_sync(
                 raise ValueError(
                     f"CONFLICT: multiple skills have the same name '{name}'")
             # last_wins: continue and let the last skill overwrite the previous one.
+            # last_wins: продолжаем и позволяем последнему навыку перезаписать предыдущий.
             continue
         seen_names.add(name)
 
+    # Validate all discovered skills before copying anything.
+    # Валидируем все обнаруженные навыки перед копированием.
     validator = Validator()
     validation_report = validator.validate(skills)
     if validation_report.has_errors:
@@ -71,6 +80,8 @@ def run_sync(
 
     target_dir = Path(target_dir).resolve()
 
+    # In dry-run mode return a summary without touching the filesystem.
+    # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
     if dry_run:
         return {
             "skills_count": len(skills),
@@ -83,6 +94,8 @@ def run_sync(
 
     copied_skills: List[Skill] = []
     links_replaced = 0
+    # Capture validator versions for the managed state file.
+    # Сохраняем версии валидаторов для файла управляемого состояния.
     validator_versions = [
         {
             "name": registered_rule[0],
@@ -93,6 +106,8 @@ def run_sync(
 
     adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
 
+    # Copy each skill into the target directory.
+    # Копируем каждый навык в целевую директорию.
     for skill in skills:
         name = skill.properties.name
         if name is None:
@@ -107,6 +122,8 @@ def run_sync(
 
         copied_skills.append(new_skill)
 
+    # Run adapters on the copied skills and count replaced links.
+    # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
     adapter = Adapter(copied_skills, adapter_list)
     adapters_version = [
         {"name": registered_adapter[0],
@@ -119,6 +136,8 @@ def run_sync(
         if link_msg is not None:
             links_replaced += link_msg.params.get("count", 0)
 
+    # Persist managed state for each copied skill.
+    # Сохраняем управляемое состояние для каждого скопированного навыка.
     for new_skill in copied_skills:
         state = {
             "hash": compute_skill_hash(new_skill),
@@ -127,6 +146,8 @@ def run_sync(
         }
         write_managed_state(new_skill.folder_path, state)
 
+    # Remove previously copied skills that are no longer present.
+    # Удаляем ранее скопированные навыки, которых больше нет в источниках.
     if cleanup_orphans:
         remove_orphans(target_dir, copied_skills)
 
@@ -140,9 +161,21 @@ def run_sync(
 def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Path]:
     """Remove previously copied skills that are no longer present in sources.
 
+    Remove previously copied skills that are no longer present in sources.
+
     Удаляет ранее скопированные скиллы, которых больше нет в исходных источниках.
     Учитываются только поддиректории целевой директории, помеченные файлом
     ``.ai-skills-managed``.
+
+    Args:
+        target_dir: Target directory containing copied skills.
+            Целевая директория, содержащая скопированные скиллы.
+        copied_skills: Skills that were copied during this sync run.
+            Скиллы, скопированные в текущем запуске синхронизации.
+
+    Returns:
+        Paths of removed orphan directories. /
+        Пути удалённых осиротевших директорий.
     """
     target_dir = Path(target_dir).resolve()
     copied_dirs = {
@@ -151,6 +184,9 @@ def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Pat
         if skill.folder_path is not None
     }
     removed: List[Path] = []
+    # Iterate target entries and remove managed directories not in copied_skills.
+    # Перебираем записи целевой директории и удаляем управляемые директории,
+    # отсутствующие среди скопированных навыков.
     for entry in target_dir.iterdir():
         if not entry.is_dir():
             continue
@@ -166,7 +202,18 @@ def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Pat
 def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:
     """Copy a flat skill to the target directory as an Agent-format skill.
 
+    Copy a flat skill to the target directory as an Agent-format skill.
+
     Копирует плоский скилл в целевую директорию в формате Agent.
+
+    Args:
+        skill: Flat skill to copy. / Плоский скилл для копирования.
+        skill_target_dir: Destination directory for the skill. /
+            Целевая директория для скилла.
+
+    Returns:
+        A new :class:`Skill` object pointing to the copied Agent-format file. /
+        Новый объект :class:`Skill`, указывающий на скопированный файл в формате Agent.
     """
     skill_target_dir.mkdir(parents=True, exist_ok=True)
     target_path = skill_target_dir / "SKILL.md"
@@ -177,13 +224,26 @@ def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:
 def _copy_dir_skill(skill: Skill, skill_target_dir: Path) -> Skill:
     """Copy a directory skill to the target directory as an Agent-format skill.
 
+    Copy a directory skill to the target directory as an Agent-format skill.
+
     Копирует директорию скилла в целевую директорию в формате Agent.
+
+    Args:
+        skill: Directory skill to copy. / Директориальный скилл для копирования.
+        skill_target_dir: Destination directory for the skill. /
+            Целевая директория для скилла.
+
+    Returns:
+        A new :class:`Skill` object pointing to the copied Agent-format directory. /
+        Новый объект :class:`Skill`, указывающий на скопированную директорию в формате Agent.
     """
     assert skill.folder_path is not None
 
     source_root = skill.folder_path
     skill_target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Recursively copy every file, renaming the main skill file to SKILL.md.
+    # Рекурсивно копируем каждый файл, переименовывая основной файл навыка в SKILL.md.
     for src_file in sorted(source_root.rglob("*")):
         if not src_file.is_file():
             continue
@@ -201,7 +261,19 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path) -> Skill:
 def _build_target_skill(file_path: Path, folder_path: Path) -> Skill:
     """Build a Skill object for a copied Agent-format skill.
 
+    Build a Skill object for a copied Agent-format skill.
+
     Создаёт объект ``Skill`` для скопированного скилла в формате Agent.
+
+    Args:
+        file_path: Path to the skill's SKILL.md file. /
+            Путь к файлу SKILL.md навыка.
+        folder_path: Path to the skill's target directory. /
+            Путь к целевой директории навыка.
+
+    Returns:
+        A new :class:`Skill` instance representing the copied skill. /
+        Новый экземпляр :class:`Skill`, представляющий скопированный навык.
     """
     source_path = folder_path.parent
     source = LocalSource(path=source_path)

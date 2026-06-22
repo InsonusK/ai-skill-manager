@@ -19,10 +19,14 @@ def main():
 
     Запускает основную точку входа CLI.
     """
+    # EN: Create the top-level argument parser.
+    # RU: Создаём корневой парсер аргументов.
     parser = argparse.ArgumentParser(
         prog='ai-skill-manager',
         description='AI skills manager CLI / CLI менеджера AI-навыков',
     )
+    # EN: Require a subcommand; ``dest`` lets us know which one was chosen.
+    # RU: Требуем подкоманду; ``dest`` позволяет узнать, какая выбрана.
     subparsers:argparse._SubParsersAction[argparse.ArgumentParser] = parser.add_subparsers(dest='command', required=True)
 
     # Register subcommand parsers.
@@ -31,6 +35,8 @@ def main():
     new_add_parser(subparsers)
     discover_add_parser(subparsers)
 
+    # EN: Parse CLI arguments and dispatch to the selected subcommand.
+    # RU: Парсим аргументы CLI и передаём управление выбранной подкоманде.
     args = parser.parse_args()
     args.func(args)
 

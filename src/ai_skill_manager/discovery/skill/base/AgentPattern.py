@@ -5,6 +5,7 @@
 
 from pathlib import Path
 from typing import Optional
+
 from ....entities import Skill, SkillFormat
 from .SkillPattern import SkillPattern
 
@@ -12,11 +13,25 @@ from .SkillPattern import SkillPattern
 class AgentPattern(SkillPattern):
     """Detects agent skills: ``SKILL.md`` inside a directory.
 
+    Detects agent skills: ``SKILL.md`` inside a directory.
+
     Обнаруживает навыки агента: файл ``SKILL.md`` внутри директории.
     """
+
     def __init__(self, source, source_path):
+        """Initialize the Agent pattern.
+
+        Initialize the Agent pattern.
+
+        Инициализировать паттерн Agent.
+
+        Args:
+            source: Source metadata for matched skills. /
+                Метаданные источника для совпавших навыков.
+            source_path: Base source path. / Базовый путь источника.
+        """
         super().__init__(source, source_path)
-        
+
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.Agent
 
@@ -24,6 +39,8 @@ class AgentPattern(SkillPattern):
         self, path: Path
     ) -> Optional[Skill]:
         """Match a directory containing ``SKILL.md``.
+
+        Match a directory containing ``SKILL.md``.
 
         Сопоставить директорию, содержащую ``SKILL.md``.
 

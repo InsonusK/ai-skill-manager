@@ -13,16 +13,32 @@ from .SkillPattern import SkillPattern
 class HumanFlatPattern(SkillPattern):
     """Detects flat human skills: a single ``*.skill.md`` file.
 
+    Detects flat human skills: a single ``*.skill.md`` file.
+
     Обнаруживает плоские человеческие навыки: один файл ``*.skill.md``.
     """
+
     def __init__(self, source, source_path):
+        """Initialize the HumanFlat pattern.
+
+        Initialize the HumanFlat pattern.
+
+        Инициализировать паттерн HumanFlat.
+
+        Args:
+            source: Source metadata for matched skills. /
+                Метаданные источника для совпавших навыков.
+            source_path: Base source path. / Базовый путь источника.
+        """
         super().__init__(source, source_path)
-        
+
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanFlat
 
     def match(self, path: Path) -> Optional[Skill]:
         """Match a file ending with ``.skill.md``.
+
+        Match a file ending with ``.skill.md``.
 
         Сопоставить файл, заканчивающийся на ``.skill.md``.
 

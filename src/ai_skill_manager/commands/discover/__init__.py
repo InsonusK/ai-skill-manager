@@ -1,6 +1,7 @@
 """Discover command package.
 
 Exposes the CLI entry point and formatter for discovering skills.
+
 Экспортирует точку входа CLI и форматёр для обнаружения навыков.
 """
 
