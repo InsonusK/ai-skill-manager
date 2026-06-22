@@ -3,9 +3,10 @@
 Сервис синхронизации.
 """
 
+from logging import Logger, ERROR, WARNING
 import shutil
 from pathlib import Path
-from typing import List, Optional, Sequence, Type
+from typing import Dict, List, Optional, Sequence, Type
 
 from ..utils import compute_skill_hash, is_managed, write_managed_state
 
@@ -15,6 +16,8 @@ from ..entities import LocalSource, Skill, Source
 from ..entities.skill_format import SkillFormat
 from ..validators import ValidationFailedError, Validator
 from .discover import discover
+
+logger = Logger("run_sync")
 
 
 def run_sync(
@@ -50,26 +53,9 @@ def run_sync(
         Summary dict with counts and the target directory.
         Сводный словарь с количеством и целевой директорией.
     """
-    skills = discover(sources)
+    skills: List[Skill] = discover(sources)
 
-    # Validate conflict resolution strategy before doing real work.
-    # Проверяем стратегию разрешения конфликтов перед выполнением основной работы.
-    if on_conflict not in ("error", "last_wins"):
-        raise ValueError(f"Invalid on_conflict value: {on_conflict}")
-
-    # Detect duplicate skill names according to the chosen conflict strategy.
-    # Обнаруживаем повторяющиеся имена навыков в соответствии с выбранной стратегией.
-    seen_names: set = set()
-    for skill in skills:
-        name = skill.properties.name
-        if name in seen_names:
-            if on_conflict == "error":
-                raise ValueError(
-                    f"CONFLICT: multiple skills have the same name '{name}'")
-            # last_wins: continue and let the last skill overwrite the previous one.
-            # last_wins: продолжаем и позволяем последнему навыку перезаписать предыдущий.
-            continue
-        seen_names.add(name)
+    validate_conflicts(on_conflict, skills)
 
     # Validate all discovered skills before copying anything.
     # Валидируем все обнаруженные навыки перед копированием.
@@ -156,6 +142,41 @@ def run_sync(
         "target_dir": str(target_dir),
         "links_replaced": links_replaced,
     }
+
+
+def validate_conflicts(on_conflict: str, skills: List[Skill]):
+    """
+    Validate conflict naming in skills
+    Проверяем конфликтующие названия в скилах
+    """    
+    # Validate conflict resolution strategy before doing real work.
+    # Проверяем стратегию разрешения конфликтов перед выполнением основной работы.
+    if on_conflict not in ("error", "last_wins"):
+        raise ValueError(f"Invalid on_conflict value: {on_conflict}")
+
+    # Detect duplicate skill names according to the chosen conflict strategy.
+    # Обнаруживаем повторяющиеся имена навыков в соответствии с выбранной стратегией.
+    seen_names: Dict[str, List[Skill]] = {}
+    for skill in skills:
+        name = skill.properties.name
+        seen_skills: List[Skill] = seen_names.get(name, [])
+        seen_skills.append(skill)
+        seen_names[name] = seen_skills
+
+    more_than_one_seen = {name: ss for name,
+                          ss in seen_names.items() if len(ss) > 1}
+    conflict_error_level = WARNING if on_conflict == "last_wins" else ERROR
+    if len(more_than_one_seen) > 0:
+        for name, seen_skills in more_than_one_seen.items():
+            paths = "\n".join(f"  - {s.file_path}" for s in seen_skills)
+            count = len(seen_skills)
+            logger.log(
+                conflict_error_level,
+                f"CONFLICT: {count} skills have the same name %s:\n%s", name, paths
+            )
+        if on_conflict != "last_wins":
+            raise ValueError(
+                f"CONFLICT: {len(more_than_one_seen)} skills have the same name")
 
 
 def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Path]:
