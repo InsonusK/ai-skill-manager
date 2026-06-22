@@ -4,8 +4,10 @@
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Dict
 
+@dataclass(frozen=True)
 class Source(ABC):
     """Abstract representation of a skill source.
 
@@ -17,7 +19,9 @@ class Source(ABC):
     локальную директорию или файл, репозиторий GitHub или любое другое
     будущее расположение.
     """
-
+    @abstractmethod
+    def __str__(self)->str:
+        ...
     @property
     @abstractmethod
     def source_type(self) -> str:

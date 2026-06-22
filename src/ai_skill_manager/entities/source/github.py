@@ -26,6 +26,19 @@ class GitHubSource(Source):
     #: Subpath(s) inside the repository to scan. / Подпуть(и) внутри репозитория.
 
     @property
+    def __subpath(self)->Optional[List[str]]:
+        if self.subpath is None:
+            return None
+        if isinstance(self.subpath, list):
+            return self.subpath
+        return [self.subpath]
+    
+    def __str__(self)->str:
+        subpath = self.__subpath or [] 
+        path = "\n - ".join(subpath)
+        return f"{self.repo_url} {self.tree}{path}"
+    
+    @property
     def source_type(self) -> str:
         """Return the source type identifier ``github``.
 
@@ -42,5 +55,5 @@ class GitHubSource(Source):
             "type": self.source_type,
             "repo_url": self.repo_url,
             "tree": self.tree,
-            "subpath": self.subpath,
+            "subpath": self.__subpath,
         }

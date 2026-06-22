@@ -20,7 +20,10 @@ class LocalSource(Source):
     path: Path
     #: Local path to a file or directory containing skills.
     #: Локальный путь к файлу или директории, содержащей навыки.
-
+    
+    def __str__(self)->str:
+        return str(self.path)
+    
     @property
     def source_type(self) -> str:
         """Return the source type identifier ``local``.
