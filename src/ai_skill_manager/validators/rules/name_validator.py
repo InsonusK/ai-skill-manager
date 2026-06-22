@@ -11,7 +11,6 @@ folder name for each supported skill format.
 """
 
 from typing import Dict, Optional
-from xml.dom import ValidationErr
 from .abs_validation_rule import Skill, absValidationRule, ValidationResult, List
 from ...entities import SkillFormat
 from ..models import ValidationSeverity, ValidationError
@@ -19,7 +18,7 @@ from ..models import ValidationSeverity, ValidationError
 
 class NameValidationRule(absValidationRule):
     """Validates that a skill's declared name matches its file system name."""
-
+    @property
     def version(self) -> str:
         """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"

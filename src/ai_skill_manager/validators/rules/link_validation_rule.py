@@ -17,7 +17,7 @@ class LinkValidationRule(absValidationRule):
     Проверяет, что каждая ссылка ведёт либо на другой скилл, либо на файл
     внутри своей директории скилла.
     """
-
+    @property
     def version(self) -> str:
         """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"
