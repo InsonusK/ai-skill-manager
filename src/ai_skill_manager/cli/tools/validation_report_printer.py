@@ -3,6 +3,7 @@ from ...validators.rules import absValidationRule
 from ...entities import Skill,Source
 from rich.console import Console
 from rich.tree import Tree
+from rich.text import Text
 from ...validators.models import ValidationReport,ValidationResult
 
 
@@ -22,7 +23,8 @@ def print_validation_report(report: ValidationReport):
             for rule, result in rule_errors.items():
                 rule_branch = skill_branch.add(f"[green]{rule.name} {rule.version}[/green]: {len(result.errors)} error(s)")
                 for error in result.errors:
-                    rule_branch.add(f"[red]{error}[/red]")
+                    text = Text(str(error), style="red")
+                    rule_branch.add(text)
     console.print(tree)
     console.print(
         f"\nTotal: {sum(len(r.errors) for s in report.result.values() for r in s.values())} error(s)")
