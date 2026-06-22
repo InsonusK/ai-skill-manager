@@ -7,7 +7,7 @@ from __future__ import annotations
 from .validation_error import ValidationError
 from .validation_severity import ValidationSeverity
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 
 
 @dataclass(slots=True)
@@ -23,7 +23,7 @@ class ValidationResult:
     определить, прошёл ли результат, выдал предупреждение или ошибку.
     """
 
-    errors: List[ValidationError]
+    errors: Tuple[ValidationError,...]
     """Validation errors found for the skill. / Ошибки валидации, найденные для навыка."""
 
     @staticmethod

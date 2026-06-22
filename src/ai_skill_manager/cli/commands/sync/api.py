@@ -10,8 +10,8 @@ No console output is produced here.
 from pathlib import Path
 from typing import Optional
 
-from ...config import build_sources_from_config, load_config
-from ...services.sync import run_sync as run_sync_service
+from ....config import build_sources_from_config, load_config
+from ....services.sync import run_sync as run_sync_service
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.

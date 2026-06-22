@@ -10,10 +10,10 @@ import sys
 from pathlib import Path
 from typing import List
 
-from ...config import build_sources_from_config
-from ...entities import GitHubSource, LocalSource, Source
-from ...services.discover import STRATEGIES, discover
-from ...entities.skill import Skill
+from ....config import build_sources_from_config
+from ....entities import GitHubSource, LocalSource, Source
+from ....services.discover import STRATEGIES, discover
+from ....entities.skill import Skill
 from .formatter import format_skills
 
 DEFAULT_CONFIG = "ai-skills.yaml"
