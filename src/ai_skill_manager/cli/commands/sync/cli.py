@@ -10,6 +10,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from ...tools.validation_report_printer import print_validation_report
+
+from ....validators import ValidationFailedError
+
 from .api import DEFAULT_CONFIG, run_sync
 from .formatter import format_sync_result
 
@@ -81,7 +85,7 @@ def add_parser(subparsers):
     parser.set_defaults(func=run)
     return parser
 
-
+logger = logging.Logger("sync cli")
 def run(args):
     """Execute the ``sync`` command from parsed CLI arguments.
 
@@ -122,6 +126,10 @@ def run(args):
         sys.exit(1)
     except ValueError as e:
         print(f"❌ {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValidationFailedError as e:
+        print_validation_report(e.report)
+        print(f"❌ Validation Errors: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error: {e}", file=sys.stderr)
