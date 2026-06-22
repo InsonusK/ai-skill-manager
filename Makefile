@@ -1,5 +1,9 @@
 init:
-	bash ./script/bash
+	bash ./script/init.bash
+	bash ./script/pip_install.bash
+
+pip-i:
+	bash ./script/pip_install.bash
 
 test:
 	.venv/bin/pytest -v

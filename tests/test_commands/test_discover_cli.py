@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.commands.discover.cli import _discover
+from ai_skill_manager.cli.commands.discover.cli import _discover
 
 
 MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_discover_cli"

@@ -9,8 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.commands.sync.api import DEFAULT_TARGET, run_sync
-from ai_skill_manager.commands.sync.cli import run as sync_run
+from ai_skill_manager.cli.commands.sync.api import DEFAULT_TARGET, run_sync
+from ai_skill_manager.cli.commands.sync.cli import run as sync_run
 
 
 class TestSyncAPI(unittest.TestCase):

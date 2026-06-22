@@ -7,7 +7,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_skill_manager.commands.sync.cli import run as sync_run
+from ai_skill_manager.cli.commands.sync.cli import run as sync_run
 
 
 MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_sync_cli"
