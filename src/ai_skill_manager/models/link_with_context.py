@@ -42,10 +42,10 @@ class LinkWithContext:
     def __post_init__(self):
         link_candidates = [
             link for link in self.context.file.links if link == self.base]
-        assert len(
-            link_candidates) == 0, f"Link {self.base.raw} doesn't find in skill file {self.context.file.path}"
-        assert len(
-            link_candidates) == 1, f"Link {self.base.raw} has more than 1 candidate in skill file {self.context.file.path}"
+        assert len(link_candidates) == 1, (
+            f"Link {self.base.raw} doesn't find or has more than 1 candidate "
+            f"in skill file {self.context.file.path}"
+        )
 
     @staticmethod
     def build(skill: Skill, file: SkillFile, link: Link) -> LinkWithContext:
@@ -82,14 +82,21 @@ class LinkWithContext:
             skill for skill in other_skills if self.os_absolute_path == skill.file_path]
         if len(skill_candidates) == 0:
             return None
-        assert len(skill_candidates) > 1, \
+        assert len(skill_candidates) == 1, \
             f"More than 1 skill candidate for link {self.base.raw}"
         return skill_candidates[0]
 
-    @property
     def to_skill_format(self, other_skills: List[Skill]) -> str:
+        if self.base.kind == LinkKind.web:
+            return self.base.path
+        
         if self.is_link_to_skill_file:
+            if self.context.skill.format.is_flat:
+                return "./SKILL.md"
             return f"./{self.os_absolute_path.relative_to(self.context.skill.folder_path)}"
-        if (skill := self.is_link_to_another_skill(other_skills)) is not None:
+        
+        skill = self.is_link_to_another_skill(other_skills)
+        if skill is not None:
             return f"skill:{skill.properties.name}"
+        
         raise ValueError("Invalid link format")

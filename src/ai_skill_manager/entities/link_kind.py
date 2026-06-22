@@ -22,5 +22,5 @@ class LinkKind(Enum):
     repo_absolute = "repo_absolute"
     """Path from root of repository. / Путь от корня репозитория."""
 
-    web = "relative"
+    web = "web"
     """Path to http links"""

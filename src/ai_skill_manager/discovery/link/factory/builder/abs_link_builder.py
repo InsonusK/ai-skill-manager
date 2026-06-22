@@ -45,4 +45,8 @@ class absLinkBuilder(ABC):
 
     def _is_repo_absolute(self, path: str) -> bool:
         """Return True for absolute repo-root paths containing ``/``."""
-        return not path.startswith("/") and not self._is_relative(path)
+        return (
+            not path.startswith("/")
+            and not self._is_relative(path)
+            and not self._is_http_link(path)
+        )

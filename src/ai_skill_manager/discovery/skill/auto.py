@@ -116,7 +116,7 @@ class AutoDiscovery(absDiscoveryStrategy):
         return [
             skill
             for pattern in self._dir_patterns
-            if (skill := pattern.match(path, self._source)) is not None
+            if (skill := pattern.match(path)) is not None
         ]
 
     def _handle_file(self, filepath: Path) -> List[Skill]:
@@ -261,12 +261,10 @@ class AutoDiscovery(absDiscoveryStrategy):
             if path.is_file():
                 # Any flat file other than the main file is a nested skill.
                 # Любой плоский файл, кроме основного, является вложенным навыком.
-                for pattern in self._FLAT_PATTERNS:
-                    if pattern.match(path, self._source) is not None:
-                        if path.resolve() != main_file_resolved:
-                            raise ValueError(
-                                f"Nested skills detected in directory skill: {directory}"
-                            )
+                if path.resolve() != main_file_resolved and self._match_flat_patterns(path):
+                    raise ValueError(
+                        f"Nested skills detected in directory skill: {directory}"
+                    )
             elif path.is_dir():
                 # Any subdirectory matching a directory pattern is a nested skill.
                 # Любая поддиректория, соответствующая директориальному паттерну,

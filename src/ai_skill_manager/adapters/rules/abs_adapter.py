@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Tuple
+
+from ..models.adapter_message import AdapterMessage
 from ...entities import Skill
 
 class absAdapter(ABC):
@@ -24,6 +26,6 @@ class absAdapter(ABC):
         return cls.__name__
 
     @abstractmethod
-    def adapt(self, skill: Skill) -> None:
+    def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Modify file in place after copying."""
         ...
