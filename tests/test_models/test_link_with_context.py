@@ -1,13 +1,17 @@
 """Tests for LinkWithContext."""
 
+import io
 import shutil
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities import GitHubSource, LocalSource, Skill, SkillFormat
 from ai_skill_manager.entities.skill_file import SkillFile
 from ai_skill_manager.models.link_with_context import LinkWithContext
+from ai_skill_manager.services.discover import discover
 
 
 MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_link_with_context"
@@ -86,6 +90,53 @@ class TestLinkWithContext(unittest.TestCase):
         ctx = self._context(skill, md)
 
         self.assertEqual(ctx.os_absolute_path, Path("/tmp/absolute.md"))
+
+    def test_repo_absolute_path_uses_repo_path(self):
+        root = self._copy_mock("repo_abs")
+        md = root / "skills" / "guide.skill.md"
+        source = LocalSource(path=root / "skills", repo_path=root)
+        skill = Skill(
+            file_path=md,
+            folder_path=None,
+            source=source,
+            format=SkillFormat.HumanFlat,
+            source_path=root / "skills",
+        )
+        ctx = self._context(skill, md)
+
+        self.assertEqual(ctx.os_absolute_path, (root / "other.skill.md").resolve())
+
+    def test_repo_absolute_path_for_github_source(self):
+        """Repo-absolute links resolve against the repository root, not subpath."""
+        repo_mock = self._copy_mock("repo_abs")
+        # Move other.skill.md to the repo root so the repo-absolute link must
+        # resolve against repo_path, not source_path.
+        # Перемещаем other.skill.md в корень репозитория, чтобы ссылка
+        # repo_absolute разрешалась относительно repo_path, а не source_path.
+        (repo_mock / "skills" / "other.skill.md").rename(repo_mock / "other.skill.md")
+
+        archive_path = self.tmpdir / "repo-main.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            tar.add(repo_mock, arcname="repo-main")
+
+        def fake_download(owner, repo, tree):
+            fake_path = self.tmpdir / "fake_archive.tar.gz"
+            fake_path.write_bytes(archive_path.read_bytes())
+            return fake_path
+
+        with patch("ai_skill_manager.entities.source.github._download_archive", side_effect=fake_download):
+            source = GitHubSource(
+                repo_url="https://github.com/owner/repo",
+                tree="main",
+                subpath="skills",
+            )
+            skills = discover([source])
+
+        self.assertEqual(len(skills), 1)
+        skill = skills[0]
+        ctx = self._context(skill, skill.file_path)
+        expected = (source.get_scan_location().repo_path / "other.skill.md").resolve()
+        self.assertEqual(ctx.os_absolute_path, expected)
 
     def test_to_skill_format_for_flat_self_link(self):
         root = self._copy_mock("flat")

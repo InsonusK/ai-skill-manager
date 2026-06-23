@@ -10,10 +10,8 @@ GitHub repositories for skill definitions.
 
 from .auto import AutoDiscovery
 from .abs_discovery_strategy import absDiscoveryStrategy
-from .github import GitHubDiscovery
 
 __all__ = [
     "AutoDiscovery",
     "absDiscoveryStrategy",
-    "GitHubDiscovery",
 ]

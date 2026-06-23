@@ -49,7 +49,7 @@ List of source locations to scan for skills. Each source is a dictionary with th
 | Field / Поле | Required / Обязательное | Default / По умолчанию | Description / Описание |
 |--------------|-------------------------|------------------------|------------------------|
 | `path` | Yes / Да | — | Directory path relative to the config file (or GitHub repo URL when `type: github`). / Путь к директории относительно файла конфигурации (или URL репозитория GitHub при `type: github`). |
-| `type` | No / Нет | `auto` | Discovery strategy: `auto`, `flat`, `directory`, or `github`. / Стратегия обнаружения: `auto`, `flat`, `directory` или `github`. |
+| `type` | No / Нет | `auto` | Source type: `auto` (local filesystem) or `github`. Values `flat` and `directory` are accepted for backward compatibility and treated as `auto`. / Тип источника: `auto` (локальная файловая система) или `github`. Значения `flat` и `directory` принимаются для обратной совместимости и обрабатываются как `auto`. |
 | `name` | No / Нет | — | Explicit skill name override. / Явное переопределение имени навыка. |
 
 ### Discovery types / Типы обнаружения

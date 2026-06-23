@@ -31,6 +31,24 @@ def load_config(config_path: Path) -> dict:
     return json.loads(content)
 
 
+def _normalize_subpaths(subpath: Any) -> List[str | None]:
+    """Convert a subpath config value into a list of single subpaths.
+
+    Преобразует значение подпути из конфигурации в список отдельных подпутей.
+
+    ``None`` and a single string become a list with one entry; a list is
+    returned unchanged.
+
+    ``None`` и одиночная строка становятся списком с одним элементом;
+    список возвращается без изменений.
+    """
+    if subpath is None:
+        return [None]
+    if isinstance(subpath, list):
+        return subpath
+    return [subpath]
+
+
 def build_sources_from_config(config_path: Path) -> List[Source]:
     """Convert config sources into universal Source objects.
 
@@ -57,13 +75,14 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
         # EN: GitHub sources are created from a repository URL and optional tree/subpath.
         # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
         if src_type == "github":
-            sources.append(
-                GitHubSource(
-                    repo_url=src_path,
-                    tree=src.get("tree", "master"),
-                    subpath=src.get("subpath"),
+            for sp in _normalize_subpaths(src.get("subpath")):
+                sources.append(
+                    GitHubSource(
+                        repo_url=src_path,
+                        tree=src.get("tree", "master"),
+                        subpath=sp,
+                    )
                 )
-            )
         else:
             # EN: Default to a local filesystem source resolved relative to the config file.
             # RU: По умолчанию используем локальный источник, разрешённый относительно файла конфигурации.

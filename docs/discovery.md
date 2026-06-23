@@ -9,7 +9,7 @@ metadata:
     - architecture
     - bilingual
   responsibilities:
-    - explain AutoDiscovery and GitHubDiscovery
+    - explain AutoDiscovery and Source-based scanning
     - document supported skill formats
     - describe how to add a new skill format
 ---
@@ -18,6 +18,36 @@ metadata:
 
 This document describes how `ai-skill-manager` discovers skills from local directories, files, and GitHub repositories.
 Этот документ описывает, как `ai-skill-manager` обнаруживает навыки в локальных директориях, файлах и репозиториях GitHub.
+
+## Source abstraction / Абстракция источника
+
+Every place skills come from is represented by a :class:`Source` entity in
+``src/ai_skill_manager/entities/source/``. A source knows how to turn itself
+into a local :class:`ScanLocation` (``repo_path`` + ``source_path``) via
+``get_scan_location()``.
+
+Каждое место, откуда приходят навыки, представлено сущностью :class:`Source`
+в ``src/ai_skill_manager/entities/source/``. Источник умеет превращать себя
+в локальную :class:`ScanLocation` (``repo_path`` + ``source_path``) через
+``get_scan_location()``.
+
+- ``repo_path`` — absolute path to the repository root. Used for resolving
+  ``repo_absolute`` links.
+  ``repo_path`` — абсолютный путь к корню репозитория. Используется для
+  разрешения ссылок ``repo_absolute``.
+- ``source_path`` — absolute path to the directory that ``AutoDiscovery``
+  should scan. Becomes ``Skill.source_path``.
+  ``source_path`` — абсолютный путь к директории, которую ``AutoDiscovery``
+  должен сканировать. Становится ``Skill.source_path``.
+
+### Supported source types / Поддерживаемые типы источников
+
+- :class:`LocalSource` — a local file or directory.
+  :class:`LocalSource` — локальный файл или директория.
+- :class:`GitHubSource` — a GitHub repository. ``get_scan_location()``
+  downloads and extracts the repository archive to a temporary directory.
+  :class:`GitHubSource` — репозиторий GitHub. ``get_scan_location()``
+  скачивает и распаковывает архив репозитория во временную директорию.
 
 ## Source layout / Структура модуля
 
@@ -34,23 +64,27 @@ src/ai_skill_manager/discovery/source/
 │   ├── HumanDirPattern.py    # HumanDir matcher / Сопоставитель HumanDir
 │   └── AgentPattern.py       # Agent matcher / Сопоставитель Agent
 ├── auto.py                   # AutoDiscovery implementation / Реализация AutoDiscovery
-├── github.py                 # GitHubDiscovery implementation / Реализация GitHubDiscovery
 └── __init__.py               # Public exports / Публичные экспорты
 ```
 
-Only two concrete discovery strategies remain:
-Осталось только две конкретные стратегии обнаружения:
+Only one concrete discovery strategy remains:
+Осталась только одна конкретная стратегия обнаружения:
 
-- `AutoDiscovery` — detects any supported skill format.
-  `AutoDiscovery` — обнаруживает любой поддерживаемый формат навыка.
-- `GitHubDiscovery` — downloads a GitHub archive and delegates to `AutoDiscovery`.
-  `GitHubDiscovery` — скачивает архив GitHub и делегирует работу `AutoDiscovery`.
+- `AutoDiscovery` — detects any supported skill format from a local scan path.
+  `AutoDiscovery` — обнаруживает любой поддерживаемый формат навыка из локального пути сканирования.
 
 `DiscoveryStrategy` is the abstract base class.
 `DiscoveryStrategy` — абстрактный базовый класс.
 
 Skill patterns live in `base/` and are reused by `AutoDiscovery`.
 Паттерны навыков находятся в `base/` и переиспользуются `AutoDiscovery`.
+
+Source acquisition (for example downloading a GitHub archive) is the
+responsibility of the :class:`Source` implementation, not of the discovery
+strategy.
+
+Захват источника (например, скачивание архива GitHub) является ответственностью
+реализации :class:`Source`, а не стратегии обнаружения.
 
 ## Supported skill formats / Поддерживаемые форматы навыков
 
@@ -111,10 +145,17 @@ The validation recursively scans the directory tree and raises:
 - `Nested skills detected in directory skill: ...` if another skill pattern is found inside.
   `Nested skills detected in directory skill: ...`, если внутри найден другой паттерн навыка.
 
-## `GitHubDiscovery` behavior / Поведение `GitHubDiscovery`
+## GitHub source behavior / Поведение источника GitHub
 
-`GitHubDiscovery` downloads the repository archive for the specified `tree`, extracts it to a temporary directory, and processes each configured `subpath` with `AutoDiscovery`.
-`GitHubDiscovery` скачивает архив репозитория для указанного `tree`, распаковывает его во временную директорию и обрабатывает каждый настроенный `subpath` с помощью `AutoDiscovery`.
+:class:`GitHubSource` downloads the repository archive for the specified
+`tree`, extracts it to a temporary directory, and returns a :class:`ScanLocation`
+where ``repo_path`` is the repository root and ``source_path`` is the configured
+``subpath``.
+
+:class:`GitHubSource` скачивает архив репозитория для указанного `tree`,
+распаковывает его во временную директорию и возвращает :class:`ScanLocation`,
+где ``repo_path`` — корень репозитория, а ``source_path`` — настроенный
+``subpath``.
 
 - If a subpath is a directory, `AutoDiscovery` scans it recursively.
   Если подпуть — директория, `AutoDiscovery` рекурсивно её сканирует.
@@ -122,6 +163,8 @@ The validation recursively scans the directory tree and raises:
   Если подпуть — файл `*.skill.md`, он считается навыком HumanFlat.
 - Missing subpaths are silently skipped.
   Отсутствующие подпути пропускаются без ошибки.
+- ``repo_absolute`` links are resolved against ``repo_path``, not ``source_path``.
+  Ссылки ``repo_absolute`` разрешаются относительно ``repo_path``, а не ``source_path``.
 
 ### GitHub discovery example / Пример обнаружения из GitHub
 
@@ -145,5 +188,8 @@ To add a new skill format:
 3. Update this documentation and `docs/config.md`.
    Обновить этот документ и `docs/config.md`.
 
-No changes are required in `GitHubDiscovery` because it delegates to `AutoDiscovery`.
-В `GitHubDiscovery` изменения не требуются, так как он делегирует работу `AutoDiscovery`.
+No changes are required in source implementations as long as they produce a
+valid :class:`ScanLocation`, because discovery delegates to `AutoDiscovery`.
+
+Изменения в реализациях источников не требуются, пока они производят корректную
+:class:`ScanLocation`, так как обнаружение делегирует работу `AutoDiscovery`.

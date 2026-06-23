@@ -79,10 +79,11 @@ class LinkWithContext:
         # RU: Относительные пути разрешаются относительно директории содержащего файла.
         elif self.base.kind == LinkKind.relative:
             return (self.context.file.path.parent / self.base.path).resolve()
-        # EN: Repo-absolute paths are resolved against the source root.
-        # RU: Пути от корня репозитория разрешаются относительно корня источника.
+        # EN: Repo-absolute paths are resolved against the repository root.
+        # RU: Пути от корня репозитория разрешаются относительно корня репозитория.
         elif self.base.kind == LinkKind.repo_absolute:
-            return (self.context.skill.source_path / self.base.path).resolve()
+            repo_path = self.context.skill.source.get_scan_location().repo_path
+            return (repo_path / self.base.path).resolve()
         else:
             raise ValueError(f"Unknown LinkKind: {self.base.kind}")
 

@@ -50,6 +50,27 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
 
         self.assertIsInstance(sources[2], LocalSource)
 
+    def test_build_github_source_with_list_subpath(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: github\n"
+            "    path: https://github.com/owner/repo\n"
+            "    tree: main\n"
+            "    subpath:\n"
+            "      - skills\n"
+            "      - docs\n"
+        )
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 2)
+        for source in sources:
+            self.assertIsInstance(source, GitHubSource)
+            self.assertEqual(source.repo_url, "https://github.com/owner/repo")
+            self.assertEqual(source.tree, "main")
+        self.assertEqual(sources[0].subpath, "skills")
+        self.assertEqual(sources[1].subpath, "docs")
+
 
 if __name__ == "__main__":
     unittest.main()

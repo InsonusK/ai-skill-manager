@@ -1,25 +1,43 @@
 """Discovery service.
 
-High-level helper that routes each configured source to the appropriate
-discovery strategy and returns the combined list of skills.
+High-level helper that resolves each configured source to its scan location
+and returns the combined list of skills.
 
 Сервис обнаружения.
-Высокоуровневый помощник, который направляет каждый настроенный источник
-в соответствующую стратегию обнаружения и возвращает объединённый список навыков.
+Высокоуровневый помощник, который разрешает каждый настроенный источник
+в его локацию сканирования и возвращает объединённый список навыков.
 """
 
 from pathlib import Path
-from typing import List, Sequence
+from typing import Iterator, List, Sequence
 
+from ..discovery.skill import AutoDiscovery
 from ..entities import GitHubSource, LocalSource, Skill, Source
-from ..discovery.skill import AutoDiscovery, GitHubDiscovery
 
-# Mapping of source types to their discovery strategies.
-# Сопоставление типов источников со стратегиями их обнаружения.
-STRATEGIES = {
-    "auto": AutoDiscovery,
-    "github": GitHubDiscovery,
-}
+
+def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
+    """Yield sources, splitting GitHub sources with a list subpath.
+
+    Возвращает источники, разбивая GitHub-источники со списком подпутей.
+
+    A single :class:`GitHubSource` always refers to exactly one scan location.
+    If the legacy list form is used, it is expanded into multiple instances
+    so that each subpath is scanned independently.
+
+    Один :class:`GitHubSource` всегда ссылается ровно на одну локацию
+    сканирования. Если используется устаревшая форма списка, она разворачивается
+    в несколько экземпляров, чтобы каждый подпуть сканировался независимо.
+    """
+    for src in sources:
+        if isinstance(src, GitHubSource) and isinstance(src.subpath, list):
+            for sp in src.subpath:
+                yield GitHubSource(
+                    repo_url=src.repo_url,
+                    tree=src.tree,
+                    subpath=sp,
+                )
+        else:
+            yield src
 
 
 def discover(sources: Sequence[Source]) -> List[Skill]:
@@ -40,26 +58,21 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
         ValueError: Если встречен неизвестный тип источника.
     """
     all_skills: List[Skill] = []
-    for src in sources:
-        # Pick the strategy based on the concrete source type.
-        # Выбираем стратегию на основе конкретного типа источника.
-        if isinstance(src, GitHubSource):
-            # GitHub repositories default to the ``skills`` subpath.
-            # Репозитории GitHub по умолчанию используют подпуть ``skills``.
-            subpath_value = src.subpath if src.subpath is not None else "skills"
-            strategy = GitHubDiscovery(
-                src.repo_url,
-                tree=src.tree,
-                subpath=subpath_value,
-            )
-        elif isinstance(src, LocalSource):
-            strategy = AutoDiscovery(
-                source_path=Path(src.path).resolve(),
-                source=src,
-            )
-        else:
-            raise ValueError(f"Unknown type {src.source_type}")
 
+    for src in _normalize_github_sources(sources):
+        # Local paths are resolved to absolute form before scanning.
+        # Локальные пути разрешаются в абсолютную форму перед сканированием.
+        if isinstance(src, LocalSource):
+            src = LocalSource(
+                path=Path(src.path).resolve(),
+                repo_path=Path(src.repo_path).resolve() if src.repo_path else None,
+            )
+
+        scan_location = src.get_scan_location()
+        strategy = AutoDiscovery(
+            source_path=scan_location.source_path,
+            source=src,
+        )
         all_skills.extend(strategy.discover())
 
     return all_skills

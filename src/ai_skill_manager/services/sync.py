@@ -55,93 +55,99 @@ def run_sync(
     """
     skills: List[Skill] = discover(sources)
 
-    validate_conflicts(on_conflict, skills)
+    try:
+        validate_conflicts(on_conflict, skills)
 
-    # Validate all discovered skills before copying anything.
-    # Валидируем все обнаруженные навыки перед копированием.
-    validator = Validator()
-    validation_report = validator.validate(skills)
-    if validation_report.has_errors:
-        raise ValidationFailedError(validation_report)
+        # Validate all discovered skills before copying anything.
+        # Валидируем все обнаруженные навыки перед копированием.
+        validator = Validator()
+        validation_report = validator.validate(skills)
+        if validation_report.has_errors:
+            raise ValidationFailedError(validation_report)
 
-    target_dir = Path(target_dir).resolve()
+        target_dir = Path(target_dir).resolve()
 
-    # In dry-run mode return a summary without touching the filesystem.
-    # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
-    if dry_run:
+        # In dry-run mode return a summary without touching the filesystem.
+        # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
+        if dry_run:
+            return {
+                "skills_count": len(skills),
+                "target_dir": str(target_dir),
+                "links_replaced": 0,
+                "dry_run": True,
+            }
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        copied_skills: List[Skill] = []
+        links_replaced = 0
+        # Capture validator versions for the managed state file.
+        # Сохраняем версии валидаторов для файла управляемого состояния.
+        validator_versions = [
+            {
+                "name": registered_rule[0],
+                "version": registered_rule[1]() if callable(registered_rule[1]) else registered_rule[1],
+            }
+            for registered_rule in validator.registered_rules_name_version
+        ]
+
+        adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
+
+        # Copy each skill into the target directory.
+        # Копируем каждый навык в целевую директорию.
+        for skill in skills:
+            name = skill.properties.name
+            if name is None:
+                raise ValueError(
+                    f"Skill {skill.file_path} has no 'name' in frontmatter")
+
+            skill_target_dir = target_dir / name
+            if skill.is_flat():
+                new_skill = _copy_flat_skill(skill, skill_target_dir)
+            else:
+                new_skill = _copy_dir_skill(skill, skill_target_dir)
+
+            copied_skills.append(new_skill)
+
+        # Run adapters on the copied skills and count replaced links.
+        # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
+        adapter = Adapter(copied_skills, adapter_list)
+        adapters_version = [
+            {"name": registered_adapter[0],
+             "version": registered_adapter[1]}
+            for registered_adapter in adapter.registered_adapters_name_version
+        ]
+        for old_skill, new_skill in zip(skills, copied_skills):
+            adapter_msg = adapter.adapt(old_skill, new_skill)
+            link_msg = adapter_msg.get(LinkAdapter.name())
+            if link_msg is not None:
+                links_replaced += link_msg.params.get("count", 0)
+
+        # Persist managed state for each copied skill.
+        # Сохраняем управляемое состояние для каждого скопированного навыка.
+        for new_skill in copied_skills:
+            state = {
+                "hash": compute_skill_hash(new_skill),
+                "validators": validator_versions,
+                "adapters": adapters_version
+            }
+            write_managed_state(new_skill.folder_path, state)
+
+        # Remove previously copied skills that are no longer present.
+        # Удаляем ранее скопированные навыки, которых больше нет в источниках.
+        if cleanup_orphans:
+            remove_orphans(target_dir, copied_skills)
+
         return {
             "skills_count": len(skills),
             "target_dir": str(target_dir),
-            "links_replaced": 0,
-            "dry_run": True,
+            "links_replaced": links_replaced,
         }
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    copied_skills: List[Skill] = []
-    links_replaced = 0
-    # Capture validator versions for the managed state file.
-    # Сохраняем версии валидаторов для файла управляемого состояния.
-    validator_versions = [
-        {
-            "name": registered_rule[0],
-            "version": registered_rule[1]() if callable(registered_rule[1]) else registered_rule[1],
-        }
-        for registered_rule in validator.registered_rules_name_version
-    ]
-
-    adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
-
-    # Copy each skill into the target directory.
-    # Копируем каждый навык в целевую директорию.
-    for skill in skills:
-        name = skill.properties.name
-        if name is None:
-            raise ValueError(
-                f"Skill {skill.file_path} has no 'name' in frontmatter")
-
-        skill_target_dir = target_dir / name
-        if skill.is_flat():
-            new_skill = _copy_flat_skill(skill, skill_target_dir)
-        else:
-            new_skill = _copy_dir_skill(skill, skill_target_dir)
-
-        copied_skills.append(new_skill)
-
-    # Run adapters on the copied skills and count replaced links.
-    # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
-    adapter = Adapter(copied_skills, adapter_list)
-    adapters_version = [
-        {"name": registered_adapter[0],
-         "version": registered_adapter[1]}
-        for registered_adapter in adapter.registered_adapters_name_version
-    ]
-    for old_skill, new_skill in zip(skills, copied_skills):
-        adapter_msg = adapter.adapt(old_skill, new_skill)
-        link_msg = adapter_msg.get(LinkAdapter.name())
-        if link_msg is not None:
-            links_replaced += link_msg.params.get("count", 0)
-
-    # Persist managed state for each copied skill.
-    # Сохраняем управляемое состояние для каждого скопированного навыка.
-    for new_skill in copied_skills:
-        state = {
-            "hash": compute_skill_hash(new_skill),
-            "validators": validator_versions,
-            "adapters": adapters_version
-        }
-        write_managed_state(new_skill.folder_path, state)
-
-    # Remove previously copied skills that are no longer present.
-    # Удаляем ранее скопированные навыки, которых больше нет в источниках.
-    if cleanup_orphans:
-        remove_orphans(target_dir, copied_skills)
-
-    return {
-        "skills_count": len(skills),
-        "target_dir": str(target_dir),
-        "links_replaced": links_replaced,
-    }
+    finally:
+        # Release temporary resources acquired by remote sources.
+        # Освобождаем временные ресурсы, полученные удалёнными источниками.
+        for src in sources:
+            src.cleanup()
 
 
 def validate_conflicts(on_conflict: str, skills: List[Skill]):

@@ -12,7 +12,7 @@ from typing import List
 
 from ....config import build_sources_from_config
 from ....entities import GitHubSource, LocalSource, Source
-from ....services.discover import STRATEGIES, discover
+from ....services.discover import discover
 from ....entities.skill import Skill
 from .formatter import format_skills
 
@@ -22,6 +22,9 @@ DEFAULT_CONFIG = "ai-skills.yaml"
 DEFAULT_TARGET = ".agents/skills"
 #: Default target directory (kept for CLI help compatibility).
 #: Целевая директория по умолчанию (оставлена для совместимости справки CLI).
+
+# Discovery types supported by the CLI. / Типы обнаружения, поддерживаемые CLI.
+_DISCOVERY_TYPES = ["auto", "github"]
 
 
 def add_parser(subparsers):
@@ -50,7 +53,7 @@ def add_parser(subparsers):
     parser.add_argument(
         "-t",
         "--type",
-        choices=list(STRATEGIES.keys()),
+        choices=_DISCOVERY_TYPES,
         help="Discovery strategy for a single source / "
              "Стратегия обнаружения для одного источника",
     )
@@ -117,22 +120,25 @@ def _discover(args) -> List[Skill]:
 
         # GitHub sources default to the "skills" subpath unless overridden.
         # Для источников GitHub по умолчанию используется подпуть "skills", если не переопределён.
-        subpath = args.subpath
-        if args.type == "github" and subpath is None:
-            subpath = "skills"
+        subpaths = args.subpath
+        if args.type == "github" and subpaths is None:
+            subpaths = ["skills"]
 
-        # Build the appropriate source object based on the selected type.
-        # Формируем соответствующий объект источника в зависимости от выбранного типа.
+        # Build the appropriate source object(s) based on the selected type.
+        # Формируем соответствующий объект(ы) источника в зависимости от выбранного типа.
         if args.type == "github":
-            source: Source = GitHubSource(
-                repo_url=args.path,
-                tree=args.tree,
-                subpath=subpath,
-            )
+            sources: List[Source] = [
+                GitHubSource(
+                    repo_url=args.path,
+                    tree=args.tree,
+                    subpath=sp,
+                )
+                for sp in subpaths
+            ]
         else:
-            source = LocalSource(path=Path(args.path))
+            sources = [LocalSource(path=Path(args.path))]
 
-        return discover([source])
+        return discover(sources)
 
     # Default: try ai-skills.yaml in the current directory.
     # По умолчанию: пробуем ai-skills.yaml в текущей директории.
@@ -142,7 +148,7 @@ def _discover(args) -> List[Skill]:
 
     raise ValueError(
         "No config file specified and no source type provided.\n"
-        "   Use --config <file> or --type <auto|directory|flat|github> --path <source>"
+        "   Use --config <file> or --type <auto|github> --path <source>"
     )
 
 
