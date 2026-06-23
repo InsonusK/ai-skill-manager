@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 from ..discovery.link import search_links_in_content
 
@@ -27,12 +27,13 @@ class SkillFile:
         path: Path to the markdown file on disk.
             Путь к markdown-файлу на диске.
     """
-
+    class Context:
+        links: Optional[Tuple[Link]] = None
+        
     path: Path
     """absolute path to skill file / абсолютный путь к файлу навыка"""
-    _links: Tuple[Link] = field(
-        default=None, init=False, repr=False, compare=False, hash=False
-    )
+    __context: Context = field(init=False, compare=False, hash=False, default_factory=Context)
+    
 
     def __post_init__(self):
         """Validate that the stored path is an absolute file path.
@@ -54,13 +55,9 @@ class SkillFile:
         """
         # EN: Parse links lazily and cache them in the frozen dataclass.
         # RU: Лениво парсим ссылки и кешируем их в замороженном dataclass.
-        if self._links is None:
-            object.__setattr__(
-                self,
-                "_links",
-                tuple(search_links_in_content(self.content)),
-            )
-        return self._links
+        if self.__context.links is None:
+            self.__context.links = tuple(search_links_in_content(self.content))
+        return self.__context.links
 
     @property
     def content(self) -> str:

@@ -6,7 +6,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ..entities import Link, LinkKind, Skill, SkillFile
 from .link_location import LinkLocation
@@ -109,6 +109,22 @@ class LinkWithContext:
         # RU: Директорийные навыки принимают ссылки внутри папки навыка.
         return self.os_absolute_path.is_relative_to(self.context.skill.folder_path)
 
+    def is_link_to_another_skill_file(self, other_skills: List[Skill]) -> Optional[Tuple[Skill,SkillFile]]:
+        """Return the other skill and SkillFile this link targets, if any.
+
+        Возвращает другой навык и файл, на который указывает ссылка, если такой есть.
+        """
+        candidates = []
+        for skill in other_skills:
+            for file in skill.files:
+                if self.os_absolute_path == file.path:
+                    candidates.append((skill,file))
+        if len(candidates) == 0:
+            return None
+        assert len(candidates) == 1, \
+            f"More than 1 (skill,file) candidate for link {self.base.raw}"
+        return candidates[0]
+    
     def is_link_to_another_skill(self, other_skills: List[Skill]) -> Optional[Skill]:
         """Return the other skill this link targets, if any.
 

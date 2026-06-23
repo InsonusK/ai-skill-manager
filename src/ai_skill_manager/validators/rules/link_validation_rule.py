@@ -115,6 +115,11 @@ class LinkValidationRule(absValidationRule):
         if link.is_link_to_another_skill(skills) is not None:
             return None
 
+        # Links that point to another known file in skill are valid.
+        # Ссылки, указывающие на другой известный файл в навыке, считаются корректными.
+        if link.is_link_to_another_skill_file(skills) is not None:
+            return None
+        
         # Anything else is a dangling link.
         # Всё остальное — висячая ссылка.
         return ValidationError(
