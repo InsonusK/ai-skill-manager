@@ -13,3 +13,9 @@ test-codecover:
 
 run-ai-skill-manager:
 	.venv/bin/python -m ai_skill_manager.cli sync
+
+profile-sync:
+	.venv/bin/python -m ai_skill_manager.cli --profile sync
+
+profile-discover:
+	.venv/bin/python -m ai_skill_manager.cli --profile discover
