@@ -193,7 +193,20 @@ def _resolve_path(
     skill = skill_file.skill
     file_path = skill_file.path
     repo_path = skill.source.get_scan_location().repo_path
-        
+
+    # A fragment-only link (e.g. [[#header]]) points to the containing skill file.
+    # Ссылка только на фрагмент (например, [[#заголовок]]) указывает на файл скилла.
+    if raw_path == "":
+        resolved = file_path.resolve()
+        repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
+        return PathInfo(
+            kind=LinkKind.relative,
+            formatted="./" + file_path.name,
+            repo_path=repo_relative,
+            os_path=resolved,
+            exists=True,
+        )
+
     if raw_kind == LinkKind.relative:
         candidate = (file_path.parent / raw_path).resolve()
     elif raw_kind == LinkKind.repo_absolute:

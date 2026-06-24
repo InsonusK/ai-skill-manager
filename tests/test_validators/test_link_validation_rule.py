@@ -87,6 +87,19 @@ class TestLinkValidationRule(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+    def test_fragment_only_wiki_link_is_valid(self):
+        # EN: A wiki link that contains only a fragment (e.g. [[#Header]]) must
+        # be treated as a link to the current skill file and therefore be valid.
+        # RU: Wiki-ссылка, содержащая только фрагмент (например, [[#Заголовок]]),
+        # должна считаться ссылкой на текущий файл скилла и быть корректной.
+        root = self._copy_mock("fragment_only_link")
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
 
 if __name__ == "__main__":
     unittest.main()

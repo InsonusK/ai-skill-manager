@@ -318,6 +318,50 @@ class TestPathLink(unittest.TestCase):
         link = self._path_link(self._flat_skill_file(), "./guide.skill.md")
         self.assertIs(link.link_type, PathLink)
 
+    def test_fragment_only_link_resolves_to_self_in_dir_skill(self):
+        # EN: A fragment-only wiki link such as [[#Header]] must resolve to the
+        # current skill file so that validation treats it as an internal link.
+        # RU: Wiki-ссылка только с фрагментом [[#Заголовок]] должна разрешаться
+        # в текущий файл скилла, чтобы валидация считала её внутренней.
+        skill_file = self._dir_skill_file()
+        link = PathLink(
+            raw="[[#Return ConflictResult<T> from the resolver]]",
+            text="Return ConflictResult<T> from the resolver",
+            format="wiki",
+            start=0,
+            end=1,
+            skill_file=skill_file,
+            raw_path="",
+            header_value="#Return ConflictResult<T> from the resolver",
+            is_image_value=False,
+        )
+        self.assertEqual(link.path_raw.path, "")
+        self.assertEqual(link.path_raw.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.formatted, "./SKILL.md")
+        self.assertEqual(link.path.os_path, skill_file.path)
+        self.assertTrue(link.path.exists)
+        self.assertEqual(link.header, "#Return ConflictResult<T> from the resolver")
+
+    def test_fragment_only_link_resolves_to_self_in_flat_skill(self):
+        # EN: A fragment-only link in a flat skill resolves to the single skill file.
+        # RU: Ссылка только с фрагментом в плоском скилле разрешается в единственный файл.
+        skill_file = self._flat_skill_file()
+        link = PathLink(
+            raw="[[#Return ConflictResult<T> from the resolver]]",
+            text="Return ConflictResult<T> from the resolver",
+            format="wiki",
+            start=0,
+            end=1,
+            skill_file=skill_file,
+            raw_path="",
+            header_value="#Return ConflictResult<T> from the resolver",
+            is_image_value=False,
+        )
+        self.assertEqual(link.path.formatted, "./guide.skill.md")
+        self.assertEqual(link.path.os_path, skill_file.path)
+        self.assertTrue(link.path.exists)
+
 
 if __name__ == "__main__":
     unittest.main()
