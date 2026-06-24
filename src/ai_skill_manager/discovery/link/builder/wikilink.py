@@ -65,12 +65,14 @@ class WikilinkBuilder(absLinkBuilder):
             Заполненный экземпляр :class:`Link`.
         """
         raw = match.group(0)
-        inner = match.group(1)
+        inner:str = match.group(1)
 
         # Wiki links support an optional display text after ``|``.
         # Wiki-ссылки поддерживают необязательный отображаемый текст после ``|``.
         if "|" in inner:
             left, custom_text = inner.rsplit("|", 1)
+            if left.endswith("\\"):
+                left = left[:-1]
         else:
             left = inner
             custom_text = None
