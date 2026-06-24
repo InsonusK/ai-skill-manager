@@ -100,7 +100,7 @@ class Skill:
                 if p in seen:
                     continue
                 seen.add(p)
-                files.append(SkillFile(p))
+                files.append(SkillFile(p, skill=self))
 
             self.__context.files = tuple(files)
         return self.__context.files

@@ -5,7 +5,7 @@
 
 from typing import List, Optional, Tuple
 
-from ...entities import Link, LinkKind, Skill, SkillFile
+from ...entities import Skill, SkillFile, WebLink, absLink
 from ...models import LinkWithContext
 from ..models.adapter_message import AdapterMessage
 from .abs_adapter import absAdapter
@@ -32,7 +32,7 @@ class LinkAdapter(absAdapter):
 
         Версия адаптера для обнаружения изменений.
         """
-        return "1.0.0"
+        return "1.0.1"
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Rewrite links in ``new_skill`` files to the skill-link format.
@@ -79,7 +79,7 @@ class LinkAdapter(absAdapter):
     def _replace_links(
         self,
         content: str,
-        links: Tuple[Link, ...],
+        links: Tuple[absLink, ...],
         skill_file: SkillFile,
         skill: Skill,
         other_skills: List[Skill],
@@ -137,7 +137,7 @@ class LinkAdapter(absAdapter):
 
     def _compute_new_target(
         self,
-        link: Link,
+        link: absLink,
         skill_file: SkillFile,
         skill: Skill,
         other_skills: List[Skill],
@@ -164,7 +164,7 @@ class LinkAdapter(absAdapter):
         """
         # External links are never rewritten.
         # Внешние ссылки никогда не переписываются.
-        if link.kind == LinkKind.web:
+        if isinstance(link, WebLink):
             return None
 
         # Build context and resolve the skill-format target.

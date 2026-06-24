@@ -205,7 +205,7 @@ class NameValidationRule(absValidationRule):
                     },
                 )
             )
-        if not NameValidationRule.is_kebab_case(skill.file_path.name):
+        if not NameValidationRule.is_kebab_case(skill.folder_path.name):
             errors.append(
                 ValidationError(
                     "Folder name ({folder_name}) is not in kebab case",
@@ -225,7 +225,7 @@ class NameValidationRule(absValidationRule):
                     },
                 )
             )
-        return []
+        return errors
 
     @staticmethod
     def is_kebab_case(name: str) -> bool:

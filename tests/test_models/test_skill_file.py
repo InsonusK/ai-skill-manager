@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
-from ai_skill_manager.entities.link import Link
+from ai_skill_manager.entities.link import PathLink, WebLink
 from ai_skill_manager.entities.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 
@@ -27,25 +27,39 @@ class TestSkillFile(unittest.TestCase):
         shutil.copytree(src, dst)
         return dst
 
+    def _skill(self, file_path: Path, folder_path: Path | None = None) -> Skill:
+        return Skill(
+            file_path=file_path,
+            folder_path=folder_path,
+            source=LocalSource(scan_path=file_path.parent),
+            format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
+            source_path=file_path.parent,
+        )
+
     def test_skill_file_is_dataclass(self):
         md = self._copy_mock("skill_with_link") / "guide.skill.md"
-        sf = SkillFile(path=md)
+        skill = self._skill(md)
+        sf = SkillFile(path=md, skill=skill)
         self.assertEqual(sf.path, md)
 
     def test_links_are_cached(self):
         md = self._copy_mock("skill_with_link") / "guide.skill.md"
-        sf = SkillFile(path=md)
+        skill = self._skill(md)
+        sf = SkillFile(path=md, skill=skill)
         first = sf.links
         second = sf.links
         self.assertEqual(first, second)
 
-    def test_links_returns_storage_link(self):
+    def test_links_returns_path_link(self):
         md = self._copy_mock("skill_with_link") / "guide.skill.md"
-        sf = SkillFile(path=md)
+        skill = self._skill(md)
+        sf = SkillFile(path=md, skill=skill)
         link = sf.links[0]
-        self.assertIsInstance(link, Link)
-        self.assertEqual(link.path, "./file.md")
-        self.assertEqual(link.kind, LinkKind.relative)
+        self.assertIsInstance(link, PathLink)
+        self.assertEqual(link.path_raw.path, "./file.md")
+        self.assertEqual(link.path_raw.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.formatted, "file.md")
 
 
 class TestSkillFiles(unittest.TestCase):

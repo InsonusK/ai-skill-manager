@@ -2,9 +2,11 @@
 
 Правило валидации ссылок внутри скиллов.
 """
+
 from typing import Dict, List, Optional
+
+from ...entities import PathLink, Skill, WebLink
 from ...models import LinkWithContext
-from ...entities import LinkKind, Skill
 from ..models import ValidationError, ValidationResult, ValidationSeverity
 from .abs_validation_rule import absValidationRule
 
@@ -15,6 +17,7 @@ class LinkValidationRule(absValidationRule):
     Проверяет, что каждая ссылка ведёт либо на другой скилл, либо на файл
     внутри своей директории скилла.
     """
+
     @property
     def version(self) -> str:
         """Return the rule version. / Возвращает версию правила."""
@@ -51,7 +54,7 @@ class LinkValidationRule(absValidationRule):
             skill: Skill whose links are being checked.
                 / Навык, ссылки которого проверяются.
             skills: All known skills, used to resolve inter-skill links.
-                / Все известные навыки, используются для разрешения межнавыковых ссылок.
+                / Все известные навыки, используемые для разрешения межнавыковых ссылок.
 
         Returns:
             List of validation errors found in the skill.
@@ -88,12 +91,12 @@ class LinkValidationRule(absValidationRule):
         """
         # External web links are always allowed.
         # Внешние веб-ссылки всегда разрешены.
-        if link.kind == LinkKind.web:
+        if isinstance(link.base, WebLink):
             return None
 
-        # Internal links must have a resolvable absolute OS path.
-        # Внутренние ссылки должны иметь разрешимый абсолютный путь ОС.
-        if link.os_absolute_path is None:
+        # Internal links must point to an existing file.
+        # Внутренние ссылки должны указывать на существующий файл.
+        if isinstance(link.base, PathLink) and not link.base.path.exists:
             return ValidationError(
                 message="Link {link_raw}\nfile {file}\nPos ({start}-{end}): doesn't have absolute OS path",
                 severity=ValidationSeverity.ERROR,
@@ -119,7 +122,7 @@ class LinkValidationRule(absValidationRule):
         # Ссылки, указывающие на другой известный файл в навыке, считаются корректными.
         if link.is_link_to_another_skill_file(skills) is not None:
             return None
-        
+
         # Anything else is a dangling link.
         # Всё остальное — висячая ссылка.
         return ValidationError(
@@ -128,7 +131,7 @@ class LinkValidationRule(absValidationRule):
             params={
                 "link_raw": link.base.raw,
                 "repo": link.context.skill.source.get_scan_location().repo_path,
-                "link": link.base.path,
+                "link": link.base.path.formatted,
                 "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
                 "start": link.base.start,
                 "end": link.base.end

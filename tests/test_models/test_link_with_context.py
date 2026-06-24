@@ -40,7 +40,7 @@ class TestLinkWithContext(unittest.TestCase):
         )
 
     def _context(self, skill: Skill, file_path: Path):
-        skill_file = SkillFile(path=file_path)
+        skill_file = SkillFile(path=file_path, skill=skill)
         link = skill_file.links[0]
         return LinkWithContext.build(skill, skill_file, link)
 
@@ -83,13 +83,13 @@ class TestLinkWithContext(unittest.TestCase):
 
         self.assertEqual(ctx.os_absolute_path, (root / "other.skill.md").resolve())
 
-    def test_os_absolute_link(self):
+    def test_os_absolute_raw_resolves_as_repo_absolute(self):
         root = self._copy_mock("os_abs")
         md = root / "guide.skill.md"
         skill = self._skill(md)
         ctx = self._context(skill, md)
 
-        self.assertEqual(ctx.os_absolute_path, Path("/tmp/absolute.md"))
+        self.assertEqual(ctx.os_absolute_path, (root / "tmp" / "absolute.md").resolve())
 
     def test_repo_absolute_path_uses_repo_path(self):
         root = self._copy_mock("repo_abs")
@@ -109,11 +109,10 @@ class TestLinkWithContext(unittest.TestCase):
     def test_repo_absolute_path_for_github_source(self):
         """Repo-absolute links resolve against the repository root, not subpath."""
         repo_mock = self._copy_mock("repo_abs")
-        # Move other.skill.md to the repo root so the repo-absolute link must
+        # other.skill.md is at the repo root so the repo-absolute link must
         # resolve against repo_path, not source_path.
-        # Перемещаем other.skill.md в корень репозитория, чтобы ссылка
+        # other.skill.md находится в корне репозитория, чтобы ссылка
         # repo_absolute разрешалась относительно repo_path, а не source_path.
-        (repo_mock / "skills" / "other.skill.md").rename(repo_mock / "other.skill.md")
 
         archive_path = self.tmpdir / "repo-main.tar.gz"
         with tarfile.open(archive_path, "w:gz") as tar:
@@ -155,7 +154,7 @@ class TestLinkWithContext(unittest.TestCase):
         (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
         other = self._skill(other_dir / "SKILL.md", other_dir)
 
-        skill_file = SkillFile(path=skill_dir / "SKILL.md")
+        skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
         skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
         link = skill_file.links[0]
         ctx = LinkWithContext.build(skill, skill_file, link)
@@ -187,6 +186,56 @@ class TestLinkWithContext(unittest.TestCase):
 
         self.assertIsNone(first)
         self.assertIs(first, second)
+
+    def test_web_link_to_skill_format_unchanged(self):
+        """Web links are returned unchanged by to_skill_format."""
+        root = self._copy_mock("flat")
+        md = root / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n[external](https://example.com#section)\n")
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        self.assertEqual(ctx.to_skill_format([]), "https://example.com")
+
+    def test_to_skill_format_raises_for_invalid_link(self):
+        """A dangling file link raises ValueError."""
+        root = self._copy_mock("flat")
+        md = root / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n[missing](./missing.md)\n")
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        with self.assertRaises(ValueError):
+            ctx.to_skill_format([])
+
+    def test_is_link_to_another_skill_and_file(self):
+        """Links to another skill are detected by helper methods."""
+        root = self._copy_mock("dir")
+        skill_dir = root / "web"
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir)
+        other_dir = root / "other"
+        other_dir.mkdir()
+        (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
+        other = self._skill(other_dir / "SKILL.md", other_dir)
+
+        skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
+        skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
+        link = skill_file.links[0]
+        ctx = LinkWithContext.build(skill, skill_file, link)
+
+        self.assertEqual(ctx.is_link_to_another_skill([skill, other]), other)
+        self.assertEqual(ctx.is_link_to_another_skill_file([skill, other]), (other, other.files[0]))
+
+    def test_getattr_forwards_to_base_and_raises(self):
+        """Attribute access forwards to the wrapped link and raises sensibly."""
+        root = self._copy_mock("flat")
+        md = root / "guide.skill.md"
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        self.assertEqual(ctx.target, "guide.skill.md")
+        with self.assertRaises(AttributeError):
+            _ = ctx.nonexistent_attribute
 
 
 if __name__ == "__main__":

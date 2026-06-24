@@ -8,9 +8,12 @@ Provides shared helpers for classifying link paths and splitting fragments.
 """
 
 from abc import ABC
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
-from ....entities import Link, LinkKind
+from ....entities.link_kind import LinkKind
+
+if TYPE_CHECKING:
+    from ....entities.skill_file import SkillFile
 
 
 class absLinkBuilder(ABC):
@@ -25,7 +28,7 @@ class absLinkBuilder(ABC):
     и разделения фрагментов.
     """
 
-    def search(self, content: str) -> List[Link]:
+    def search(self, content: str, skill_file: "SkillFile") -> List:
         """Search ``content`` for links supported by this builder.
 
         Search ``content`` for links supported by this builder.
@@ -34,10 +37,11 @@ class absLinkBuilder(ABC):
 
         Args:
             content: Markdown text to scan. / Markdown-текст для сканирования.
+            skill_file: Skill file that contains the content.
+                Файл скилла, содержащий содержимое.
 
         Returns:
-            List of matched :class:`Link` objects. /
-            Список найденных объектов :class:`Link`.
+            List of matched link objects. / Список найденных объектов ссылок.
         """
         ...
 
@@ -79,11 +83,11 @@ class absLinkBuilder(ABC):
         return raw.startswith("!")
 
     def _get_kind(self, path: str) -> LinkKind:
-        """Classify a link path into a :class:`LinkKind`.
+        """Classify a local link path into a :class:`LinkKind`.
 
-        Classify a link path into a :class:`LinkKind`.
+        Classify a local link path into a :class:`LinkKind`.
 
-        Классифицировать путь ссылки по значению :class:`LinkKind`.
+        Классифицировать локальный путь ссылки по значению :class:`LinkKind`.
 
         Args:
             path: Clean link path without fragment. /
@@ -93,19 +97,17 @@ class absLinkBuilder(ABC):
             The determined link kind. / Определённый вид ссылки.
 
         Raises:
-            ValueError: If the path cannot be classified. /
-                Если путь невозможно классифицировать.
+            ValueError: If the path cannot be classified or is a web URI. /
+                Если путь невозможно классифицировать или является веб-URI.
         """
         if self._is_relative(path):
             return LinkKind.relative
         elif self._is_os_absolute(path):
             return LinkKind.os_absolute
-        elif self._is_repo_absolute(path):
-            return LinkKind.repo_absolute
         elif self._is_http_link(path):
-            return LinkKind.web
+            raise ValueError(f"Web links are represented by WebLink: {path}")
         else:
-            raise ValueError(f"Cann't define kind of path:{path}")
+            return LinkKind.repo_absolute
 
     def _is_http_link(self, path: str) -> bool:
         """Return ``True`` for web/mailto/ftp/file links.
@@ -155,25 +157,3 @@ class absLinkBuilder(ABC):
             ``True``, когда путь абсолютен в локальной файловой системе.
         """
         return path.startswith("/")
-
-    def _is_repo_absolute(self, path: str) -> bool:
-        """Return ``True`` for absolute repo-root paths containing ``/``.
-
-        Return ``True`` for absolute repo-root paths containing ``/``.
-
-        Вернуть ``True`` для абсолютных путей от корня репозитория,
-        содержащих ``/``.
-
-        Args:
-            path: Link path to check. / Путь ссылки для проверки.
-
-        Returns:
-            ``True`` for repo-root paths that are neither relative nor OS absolute. /
-            ``True`` для путей от корня репозитория, которые не являются
-            ни относительными, ни абсолютными в ОС.
-        """
-        return (
-            not path.startswith("/")
-            and not self._is_relative(path)
-            and not self._is_http_link(path)
-        )
