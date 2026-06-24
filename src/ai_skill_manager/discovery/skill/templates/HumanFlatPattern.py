@@ -7,15 +7,13 @@ from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
-from .SkillPattern import SkillPattern
+from .SkillPattern import absSkillTemplate
 
 
-class HumanFlatPattern(SkillPattern):
-    """Detects flat human skills: a single ``*.skill.md`` file.
+class HumanFlatPattern(absSkillTemplate):
+    """Detects flat skill in human friendly format: a single ``*.skill.md`` file.
 
-    Detects flat human skills: a single ``*.skill.md`` file.
-
-    Обнаруживает плоские человеческие навыки: один файл ``*.skill.md``.
+    Обнаруживает плоские скилы в человеко ориентрованном формате: один файл ``*.skill.md``.
     """
 
     def __init__(self, source, source_path):

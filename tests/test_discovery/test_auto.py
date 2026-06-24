@@ -65,7 +65,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(len(result), 0)
 
     def test_directory_skill(self):
-        skill_dir = self._copy_mock("directory_skill") / "web"
+        skill_dir = self._copy_mock("directory_skill") / "web.skill"
 
         strategy = self._discover(skill_dir)
         result = strategy.discover()
@@ -142,7 +142,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertTrue(result[0].is_flat())
 
     def test_directory_skill_with_extra_skill_md_raises(self):
-        skill_dir = self._copy_mock("directory_with_extra_skill_md_raises") / "web"
+        skill_dir = self._copy_mock("directory_with_extra_skill_md_raises") / "web.skill"
 
         strategy = self._discover(skill_dir)
         with self.assertRaises(ValueError):
@@ -150,7 +150,7 @@ class TestAutoDiscovery(unittest.TestCase):
 
     def test_human_dir_and_matching_flat_file_takes_directory(self):
         """If {dir}.skill.md is both a flat and directory pattern, prefer directory."""
-        skill_dir = self._copy_mock("human_dir_and_matching_flat_file_takes_directory") / "web"
+        skill_dir = self._copy_mock("human_dir_and_matching_flat_file_takes_directory") / "web.skill"
 
         strategy = self._discover(skill_dir)
         result = strategy.discover()

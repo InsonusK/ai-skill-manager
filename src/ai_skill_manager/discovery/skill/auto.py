@@ -22,7 +22,7 @@ from typing import List, Optional
 
 from ...entities import Skill, Source
 from ...entities.source import LocalSource
-from .base import AgentPattern, HumanDirPattern, HumanFlatPattern, SkillPattern
+from .templates import AgentTemplate, HumanDirPattern, HumanFlatPattern, absSkillTemplate
 from .abs_discovery_strategy import absDiscoveryStrategy
 
 
@@ -34,11 +34,11 @@ class AutoDiscovery(absDiscoveryStrategy):
 
     # Flat patterns are applied to files directly inside a scanned directory.
     # Плоские паттерны применяются к файлам непосредственно внутри сканируемой директории.
-    _FLAT_PATTERNS: List[SkillPattern] = [HumanFlatPattern]
+    _FLAT_PATTERNS: List[absSkillTemplate] = [HumanFlatPattern]
 
     # Directory patterns are applied to the directory itself.
     # Директориальные паттерны применяются к самой директории.
-    _DIR_PATTERNS: List[SkillPattern] = [AgentPattern, HumanDirPattern]
+    _DIR_PATTERNS: List[absSkillTemplate] = [AgentTemplate, HumanDirPattern]
 
     def __init__(
         self, source_path: Path, source: Source
@@ -57,9 +57,9 @@ class AutoDiscovery(absDiscoveryStrategy):
         self._source = source if source is not None else LocalSource(
             self.source_path)
         
-        self._flat_patterns:List[SkillPattern] = [pattern(source, source_path)
+        self._flat_patterns:List[absSkillTemplate] = [pattern(source, source_path)
                                for pattern in self._FLAT_PATTERNS]
-        self._dir_patterns:List[SkillPattern] = [pattern(source, source_path)
+        self._dir_patterns:List[absSkillTemplate] = [pattern(source, source_path)
                               for pattern in self._DIR_PATTERNS]
         
 

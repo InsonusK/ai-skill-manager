@@ -7,15 +7,13 @@ from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
-from .SkillPattern import SkillPattern
+from .SkillPattern import absSkillTemplate
 
 
-class AgentPattern(SkillPattern):
-    """Detects agent skills: ``SKILL.md`` inside a directory.
+class AgentTemplate(absSkillTemplate):
+    """Detects skills in agent format: ``SKILL.md`` inside a directory.
 
-    Detects agent skills: ``SKILL.md`` inside a directory.
-
-    Обнаруживает навыки агента: файл ``SKILL.md`` внутри директории.
+    Обнаруживает навыки в агентском формате: файл ``SKILL.md`` внутри директории.
     """
 
     def __init__(self, source, source_path):

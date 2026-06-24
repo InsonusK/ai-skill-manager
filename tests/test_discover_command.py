@@ -24,7 +24,7 @@ class TestDiscoverCommand(unittest.TestCase):
         src.mkdir()
         (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
 
-        web = src / "web"
+        web = src / "web.skill"
         web.mkdir()
         (web / "web.skill.md").write_text("---\nname: web\n---\n# Web")
         return src

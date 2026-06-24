@@ -7,16 +7,16 @@ from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
-from .SkillPattern import SkillPattern
+from .SkillPattern import absSkillTemplate
 
 
-class HumanDirPattern(SkillPattern):
-    """Detects directory human skills: ``{dir_name}.skill.md`` inside a directory.
+class HumanDirPattern(absSkillTemplate):
+    """Detects directory skill in human friendly format: 
+    
+    file ``{skill_name}.skill.md`` inside a directory ``{skill_name}.skill``.
 
-    Detects directory human skills: ``{dir_name}.skill.md`` inside a directory.
-
-    Обнаруживает директориальные человеческие навыки:
-    файл ``{dir_name}.skill.md`` внутри директории.
+    Обнаруживает директориальные скилов в человеко ориентрованном формате:
+    файл ``{skill_name}.skill.md`` внутри директории ``{skill_name}.skill``.
     """
 
     def __init__(self, source, source_path):
@@ -35,7 +35,15 @@ class HumanDirPattern(SkillPattern):
 
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanDir
-
+    
+    @staticmethod
+    def __is_directory_name_correct(path:Path)->bool:
+        """
+        Directory name must end on ``.skill``
+        
+        Название директории должно заканчиваться на ``.skill``
+        """        
+        return path.name.endswith(".skill")
     def match(
         self, path: Path
     ) -> Optional[Skill]:
@@ -56,10 +64,13 @@ class HumanDirPattern(SkillPattern):
             # This pattern only applies to directories.
             # Этот паттерн применяется только к директориям.
             return None
-
+        
+        if not HumanDirPattern.__is_directory_name_correct(path):
+            return None
+        
         # Expected skill markdown file named after the directory.
         # Ожидаемый skill-файл, названный по имени директории.
-        skill_md = path / f"{path.name}.skill.md"
+        skill_md = path / f"{path.name}.md"
         if skill_md.is_file():
             return Skill(
                 file_path=skill_md,

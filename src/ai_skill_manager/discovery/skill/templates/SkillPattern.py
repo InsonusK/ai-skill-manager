@@ -10,13 +10,13 @@ from typing import Optional
 from ....entities import Skill, SkillFormat, Source
 
 
-class SkillPattern(ABC):
-    """Pattern that can match a filesystem path to a skill.
+class absSkillTemplate(ABC):
+    """Tempaltes that can match a filesystem path to a skill format.
 
     Subclasses implement matching rules for a single skill format, such as
     ``*.skill.md`` files or directories containing ``SKILL.md``.
 
-    Паттерн, который может сопоставить путь файловой системы с навыком.
+    Шаблон, который может сопоставить путь файловой системы с форматом навыка.
     Подклассы реализуют правила сопоставления для одного формата навыка,
     например файлы ``*.skill.md`` или директории, содержащие ``SKILL.md``.
     """

@@ -8,14 +8,14 @@ from a single location.
 мог импортировать их из одного места.
 """
 
-from .AgentPattern import AgentPattern
+from .AgentPattern import AgentTemplate
 from .HumanDirPattern import HumanDirPattern
 from .HumanFlatPattern import HumanFlatPattern
-from .SkillPattern import SkillPattern
+from .SkillPattern import absSkillTemplate
 
 __all__ = [
-    "SkillPattern",
+    "absSkillTemplate",
     "HumanFlatPattern",
     "HumanDirPattern",
-    "AgentPattern",
+    "AgentTemplate",
 ]

@@ -77,6 +77,8 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
         if src_type == "github":
             for sp in _normalize_subpaths(src.get("subpath")):
                 sources.append(
+                    #BUG: если в github источнике нескольно subpath, то будет создано несколько GitHubSource каждый из которых будет скачивать репозитарий
+                    #     необходиво подумать на разделением Source на Source (истоник) и ScanPackage (путь сканирования)
                     GitHubSource(
                         repo_url=src_path,
                         tree=src.get("tree", "master"),
