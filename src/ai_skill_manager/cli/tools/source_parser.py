@@ -1,13 +1,16 @@
 """Shared helpers for parsing source-related CLI arguments.
 
 Provides a single place where ``--config``, ``--type``, ``--path`` and
-``--subpath`` are resolved into a list of :class:`Source` objects.
+``--subpath`` are registered, parsed and resolved into a list of
+:class:`Source` objects.
 
 Общие помощники для разбора аргументов CLI, связанных с источниками.
 Предоставляет единое место, где ``--config``, ``--type``, ``--path`` и
-``--subpath`` превращаются в список объектов :class:`Source`.
+``--subpath`` регистрируются, парсятся и превращаются в список объектов
+:class:`Source`.
 """
 
+import argparse
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -17,9 +20,65 @@ from ...entities import GitHubSource, LocalSource, Source
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
 
+_SOURCE_TYPES = ["auto", "github"]
+#: Source types supported by the CLI. / Типы источников, поддерживаемые CLI.
+
 _DEFAULT_GITHUB_SUBPATHS = ["skills"]
 #: Default subpath for GitHub sources when no --subpath is given.
 #: Подпуть GitHub по умолчанию, если --subpath не указан.
+
+
+def add_source_arguments(
+    parser: argparse.ArgumentParser,
+    config_default: Optional[str] = None,
+) -> None:
+    """Register the shared source-related arguments on ``parser``.
+
+    Adds ``--config``, ``--type``, ``--path`` and ``--subpath`` so that
+    every command that works with skill sources exposes the same interface.
+
+    Регистрирует общие аргументы, связанные с источниками, на ``parser``.
+    Добавляет ``--config``, ``--type``, ``--path`` и ``--subpath``, чтобы
+    каждая команда, работающая с источниками навыков, имела одинаковый
+    интерфейс.
+
+    Args:
+        parser: Argument parser or sub-parser to extend.
+            Парсер аргументов или подпарсер для расширения.
+        config_default: Default value for ``--config``. When ``None`` the
+            default config file is resolved lazily by
+            :func:`build_sources_from_args`.
+            Значение по умолчанию для ``--config``. При ``None`` файл
+            конфигурации по умолчанию разрешается лениво через
+            :func:`build_sources_from_args`.
+    """
+    parser.add_argument(
+        "-c",
+        "--config",
+        default=config_default,
+        help=f"Config file (default: {DEFAULT_CONFIG}) / "
+             f"Файл конфигурации (по умолчанию: {DEFAULT_CONFIG})",
+    )
+    parser.add_argument(
+        "-t",
+        "--type",
+        choices=_SOURCE_TYPES,
+        help="Discovery strategy for a single source / "
+             "Стратегия обнаружения для одного источника",
+    )
+    parser.add_argument(
+        "-p",
+        "--path",
+        help="Source path or GitHub repo URL (with optional branch: 'url branch') / "
+             "Путь к источнику или URL репозитория GitHub (с опциональной веткой: 'url branch')",
+    )
+    parser.add_argument(
+        "--subpath",
+        action="append",
+        default=None,
+        help="GitHub subpath when type=github (can be repeated; default: skills) / "
+             "Подпуть в GitHub при type=github (можно повторять; по умолчанию: skills)",
+    )
 
 
 def _parse_github_path(path: str) -> Tuple[str, str]:

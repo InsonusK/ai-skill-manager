@@ -10,17 +10,13 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from ...tools.source_parser import build_sources_from_args
+from ...tools.source_parser import add_source_arguments, build_sources_from_args
 from ...tools.validation_report_printer import print_validation_report
 
 from ....validators import ValidationFailedError
 
 from .api import DEFAULT_CONFIG, run_sync
 from .formatter import format_sync_result
-
-
-# Source types exposed by the sync CLI. / Типы источников, доступные в CLI sync.
-_SYNC_TYPES = ["auto", "github"]
 
 
 def add_parser(subparsers):
@@ -40,33 +36,7 @@ def add_parser(subparsers):
              "Синхронизировать AI-навыки в .agents/skills/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        help=f"Config file (default: {DEFAULT_CONFIG}) / "
-             f"Файл конфигурации (по умолчанию: {DEFAULT_CONFIG})",
-    )
-    parser.add_argument(
-        "-t",
-        "--type",
-        choices=_SYNC_TYPES,
-        help="Discovery strategy for a single source / "
-             "Стратегия обнаружения для одного источника",
-    )
-    parser.add_argument(
-        "-p",
-        "--path",
-        help="Source path or GitHub repo URL (with optional branch: 'url branch') / "
-             "Путь к источнику или URL репозитория GitHub (с опциональной веткой: 'url branch')",
-    )
-    parser.add_argument(
-        "--subpath",
-        action="append",
-        default=None,
-        help="GitHub subpath when type=github (can be repeated; default: skills) / "
-             "Подпуть в GitHub при type=github (можно повторять; по умолчанию: skills)",
-    )
+    add_source_arguments(parser)
     parser.add_argument(
         "--target",
         help="Override target directory / Переопределить целевую директорию",
@@ -134,6 +104,7 @@ def run(args):
         # Resolve sources from --config, --type/--path or the default config.
         # Разрешаем источники из --config, --type/--path или конфигурации по умолчанию.
         sources, config_path = build_sources_from_args(args)
+
         if config_path is not None:
             result = run_sync(
                 config_path=config_path,
