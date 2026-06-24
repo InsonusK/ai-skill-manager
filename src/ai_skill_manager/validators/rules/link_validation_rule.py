@@ -123,11 +123,13 @@ class LinkValidationRule(absValidationRule):
         # Anything else is a dangling link.
         # Всё остальное — висячая ссылка.
         return ValidationError(
-            message="Link {link_raw}\nRepos {repo}\nPos ({start}-{end}): doesn't lead to subfiles or other skills",
+            message="Link {link_raw}\nPath {link}\nFile {file}\nRepos {repo}\nPos ({start}-{end}): doesn't lead to subfiles or other skills",
             severity=ValidationSeverity.ERROR,
             params={
                 "link_raw": link.base.raw,
                 "repo": link.context.skill.source.get_scan_location().repo_path,
+                "link": link.base.path,
+                "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
                 "start": link.base.start,
                 "end": link.base.end
             },

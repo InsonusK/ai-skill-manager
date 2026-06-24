@@ -162,6 +162,32 @@ class TestLinkWithContext(unittest.TestCase):
 
         self.assertEqual(ctx.to_skill_format([skill, other]), "skill:other")
 
+    def test_os_absolute_path_is_cached(self):
+        """Repeated accesses return the same resolved Path instance."""
+        root = self._copy_mock("flat")
+        md = root / "guide.skill.md"
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        first = ctx.os_absolute_path
+        second = ctx.os_absolute_path
+
+        self.assertIs(first, second)
+
+    def test_os_absolute_path_is_cached_for_web_link(self):
+        """Repeated accesses return the same None for web links."""
+        root = self._copy_mock("flat")
+        md = root / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n[external](https://example.com)\n")
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        first = ctx.os_absolute_path
+        second = ctx.os_absolute_path
+
+        self.assertIsNone(first)
+        self.assertIs(first, second)
+
 
 if __name__ == "__main__":
     unittest.main()

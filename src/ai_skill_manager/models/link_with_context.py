@@ -4,16 +4,26 @@
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ..entities import Link, LinkKind, Skill, SkillFile
 from .link_location import LinkLocation
 
+_UNSET = object()
+
 
 @dataclass(frozen=True)
 class LinkWithContext:
+    class Context:
+        """Lazy cache for the resolved OS absolute path.
+
+        Ленивый кеш разрешённого абсолютного пути ОС.
+        """
+
+        os_absolute_path_cache: Path | None | object = _UNSET
+
     """Represents a parsed link for adapter-level processing.
 
     Wraps the storage-level :class:`Link` and adds the original source location
@@ -32,6 +42,9 @@ class LinkWithContext:
 
     base: Link
     context: LinkLocation
+    __context: Context = field(
+        init=False, compare=False, hash=False, default_factory=Context
+    )
 
     def __getattr__(self, name: str):
         """Forward attribute access to the wrapped base link.
@@ -66,26 +79,44 @@ class LinkWithContext:
         """Return the OS-absolute target path, or ``None`` for web links.
 
         Возвращает абсолютный путь цели ОС или ``None`` для веб-ссылок.
+        The resolved path is cached on first access because ``Path.resolve()``
+        performs filesystem I/O and is used repeatedly by link validation and
+        adaptation logic.
+
+        Разрешённый путь кешируется при первом обращении, так как
+        ``Path.resolve()`` выполняет файловый ввод-вывод и используется
+        многократно в логике валидации и адаптации ссылок.
         """
+        # EN: Return the cached value if it has already been computed.
+        # RU: Возвращаем закешированное значение, если оно уже вычислено.
+        cached = self.__context.os_absolute_path_cache
+        if cached is not _UNSET:
+            return cached  # type: ignore[return-value]
+
         # EN: Web links have no local filesystem path.
         # RU: Веб-ссылки не имеют локального пути файловой системы.
         if self.base.kind == LinkKind.web:
-            return None
+            result: Path | None = None
         # EN: OS-absolute paths can be used directly.
         # RU: Абсолютные пути ОС можно использовать напрямую.
         elif self.base.kind == LinkKind.os_absolute:
-            return Path(self.base.path)
+            result = Path(self.base.path)
         # EN: Relative paths are resolved against the containing file's directory.
         # RU: Относительные пути разрешаются относительно директории содержащего файла.
         elif self.base.kind == LinkKind.relative:
-            return (self.context.file.path.parent / self.base.path).resolve()
+            result = (self.context.file.path.parent / self.base.path).resolve()
         # EN: Repo-absolute paths are resolved against the repository root.
         # RU: Пути от корня репозитория разрешаются относительно корня репозитория.
         elif self.base.kind == LinkKind.repo_absolute:
             repo_path = self.context.skill.source.get_scan_location().repo_path
-            return (repo_path / self.base.path).resolve()
+            result = (repo_path / self.base.path).resolve()
         else:
             raise ValueError(f"Unknown LinkKind: {self.base.kind}")
+
+        # EN: Cache the result for subsequent accesses.
+        # RU: Кешируем результат для последующих обращений.
+        self.__context.os_absolute_path_cache = result
+        return result
 
     @property
     def is_link_to_skill_file(self) -> bool:
