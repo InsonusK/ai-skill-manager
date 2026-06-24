@@ -1,9 +1,0 @@
-{
-  "hash": "44a5c8d10360c6260e9e3d14a580f88fdfd4fa5a6371846040350d468c3fd15d",
-  "adapters": [
-    {
-      "name": "LinkUpdater",
-      "version": 1
-    }
-  ]
-}
