@@ -52,9 +52,11 @@ class TestCheckCommand(unittest.TestCase):
 
         self.assertIn("guide", output)
         self.assertIn("web", output)
-        self.assertIn("1. guide | flat | guide.skill.md", output)
-        self.assertIn("2. web | directory | web.skill.md", output)
-        self.assertIn("File:", output)
+        self.assertIn("Discovered skills", output)
+        self.assertIn("guide", output)
+        self.assertIn("web", output)
+        self.assertIn("guide.skill.md", output)
+        self.assertIn("web.skill.md", output)
         self.assertIn("Total: 2 skill(s)", output)
         self.assertIn("Validation passed", output)
 
@@ -78,8 +80,11 @@ class TestCheckCommand(unittest.TestCase):
             check_run(args)
             output = stdout.getvalue()
 
-        self.assertIn("1. guide | flat | guide.skill.md", output)
-        self.assertIn("2. web | directory | web.skill.md", output)
+        self.assertIn("Discovered skills", output)
+        self.assertIn("guide", output)
+        self.assertIn("web", output)
+        self.assertIn("guide.skill.md", output)
+        self.assertIn("web.skill.md", output)
         self.assertIn("Total: 2 skill(s)", output)
         self.assertIn("Validation passed", output)
 

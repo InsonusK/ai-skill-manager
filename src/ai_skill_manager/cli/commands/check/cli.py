@@ -17,7 +17,7 @@ from ....entities.skill import Skill
 from ....services.discover import discover
 from ....services.validate import validate
 from ....validators import ValidationFailedError
-from .formatter import format_skills
+from .formatter import print_skills
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
@@ -86,12 +86,12 @@ def run(args):
         report = validate(skills)
 
         if report.has_errors:
-            print(format_skills(skills))
+            print_skills(skills)
             print()
             print_validation_report(report)
             raise ValidationFailedError(report)
 
-        print(format_skills(skills))
+        print_skills(skills)
         print("\n✅ Validation passed")
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)

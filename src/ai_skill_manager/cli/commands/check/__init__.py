@@ -7,11 +7,11 @@ skills.
 """
 
 from .cli import DEFAULT_CONFIG, add_parser, run
-from .formatter import format_skills
+from .formatter import print_skills
 
 __all__ = [
     "DEFAULT_CONFIG",
     "add_parser",
-    "format_skills",
+    "print_skills",
     "run",
 ]
