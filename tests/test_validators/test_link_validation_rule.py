@@ -26,10 +26,11 @@ class TestLinkValidationRule(unittest.TestCase):
         return dst
 
     def _skill(self, file_path: Path, folder_path: Path | None = None) -> Skill:
+        repo_path = file_path.parent.parent if folder_path else file_path.parent
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(scan_path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent, repo_path=repo_path),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )

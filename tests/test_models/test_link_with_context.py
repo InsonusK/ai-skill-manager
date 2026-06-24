@@ -30,11 +30,11 @@ class TestLinkWithContext(unittest.TestCase):
         shutil.copytree(src, dst)
         return dst
 
-    def _skill(self, file_path: Path, folder_path: Path | None = None) -> Skill:
+    def _skill(self, file_path: Path, folder_path: Path | None = None, repo_path: Path | None = None) -> Skill:
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(scan_path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent, repo_path=repo_path),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )
@@ -148,11 +148,11 @@ class TestLinkWithContext(unittest.TestCase):
     def test_to_skill_format_for_cross_skill(self):
         root = self._copy_mock("dir")
         skill_dir = root / "web"
-        skill = self._skill(skill_dir / "SKILL.md", skill_dir)
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
         other_dir = root / "other"
         other_dir.mkdir()
         (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
-        other = self._skill(other_dir / "SKILL.md", other_dir)
+        other = self._skill(other_dir / "SKILL.md", other_dir, repo_path=root)
 
         skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
         skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
@@ -212,11 +212,11 @@ class TestLinkWithContext(unittest.TestCase):
         """Links to another skill are detected by helper methods."""
         root = self._copy_mock("dir")
         skill_dir = root / "web"
-        skill = self._skill(skill_dir / "SKILL.md", skill_dir)
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
         other_dir = root / "other"
         other_dir.mkdir()
         (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
-        other = self._skill(other_dir / "SKILL.md", other_dir)
+        other = self._skill(other_dir / "SKILL.md", other_dir, repo_path=root)
 
         skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
         skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
@@ -233,7 +233,7 @@ class TestLinkWithContext(unittest.TestCase):
         skill = self._skill(md)
         ctx = self._context(skill, md)
 
-        self.assertEqual(ctx.target, "guide.skill.md")
+        self.assertEqual(ctx.target, "./guide.skill.md")
         with self.assertRaises(AttributeError):
             _ = ctx.nonexistent_attribute
 

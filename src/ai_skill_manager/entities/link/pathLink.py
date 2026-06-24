@@ -209,10 +209,24 @@ def _resolve_path(
     target = _existing_file(candidate)
     resolved = target if target is not None else candidate
 
+    if not resolved.is_relative_to(repo_path):
+        raise ValueError(
+            f"Link target {resolved.as_posix()!r} is outside the repository root "
+            f"{repo_path.as_posix()!r}"
+        )
+
     folder = skill.folder_path
-    if target is not None and folder is not None and target.is_relative_to(folder):
+    is_self_link = target is not None and target == skill.file_path
+    is_inside_skill_folder = (
+        target is not None and folder is not None and target.is_relative_to(folder)
+    )
+
+    if is_self_link or is_inside_skill_folder:
         kind = LinkKind.relative
-        formatted = "./" + target.relative_to(folder).as_posix()
+        if is_self_link:
+            formatted = "./" + skill.file_path.name
+        else:
+            formatted = "./" + target.relative_to(folder).as_posix()
     else:
         kind = LinkKind.repo_absolute
         formatted = Path(os.path.relpath(resolved, repo_path)).as_posix()
