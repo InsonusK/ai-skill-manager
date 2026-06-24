@@ -30,8 +30,10 @@ class TestSyncCLI(unittest.TestCase):
     def _args(self, **overrides):
         defaults = {
             "config": None,
+            "type": None,
+            "path": None,
+            "subpath": None,
             "target": None,
-            "on_conflict": "error",
             "remove_orphans": False,
             "keep_orphans": False,
             "dry_run": False,

@@ -12,11 +12,22 @@ abstract base class for implementing custom rules.
 from typing import List
 
 from .abs_validation_rule import absValidationRule
+from .conflict_validation_rule import ConflictValidationRule
 from .link_validation_rule import LinkValidationRule
 from .name_validator import NameValidationRule
 
 # Default rule set used by Validator when no custom rules are supplied.
 # Набор правил по умолчанию, используемый Validator, если не переданы кастомные правила.
-DEFAULT_RULES: List[absValidationRule] = [NameValidationRule(), LinkValidationRule()]
+DEFAULT_RULES: List[absValidationRule] = [
+    NameValidationRule(),
+    ConflictValidationRule(),
+    LinkValidationRule(),
+]
 
-__all__ = ["absValidationRule", "DEFAULT_RULES", "LinkValidationRule", "NameValidationRule"]
+__all__ = [
+    "absValidationRule",
+    "ConflictValidationRule",
+    "DEFAULT_RULES",
+    "LinkValidationRule",
+    "NameValidationRule",
+]

@@ -11,6 +11,7 @@ from unittest.mock import patch
 from ai_skill_manager.cli import main
 from ai_skill_manager.cli.commands.sync.api import DEFAULT_TARGET, run_sync
 from ai_skill_manager.cli.commands.sync.cli import run as sync_run
+from ai_skill_manager.validators import ValidationFailedError
 
 
 class TestSyncAPI(unittest.TestCase):
@@ -33,7 +34,7 @@ class TestSyncAPI(unittest.TestCase):
     def _write_config(self, **settings):
         config = self.tmp / "ai-skills.yaml"
         data = {
-            "sources": [{"path": "./skills","type":"local"}],
+            "sources": [{"path": "./skills", "type": "local"}],
             "settings": settings,
         }
         config.write_text(json.dumps(data))
@@ -88,7 +89,7 @@ class TestSyncAPI(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             run_sync(config_path=self.tmp / "missing.yaml")
 
-    def test_sync_conflict_error(self):
+    def test_sync_conflict_is_validation_error(self):
         src_a = self.tmp / "repo_a"
         src_a.mkdir()
         (src_a / "same.skill.md").write_text("---\nname: same\n---\n# A")
@@ -99,33 +100,14 @@ class TestSyncAPI(unittest.TestCase):
 
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./repo_a", "type":"local"}, {"path": "./repo_b", "type":"local"}],
+            "sources": [{"path": "./repo_a", "type": "local"}, {"path": "./repo_b", "type": "local"}],
             "settings": {"target": "./target"}
         }))
 
-        with self.assertRaises(ValueError) as ctx:
-            run_sync(config_path=config, on_conflict="error")
+        with self.assertRaises(ValidationFailedError) as ctx:
+            run_sync(config_path=config)
 
-        self.assertIn("CONFLICT", str(ctx.exception))
-
-    def test_sync_conflict_last_wins(self):
-        src_a = self.tmp / "repo_a"
-        src_a.mkdir()
-        (src_a / "same.skill.md").write_text("---\nname: same\n---\n# A")
-
-        src_b = self.tmp / "repo_b"
-        src_b.mkdir()
-        (src_b / "same.skill.md").write_text("---\nname: same\n---\n# B")
-
-        config = self.tmp / "ai-skills.yaml"
-        config.write_text(json.dumps({
-            "sources": [{"path": "./repo_a", "type":"local"}, {"path": "./repo_b", "type":"local"}],
-            "settings": {"target": "./target"}
-        }))
-
-        run_sync(config_path=config, on_conflict="last_wins")
-
-        self.assertIn("# B", (self.tmp / "target" / "same" / "SKILL.md").read_text())
+        self.assertTrue(ctx.exception.report.has_errors)
 
 
 class TestSyncCLI(unittest.TestCase):
@@ -141,24 +123,31 @@ class TestSyncCLI(unittest.TestCase):
         (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
         return src
 
-    def test_sync_command_runs(self):
-        self._make_source_dir()
-        config = self.tmp / "ai-skills.yaml"
-        config.write_text(json.dumps({
-            "sources": [{"path": "./skills", "type":"local"}],
-            "settings": {"target": "./target"}
-        }))
-
-        args = type("Args", (), {
-            "config": str(config),
+    def _args(self, **overrides):
+        defaults = {
+            "config": None,
+            "type": None,
+            "path": None,
+            "subpath": None,
             "target": None,
-            "on_conflict": "error",
             "remove_orphans": False,
             "keep_orphans": False,
             "dry_run": False,
             "force": False,
             "verbose": False,
-        })()
+        }
+        defaults.update(overrides)
+        return type("Args", (), defaults)()
+
+    def test_sync_command_runs(self):
+        self._make_source_dir()
+        config = self.tmp / "ai-skills.yaml"
+        config.write_text(json.dumps({
+            "sources": [{"path": "./skills", "type": "local"}],
+            "settings": {"target": "./target"}
+        }))
+
+        args = self._args(config=str(config))
 
         with patch("sys.stdout", new_callable=StringIO) as stdout:
             sync_run(args)
@@ -171,20 +160,11 @@ class TestSyncCLI(unittest.TestCase):
         self._make_source_dir()
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./skills", "type":"local"}],
+            "sources": [{"path": "./skills", "type": "local"}],
             "settings": {"target": "./target"}
         }))
 
-        args = type("Args", (), {
-            "config": str(config),
-            "target": None,
-            "on_conflict": "error",
-            "remove_orphans": False,
-            "keep_orphans": False,
-            "dry_run": True,
-            "force": False,
-            "verbose": False,
-        })()
+        args = self._args(config=str(config), dry_run=True)
 
         with patch("sys.stdout", new_callable=StringIO) as stdout:
             sync_run(args)
@@ -192,6 +172,18 @@ class TestSyncCLI(unittest.TestCase):
 
         self.assertIn("Dry run - no changes", output)
         self.assertFalse((self.tmp / "target").exists())
+
+    def test_sync_command_direct_source(self):
+        src = self._make_source_dir()
+
+        args = self._args(type="auto", path=str(src), target=str(self.tmp / "target"))
+
+        with patch("sys.stdout", new_callable=StringIO) as stdout:
+            sync_run(args)
+            output = stdout.getvalue()
+
+        self.assertIn("Synced: 1 skills", output)
+        self.assertTrue((self.tmp / "target" / "guide" / "SKILL.md").exists())
 
     def test_sync_help(self):
         with patch("sys.argv", ["ai-skill-manager", "sync", "--help"]):

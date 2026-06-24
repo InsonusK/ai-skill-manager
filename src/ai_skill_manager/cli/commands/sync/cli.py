@@ -10,12 +10,17 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from ...tools.source_parser import build_sources_from_args
 from ...tools.validation_report_printer import print_validation_report
 
 from ....validators import ValidationFailedError
 
 from .api import DEFAULT_CONFIG, run_sync
 from .formatter import format_sync_result
+
+
+# Source types exposed by the sync CLI. / Типы источников, доступные в CLI sync.
+_SYNC_TYPES = ["auto", "github"]
 
 
 def add_parser(subparsers):
@@ -38,18 +43,33 @@ def add_parser(subparsers):
     parser.add_argument(
         "-c",
         "--config",
-        default=DEFAULT_CONFIG,
+        default=None,
         help=f"Config file (default: {DEFAULT_CONFIG}) / "
              f"Файл конфигурации (по умолчанию: {DEFAULT_CONFIG})",
     )
     parser.add_argument(
-        "--target",
-        help="Override target directory / Переопределить целевую директорию",
+        "-t",
+        "--type",
+        choices=_SYNC_TYPES,
+        help="Discovery strategy for a single source / "
+             "Стратегия обнаружения для одного источника",
     )
     parser.add_argument(
-        "--on-conflict",
-        choices=["error", "last_wins"],
-        help="Conflict resolution / Разрешение конфликтов",
+        "-p",
+        "--path",
+        help="Source path or GitHub repo URL (with optional branch: 'url branch') / "
+             "Путь к источнику или URL репозитория GitHub (с опциональной веткой: 'url branch')",
+    )
+    parser.add_argument(
+        "--subpath",
+        action="append",
+        default=None,
+        help="GitHub subpath when type=github (can be repeated; default: skills) / "
+             "Подпуть в GitHub при type=github (можно повторять; по умолчанию: skills)",
+    )
+    parser.add_argument(
+        "--target",
+        help="Override target directory / Переопределить целевую директорию",
     )
     parser.add_argument(
         "--remove-orphans",
@@ -85,7 +105,10 @@ def add_parser(subparsers):
     parser.set_defaults(func=run)
     return parser
 
+
 logger = logging.Logger("sync cli")
+
+
 def run(args):
     """Execute the ``sync`` command from parsed CLI arguments.
 
@@ -99,10 +122,6 @@ def run(args):
         # Включаем подробное логирование во всём конвейере синхронизации.
         logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
-    # Resolve the configuration file path to an absolute path.
-    # Разрешаем путь к файлу конфигурации в абсолютный.
-    config_path = Path(args.config).resolve()
-
     # Resolve conflicting orphan flags into a single boolean.
     # Преобразуем конфликтующие флаги orphan в одно булево значение.
     remove: Optional[bool] = None
@@ -112,14 +131,25 @@ def run(args):
         remove = False
 
     try:
-        result = run_sync(
-            config_path=config_path,
-            target_dir=Path(args.target) if args.target else None,
-            on_conflict=args.on_conflict or "error",
-            remove_orphans=remove if remove is not None else True,
-            dry_run=args.dry_run,
-            force=args.force,
-        )
+        # Resolve sources from --config, --type/--path or the default config.
+        # Разрешаем источники из --config, --type/--path или конфигурации по умолчанию.
+        sources, config_path = build_sources_from_args(args)
+        if config_path is not None:
+            result = run_sync(
+                config_path=config_path,
+                target_dir=Path(args.target) if args.target else None,
+                remove_orphans=remove if remove is not None else True,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
+        else:
+            result = run_sync(
+                sources=sources,
+                target_dir=Path(args.target) if args.target else None,
+                remove_orphans=remove if remove is not None else True,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
         print(format_sync_result(result))
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
