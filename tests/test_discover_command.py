@@ -63,7 +63,7 @@ class TestDiscoverCommand(unittest.TestCase):
         src = self._make_source_dir()
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./skills"}],
+            "sources": [{"path": "./skills", "type": "local"}],
             "settings": {"target": ".agents/skills"}
         }))
 

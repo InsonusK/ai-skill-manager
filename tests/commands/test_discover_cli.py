@@ -9,9 +9,10 @@ from unittest.mock import patch
 
 from ai_skill_manager.cli import main
 from ai_skill_manager.cli.commands.discover.cli import _discover
+from . import MOCK_DIR
 
 
-MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_discover_cli"
+TESTCASE_MOCK_DIR = MOCK_DIR / "test_discover_cli"
 
 
 class TestDiscoverCLI(unittest.TestCase):
@@ -22,7 +23,7 @@ class TestDiscoverCLI(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def _copy_mock(self, name: str) -> Path:
-        src = MOCK_DIR / name
+        src = TESTCASE_MOCK_DIR / name
         dst = self.tmpdir / name
         shutil.copytree(src, dst)
         return dst

@@ -1,10 +1,9 @@
 sources:
   - path: ./skills
+    type: local
   - type: github
     path: https://github.com/owner/repo
     tree: main
     subpath: docs
-  - type: unknown
-    path: ./fallback
 settings:
   target: ./target

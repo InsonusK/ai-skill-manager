@@ -64,7 +64,7 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
         # Локальные пути разрешаются в абсолютную форму перед сканированием.
         if isinstance(src, LocalSource):
             src = LocalSource(
-                path=Path(src.path).resolve(),
+                scan_path=Path(src.scan_path).resolve(),
                 repo_path=Path(src.repo_path).resolve() if src.repo_path else None,
             )
 

@@ -33,7 +33,7 @@ class TestAutoDiscovery(unittest.TestCase):
     def _discover(self, path: Path) -> AutoDiscovery:
         resolved = path.resolve()
         source_path = resolved.parent if resolved.is_file() else resolved
-        source = LocalSource(path=source_path)
+        source = LocalSource(scan_path=source_path)
         return AutoDiscovery(source_path=source_path, source=source)
 
     def test_empty_directory(self):
@@ -186,7 +186,7 @@ class TestAutoDiscovery(unittest.TestCase):
     def test_missing_source_path_returns_empty(self):
         """A missing source path produces an empty result."""
         missing = self.tmpdir / "missing"
-        source = LocalSource(path=missing.resolve())
+        source = LocalSource(scan_path=missing.resolve())
         strategy = AutoDiscovery(source_path=missing.resolve(), source=source)
 
         result = strategy.discover()

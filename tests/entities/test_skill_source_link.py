@@ -25,7 +25,7 @@ class TestSkillSourceLink(unittest.TestCase):
 
     def test_skill_has_optional_source(self):
         md = self._copy_mock("name_value") / "guide.skill.md"
-        source = LocalSource(path=md.parent)
+        source = LocalSource(scan_path=md.parent)
 
         skill = Skill(
             file_path=md,
@@ -49,21 +49,21 @@ class TestSkillSourceLink(unittest.TestCase):
 
     def test_skill_requires_format(self):
         md = self._copy_mock("name_value") / "guide.skill.md"
-        source = LocalSource(path=md.parent)
+        source = LocalSource(scan_path=md.parent)
 
         with self.assertRaises(TypeError):
             Skill(file_path=md, folder_path=None, source=source, source_path=md.parent)
 
     def test_autodiscovery_attaches_local_source(self):
         root = self._copy_mock("autodiscovery")
-        source = LocalSource(path=root)
+        source = LocalSource(scan_path=root)
 
         strategy = AutoDiscovery(source_path=root, source=source)
         skills = strategy.discover()
 
         self.assertEqual(len(skills), 1)
         self.assertIsInstance(skills[0].source, LocalSourceCls)
-        self.assertEqual(skills[0].source.path, root)
+        self.assertEqual(skills[0].source.scan_path, root)
 
 if __name__ == "__main__":
     unittest.main()

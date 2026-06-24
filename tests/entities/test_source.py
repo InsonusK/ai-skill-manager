@@ -10,13 +10,13 @@ from pathlib import Path
 class TestSource(unittest.TestCase):
     def test_local_source_is_abstract_source(self):
         path = Path("/tmp/skills")
-        source = LocalSource(path=path)
+        source = LocalSource(scan_path=path)
         self.assertIsInstance(source, Source)
         self.assertEqual(source.source_type, "local")
         self.assertEqual(source.to_dict(), {"type": "local", "path": str(path)})
 
     def test_local_source_scan_location_for_directory(self):
-        source = LocalSource(path=Path("/tmp/skills"))
+        source = LocalSource(scan_path=Path("/tmp/skills"))
         loc = source.get_scan_location()
         self.assertEqual(loc.source_path, Path("/tmp/skills"))
         self.assertEqual(loc.repo_path, Path("/tmp/skills"))
@@ -26,7 +26,7 @@ class TestSource(unittest.TestCase):
         try:
             skill_file = tmpdir / "guide.skill.md"
             skill_file.write_text("# Guide")
-            source = LocalSource(path=skill_file)
+            source = LocalSource(scan_path=skill_file)
             loc = source.get_scan_location()
             self.assertEqual(loc.source_path, tmpdir)
             self.assertEqual(loc.repo_path, tmpdir)
@@ -35,7 +35,7 @@ class TestSource(unittest.TestCase):
 
     def test_local_source_scan_location_with_custom_repo_path(self):
         source = LocalSource(
-            path=Path("/tmp/skills"),
+            scan_path=Path("/tmp/skills"),
             repo_path=Path("/repo/root"),
         )
         loc = source.get_scan_location()
@@ -44,7 +44,7 @@ class TestSource(unittest.TestCase):
 
     def test_local_source_to_dict_includes_repo_path(self):
         source = LocalSource(
-            path=Path("/tmp/skills"),
+            scan_path=Path("/tmp/skills"),
             repo_path=Path("/repo/root"),
         )
         self.assertEqual(

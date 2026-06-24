@@ -17,7 +17,7 @@ class LocalSource(Source):
     Навыки, обнаруженные в локальном файле или директории.
 
     Attributes:
-        path: Local path to a file or directory containing skills.
+        scan_path: Local path to a file or directory containing skills.
             Локальный путь к файлу или директории, содержащей навыки.
         repo_path: Optional absolute path to the repository root. When omitted,
             the directory containing ``path`` (or ``path`` itself if it is a
@@ -29,7 +29,7 @@ class LocalSource(Source):
             ссылок ``repo_absolute``.
     """
 
-    path: Path
+    scan_path: Path
     #: Local path to a file or directory containing skills.
     #: Локальный путь к файлу или директории, содержащей навыки.
 
@@ -38,7 +38,7 @@ class LocalSource(Source):
     #: Опциональный корень репозитория для разрешения ссылок repo_absolute.
 
     def __str__(self) -> str:
-        return str(self.path)
+        return str(self.scan_path)
 
     @property
     def source_type(self) -> str:
@@ -55,7 +55,7 @@ class LocalSource(Source):
         """
         result: Dict[str, Any] = {
             "type": self.source_type,
-            "path": str(self.path),
+            "path": str(self.scan_path),
         }
         if self.repo_path is not None:
             result["repo_path"] = str(self.repo_path)
@@ -74,7 +74,7 @@ class LocalSource(Source):
         его родитель. Корень репозитория по умолчанию совпадает с директорией
         сканирования, если не задан явный ``repo_path``.
         """
-        scan_path = self.path.resolve()
+        scan_path = self.scan_path.resolve()
         source_path = scan_path.parent if scan_path.is_file() else scan_path
         repo_path = self.repo_path.resolve() if self.repo_path else source_path
         return ScanLocation(repo_path=repo_path, source_path=source_path)

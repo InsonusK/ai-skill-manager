@@ -26,7 +26,8 @@ def load_config(config_path: Path) -> dict:
             import yaml
             return yaml.safe_load(content)
         except ImportError:
-            raise ImportError("PyYAML required for .yaml files. Install: pip install pyyaml")
+            raise ImportError(
+                "PyYAML required for .yaml files. Install: pip install pyyaml")
 
     return json.loads(content)
 
@@ -77,7 +78,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
         if src_type == "github":
             for sp in _normalize_subpaths(src.get("subpath")):
                 sources.append(
-                    #BUG: если в github источнике нескольно subpath, то будет создано несколько GitHubSource каждый из которых будет скачивать репозитарий
+                    # BUG: если в github источнике нескольно subpath, то будет создано несколько GitHubSource каждый из которых будет скачивать репозитарий
                     #     необходиво подумать на разделением Source на Source (истоник) и ScanPackage (путь сканирования)
                     GitHubSource(
                         repo_url=src_path,
@@ -85,11 +86,25 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                         subpath=sp,
                     )
                 )
-        else:
+        elif src_type == "local":
+            src_path = Path(src_path)
             # EN: Default to a local filesystem source resolved relative to the config file.
             # RU: По умолчанию используем локальный источник, разрешённый относительно файла конфигурации.
-            sources.append(
-                LocalSource(path=Path(config_dir / src_path))
-            )
+            repo_path = src_path if src_path.is_absolute() else config_dir / src_path
+            for sp in _normalize_subpaths(src.get("subpath")):
+                if sp is None:
+                    sp_path = repo_path
+                else:
+                    sp_path = Path(sp)
+                    if not sp_path.is_absolute():
+                        sp_path = repo_path / sp_path
+                sources.append(
+                    LocalSource(
+                        scan_path=sp_path,
+                        repo_path=repo_path
+                    )
+                )
+        else:
+            raise ValueError(f"Unkonwn {src_type}")
 
     return sources

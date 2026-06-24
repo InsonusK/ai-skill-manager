@@ -34,7 +34,7 @@ class TestLinkWithContext(unittest.TestCase):
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )
@@ -71,7 +71,7 @@ class TestLinkWithContext(unittest.TestCase):
     def test_repo_absolute_path(self):
         root = self._copy_mock("repo_abs")
         md = root / "skills" / "guide.skill.md"
-        source = LocalSource(path=root)
+        source = LocalSource(scan_path=root)
         skill = Skill(
             file_path=md,
             folder_path=None,
@@ -94,7 +94,7 @@ class TestLinkWithContext(unittest.TestCase):
     def test_repo_absolute_path_uses_repo_path(self):
         root = self._copy_mock("repo_abs")
         md = root / "skills" / "guide.skill.md"
-        source = LocalSource(path=root / "skills", repo_path=root)
+        source = LocalSource(scan_path=root / "skills", repo_path=root)
         skill = Skill(
             file_path=md,
             folder_path=None,

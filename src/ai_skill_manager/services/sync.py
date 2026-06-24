@@ -303,7 +303,7 @@ def _build_target_skill(file_path: Path, folder_path: Path) -> Skill:
         Новый экземпляр :class:`Skill`, представляющий скопированный навык.
     """
     source_path = folder_path.parent
-    source = LocalSource(path=source_path)
+    source = LocalSource(scan_path=source_path)
     return Skill(
         file_path=file_path,
         folder_path=folder_path,

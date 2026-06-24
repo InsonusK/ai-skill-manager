@@ -8,9 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli.commands.sync.cli import run as sync_run
+from . import MOCK_DIR
 
 
-MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_sync_cli"
+TESTCASE_MOCK_DIR = MOCK_DIR / "test_sync_cli"
 
 
 class TestSyncCLI(unittest.TestCase):
@@ -21,7 +22,7 @@ class TestSyncCLI(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def _copy_mock(self, name: str) -> Path:
-        src = MOCK_DIR / name
+        src = TESTCASE_MOCK_DIR / name
         dst = self.tmpdir / name
         shutil.copytree(src, dst)
         return dst

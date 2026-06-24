@@ -34,7 +34,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill-a\n---\n# A\n[link to b](../skill-b/SKILL.md)\n"
         )
 
-        result = run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertEqual(result["skills_count"], 2)
         self.assertEqual(result["links_replaced"], 1)
@@ -48,7 +48,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill\n---\n# Skill\n[template](./template.md)\n"
         )
 
-        result = run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertEqual(result["links_replaced"], 1)
         synced = (self.target_dir / "skill" / "SKILL.md").read_text()
@@ -61,7 +61,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill-a\n---\n# A\n[[../skill-b/SKILL.md|link to b]]\n"
         )
 
-        result = run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertEqual(result["links_replaced"], 1)
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
@@ -73,7 +73,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill\n---\n# Skill\n[external](https://example.com)\n"
         )
 
-        result = run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertEqual(result["links_replaced"], 0)
         synced = (self.target_dir / "skill" / "SKILL.md").read_text()
@@ -86,13 +86,13 @@ class TestRunSync(unittest.TestCase):
         )
 
         with self.assertRaises(ValidationFailedError):
-            run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+            run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
     def test_handles_flat_skill(self):
         md = self.source_dir / "guide.skill.md"
         md.write_text("---\nname: guide\n---\n# Guide\n")
 
-        result = run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertEqual(result["skills_count"], 1)
         self.assertTrue((self.target_dir / "guide" / "SKILL.md").exists())
@@ -105,7 +105,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill\n---\n# Skill\n[template](./template.md)\n"
         )
 
-        run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         self.assertTrue((self.target_dir / "skill" / "data.json").exists())
         self.assertEqual(
@@ -120,7 +120,7 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill-a\n---\n# A\n[link](../skill-b/SKILL.md#section)\n"
         )
 
-        run_sync([LocalSource(path=self.source_dir)], self.target_dir)
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
         self.assertIn("[link](skill:skill-b#section)", synced_a)
@@ -145,7 +145,7 @@ class TestRemoveOrphans(unittest.TestCase):
             file_path=skill_file,
             folder_path=skill_dir,
             source_path=self.target_dir,
-            source=LocalSource(path=self.target_dir),
+            source=LocalSource(scan_path=self.target_dir),
             format=SkillFormat.Agent,
         )
 

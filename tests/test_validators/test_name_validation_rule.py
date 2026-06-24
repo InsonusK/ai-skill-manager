@@ -30,7 +30,7 @@ class TestNameValidationRule(unittest.TestCase):
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent),
             format=fmt,
             source_path=file_path.parent,
         )
@@ -108,7 +108,7 @@ class TestNameValidationRule(unittest.TestCase):
         skill = Skill(
             file_path=md,
             folder_path=None,
-            source=LocalSource(path=self.tmpdir),
+            source=LocalSource(scan_path=self.tmpdir),
             format=SkillFormat.HumanFlat,
             source_path=self.tmpdir,
         )
@@ -123,7 +123,7 @@ class TestNameValidationRule(unittest.TestCase):
         skill = Skill(
             file_path=md,
             folder_path=None,
-            source=LocalSource(path=self.tmpdir),
+            source=LocalSource(scan_path=self.tmpdir),
             format=SkillFormat.HumanFlat,
             source_path=self.tmpdir,
         )

@@ -136,7 +136,7 @@ def _discover(args) -> List[Skill]:
                 for sp in subpaths
             ]
         else:
-            sources = [LocalSource(path=Path(args.path))]
+            sources = [LocalSource(scan_path=Path(args.path))]
 
         return discover(sources)
 

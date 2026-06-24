@@ -28,7 +28,7 @@ class TestSkillName(unittest.TestCase):
             file_path=file_path,
             folder_path=None,
             format=SkillFormat.HumanFlat,
-            source=LocalSource(path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent),
             source_path=file_path.parent,
         )
 

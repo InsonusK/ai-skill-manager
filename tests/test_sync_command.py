@@ -33,7 +33,7 @@ class TestSyncAPI(unittest.TestCase):
     def _write_config(self, **settings):
         config = self.tmp / "ai-skills.yaml"
         data = {
-            "sources": [{"path": "./skills"}],
+            "sources": [{"path": "./skills","type":"local"}],
             "settings": settings,
         }
         config.write_text(json.dumps(data))
@@ -99,7 +99,7 @@ class TestSyncAPI(unittest.TestCase):
 
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./repo_a"}, {"path": "./repo_b"}],
+            "sources": [{"path": "./repo_a", "type":"local"}, {"path": "./repo_b", "type":"local"}],
             "settings": {"target": "./target"}
         }))
 
@@ -119,7 +119,7 @@ class TestSyncAPI(unittest.TestCase):
 
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./repo_a"}, {"path": "./repo_b"}],
+            "sources": [{"path": "./repo_a", "type":"local"}, {"path": "./repo_b", "type":"local"}],
             "settings": {"target": "./target"}
         }))
 
@@ -145,7 +145,7 @@ class TestSyncCLI(unittest.TestCase):
         self._make_source_dir()
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./skills"}],
+            "sources": [{"path": "./skills", "type":"local"}],
             "settings": {"target": "./target"}
         }))
 
@@ -171,7 +171,7 @@ class TestSyncCLI(unittest.TestCase):
         self._make_source_dir()
         config = self.tmp / "ai-skills.yaml"
         config.write_text(json.dumps({
-            "sources": [{"path": "./skills"}],
+            "sources": [{"path": "./skills", "type":"local"}],
             "settings": {"target": "./target"}
         }))
 

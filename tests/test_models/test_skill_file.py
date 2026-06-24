@@ -65,7 +65,7 @@ class TestSkillFiles(unittest.TestCase):
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )
