@@ -10,6 +10,9 @@ from ai_skill_manager.entities.link import WebLink
 
 class TestWebLink(unittest.TestCase):
     def test_simple_web_link(self):
+        # EN: A plain Markdown web link must store the URL and not be an image.
+        # RU: Обычная markdown веб-ссылка должна сохранять URL и не быть
+        # изображением.
         link = WebLink(
             raw="[text](https://example.com)",
             text="text",
@@ -24,6 +27,8 @@ class TestWebLink(unittest.TestCase):
         self.assertIsNone(link.header)
 
     def test_web_link_with_fragment(self):
+        # EN: A web link with a URL fragment must keep the fragment in header.
+        # RU: Веб-ссылка с фрагментом URL должна сохранять фрагмент в header.
         link = WebLink(
             raw="[text](https://example.com#section)",
             text="text",
@@ -37,6 +42,8 @@ class TestWebLink(unittest.TestCase):
         self.assertEqual(link.header, "#section")
 
     def test_image_web_link(self):
+        # EN: An image web link must set is_image=True.
+        # RU: Веб-ссылка на изображение должна иметь is_image=True.
         link = WebLink(
             raw="![alt](https://example.com/img.png)",
             text="alt",
@@ -49,6 +56,8 @@ class TestWebLink(unittest.TestCase):
         self.assertTrue(link.is_image)
 
     def test_wiki_format_web_link(self):
+        # EN: A web link written in wiki format must preserve the wiki format.
+        # RU: Веб-ссылка в формате wiki должна сохранять формат wiki.
         link = WebLink(
             raw="[[https://example.com|text]]",
             text="text",
@@ -61,6 +70,8 @@ class TestWebLink(unittest.TestCase):
         self.assertEqual(link.target, "https://example.com")
 
     def test_link_type_property(self):
+        # EN: WebLink.link_type must return the WebLink class.
+        # RU: WebLink.link_type должен возвращать класс WebLink.
         link = WebLink(
             raw="[text](https://example.com)",
             text="text",
