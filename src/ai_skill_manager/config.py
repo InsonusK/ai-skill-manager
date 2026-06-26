@@ -26,9 +26,28 @@ def load_config(config_path: Path) -> dict:
             import yaml
             return yaml.safe_load(content)
         except ImportError:
-            raise ImportError("PyYAML required for .yaml files. Install: pip install pyyaml")
+            raise ImportError(
+                "PyYAML required for .yaml files. Install: pip install pyyaml")
 
     return json.loads(content)
+
+
+def _normalize_subpaths(subpath: Any) -> List[str | None]:
+    """Convert a subpath config value into a list of single subpaths.
+
+    Преобразует значение подпути из конфигурации в список отдельных подпутей.
+
+    ``None`` and a single string become a list with one entry; a list is
+    returned unchanged.
+
+    ``None`` и одиночная строка становятся списком с одним элементом;
+    список возвращается без изменений.
+    """
+    if subpath is None:
+        return [None]
+    if isinstance(subpath, list):
+        return subpath
+    return [subpath]
 
 
 def build_sources_from_config(config_path: Path) -> List[Source]:
@@ -57,18 +76,35 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
         # EN: GitHub sources are created from a repository URL and optional tree/subpath.
         # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
         if src_type == "github":
-            sources.append(
-                GitHubSource(
-                    repo_url=src_path,
-                    tree=src.get("tree", "master"),
-                    subpath=src.get("subpath"),
+            for sp in _normalize_subpaths(src.get("subpath")):
+                sources.append(
+                    # BUG: если в github источнике нескольно subpath, то будет создано несколько GitHubSource каждый из которых будет скачивать репозитарий
+                    #     необходиво подумать на разделением Source на Source (истоник) и ScanPackage (путь сканирования)
+                    GitHubSource(
+                        repo_url=src_path,
+                        tree=src.get("tree", "master"),
+                        subpath=sp,
+                    )
                 )
-            )
-        else:
+        elif src_type == "local":
+            src_path = Path(src_path)
             # EN: Default to a local filesystem source resolved relative to the config file.
             # RU: По умолчанию используем локальный источник, разрешённый относительно файла конфигурации.
-            sources.append(
-                LocalSource(path=Path(config_dir / src_path))
-            )
+            repo_path = src_path if src_path.is_absolute() else config_dir / src_path
+            for sp in _normalize_subpaths(src.get("subpath")):
+                if sp is None:
+                    sp_path = repo_path
+                else:
+                    sp_path = Path(sp)
+                    if not sp_path.is_absolute():
+                        sp_path = repo_path / sp_path
+                sources.append(
+                    LocalSource(
+                        scan_path=sp_path,
+                        repo_path=repo_path
+                    )
+                )
+        else:
+            raise ValueError(f"Unkonwn {src_type}")
 
     return sources

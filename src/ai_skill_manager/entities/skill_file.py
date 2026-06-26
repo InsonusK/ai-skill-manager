@@ -3,13 +3,16 @@
 Модель файла скила с ленивой загрузкой ссылок.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
-from ..discovery.link.factory.link_factory import search_links_in_content
+from .link import absLink
 
-from .link import Link
+if TYPE_CHECKING:
+    from .skill import Skill
 
 
 @dataclass(frozen=True)
@@ -26,13 +29,18 @@ class SkillFile:
     Attributes:
         path: Path to the markdown file on disk.
             Путь к markdown-файлу на диске.
+        skill: Skill that owns this file. Not used for equality/hashing.
+            Скилл, которому принадлежит файл. Не участвует в сравнении и хеше.
     """
+
+    class Context:
+        links: Optional[Tuple[absLink, ...]] = None
 
     path: Path
     """absolute path to skill file / абсолютный путь к файлу навыка"""
-    _links: Tuple[Link] = field(
-        default=None, init=False, repr=False, compare=False, hash=False
-    )
+    skill: "Skill" = field(compare=False, hash=False)
+    """owning skill / владеющий скилл"""
+    __context: Context = field(init=False, compare=False, hash=False, default_factory=Context)
 
     def __post_init__(self):
         """Validate that the stored path is an absolute file path.
@@ -43,7 +51,7 @@ class SkillFile:
         assert self.path.is_file(), f"Skill file path must lead to file. Now it leads to {self.path}"
 
     @property
-    def links(self) -> Tuple[Link]:
+    def links(self) -> Tuple[absLink, ...]:
         """Return all parsed links in this file.
 
         Вернуть все распарсенные ссылки в этом файле.
@@ -54,13 +62,13 @@ class SkillFile:
         """
         # EN: Parse links lazily and cache them in the frozen dataclass.
         # RU: Лениво парсим ссылки и кешируем их в замороженном dataclass.
-        if self._links is None:
-            object.__setattr__(
-                self,
-                "_links",
-                tuple(search_links_in_content(self.content)),
-            )
-        return self._links
+        if self.__context.links is None:
+            # Local import avoids a circular dependency between entities and discovery.
+            # Локальный импорт позволяет избежать циклической зависимости между entities и discovery.
+            from ..discovery.link import search_links_in_content
+
+            self.__context.links = tuple(search_links_in_content(self.content, self))
+        return self.__context.links
 
     @property
     def content(self) -> str:

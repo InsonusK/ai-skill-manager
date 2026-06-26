@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from ...tools.source_parser import add_source_arguments, build_sources_from_args
 from ...tools.validation_report_printer import print_validation_report
 
 from ....validators import ValidationFailedError
@@ -35,21 +36,10 @@ def add_parser(subparsers):
              "Синхронизировать AI-навыки в .agents/skills/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "-c",
-        "--config",
-        default=DEFAULT_CONFIG,
-        help=f"Config file (default: {DEFAULT_CONFIG}) / "
-             f"Файл конфигурации (по умолчанию: {DEFAULT_CONFIG})",
-    )
+    add_source_arguments(parser)
     parser.add_argument(
         "--target",
         help="Override target directory / Переопределить целевую директорию",
-    )
-    parser.add_argument(
-        "--on-conflict",
-        choices=["error", "last_wins"],
-        help="Conflict resolution / Разрешение конфликтов",
     )
     parser.add_argument(
         "--remove-orphans",
@@ -85,7 +75,10 @@ def add_parser(subparsers):
     parser.set_defaults(func=run)
     return parser
 
+
 logger = logging.Logger("sync cli")
+
+
 def run(args):
     """Execute the ``sync`` command from parsed CLI arguments.
 
@@ -99,10 +92,6 @@ def run(args):
         # Включаем подробное логирование во всём конвейере синхронизации.
         logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
-    # Resolve the configuration file path to an absolute path.
-    # Разрешаем путь к файлу конфигурации в абсолютный.
-    config_path = Path(args.config).resolve()
-
     # Resolve conflicting orphan flags into a single boolean.
     # Преобразуем конфликтующие флаги orphan в одно булево значение.
     remove: Optional[bool] = None
@@ -112,14 +101,26 @@ def run(args):
         remove = False
 
     try:
-        result = run_sync(
-            config_path=config_path,
-            target_dir=Path(args.target) if args.target else None,
-            on_conflict=args.on_conflict or "error",
-            remove_orphans=remove if remove is not None else True,
-            dry_run=args.dry_run,
-            force=args.force,
-        )
+        # Resolve sources from --config, --type/--path or the default config.
+        # Разрешаем источники из --config, --type/--path или конфигурации по умолчанию.
+        sources, config_path = build_sources_from_args(args)
+
+        if config_path is not None:
+            result = run_sync(
+                config_path=config_path,
+                target_dir=Path(args.target) if args.target else None,
+                remove_orphans=remove if remove is not None else True,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
+        else:
+            result = run_sync(
+                sources=sources,
+                target_dir=Path(args.target) if args.target else None,
+                remove_orphans=remove if remove is not None else True,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
         print(format_sync_result(result))
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)

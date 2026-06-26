@@ -8,9 +8,10 @@ No console output is produced here.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from ....config import build_sources_from_config, load_config
+from ....entities import Source
 from ....services.sync import run_sync as run_sync_service
 
 DEFAULT_CONFIG = "ai-skills.yaml"
@@ -21,9 +22,9 @@ DEFAULT_TARGET = ".agents/skills"
 
 
 def run_sync(
-    config_path: Path,
+    config_path: Optional[Path] = None,
+    sources: Optional[Sequence[Source]] = None,
     target_dir: Optional[Path] = None,
-    on_conflict: str = "error",
     remove_orphans: Optional[bool] = None,
     dry_run: bool = False,
     force: bool = False,
@@ -33,11 +34,18 @@ def run_sync(
     Запускает синхронизацию и возвращает словарь результата.
 
     Args:
-        config_path: Path to the configuration file. / Путь к файлу конфигурации.
+        config_path: Path to the configuration file. When ``sources`` is not
+            provided, the config is loaded and used to resolve sources,
+            target directory and orphan settings.
+            / Путь к файлу конфигурации. Если ``sources`` не переданы,
+            конфиг загружается и используется для источников, целевой
+            директории и настроек осиротевших навыков.
+        sources: Optional explicit sources. If provided, ``config_path`` is
+            only used to resolve relative target paths when it is also given.
+            / Опциональные явные источники. Если переданы, ``config_path``
+            используется только для разрешения относительных целевых путей.
         target_dir: Optional override for the target directory. /
             Опциональное переопределение целевой директории.
-        on_conflict: Conflict resolution strategy (``error`` or ``last_wins``). /
-            Стратегия разрешения конфликтов (``error`` или ``last_wins``).
         remove_orphans: Whether to remove orphan skills. Defaults to ``True``. /
             Удалять ли осиротевшие навыки. По умолчанию ``True``.
         dry_run: If ``True``, do not write any changes. /
@@ -51,53 +59,63 @@ def run_sync(
     Raises:
         FileNotFoundError: If the configuration file does not exist.
             / Если файл конфигурации не существует.
-        ValueError: If an invalid configuration is encountered.
-            / Если встречена некорректная конфигурация.
+        ValueError: If neither ``config_path`` nor ``sources`` is provided.
+            / Если не указан ни ``config_path``, ни ``sources``.
 
     Example:
         >>> from pathlib import Path
-        >>> run_sync(Path("ai-skills.yaml"), dry_run=True)
+        >>> run_sync(config_path=Path("ai-skills.yaml"), dry_run=True)
         {'skills_count': 0, 'target_dir': '...', 'links_replaced': 0, 'dry_run': True}
     """
-    config_path = config_path.resolve()
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config not found: {config_path}")
+    if config_path is None and sources is None:
+        raise ValueError("Either config_path or sources must be provided")
 
-    config = load_config(config_path)
-    settings = config.get("settings", {})
+    resolved_sources: Sequence[Source]
+    config_base: Optional[Path] = None
 
-    # Resolve target directory: CLI override > config > default.
-    # Определяем целевую директорию: CLI > конфиг > умолчание.
+    if config_path is not None:
+        config_path = config_path.resolve()
+        if not config_path.exists():
+            raise FileNotFoundError(f"Config not found: {config_path}")
+        config_base = config_path.parent
+
+        if sources is None:
+            config = load_config(config_path)
+            settings = config.get("settings", {})
+
+            # Resolve target directory: CLI override > config > default.
+            # Определяем целевую директорию: CLI > конфиг > умолчание.
+            if target_dir is None:
+                target_dir = Path(settings.get("target", DEFAULT_TARGET))
+            if not target_dir.is_absolute():
+                target_dir = config_base / target_dir
+
+            # Resolve orphan removal: CLI override > config > default.
+            # Определяем удаление осиротевших навыков: CLI > конфиг > умолчание.
+            if remove_orphans is None:
+                remove_orphans = settings.get("remove_orphans", True)
+
+            resolved_sources = build_sources_from_config(config_path)
+        else:
+            resolved_sources = sources
+    else:
+        resolved_sources = sources  # type: ignore[assignment]
+
     if target_dir is None:
-        target_dir = Path(settings.get("target", DEFAULT_TARGET))
+        target_dir = Path(DEFAULT_TARGET)
     if not target_dir.is_absolute():
-        target_dir = config_path.parent / target_dir
+        base = config_base if config_base is not None else Path.cwd()
+        target_dir = base / target_dir
     target_dir = target_dir.resolve()
 
-    # Resolve orphan removal: CLI override > config > default.
-    # Определяем удаление осиротевших навыков: CLI > конфиг > умолчание.
     if remove_orphans is None:
-        remove_orphans = settings.get("remove_orphans", True)
+        remove_orphans = True
 
-    # Build sources from the configuration file.
-    # Формируем источники из файла конфигурации.
-    sources = build_sources_from_config(config_path)
-
-    # Validate conflict strategy.
-    # Проверяем стратегию разрешения конфликтов.
-    if on_conflict not in ("error", "last_wins"):
-        raise ValueError(f"Invalid on_conflict value: {on_conflict}")
-
-    # The service handles conflict errors by raising ValueError.
-    # Conflict resolution beyond error reporting is not yet supported.
-    # Сервис обрабатывает конфликты, выбрасывая ValueError.
-    # Разрешение конфликтов кроме ошибки пока не поддерживается.
     result = run_sync_service(
-        sources=sources,
+        sources=resolved_sources,
         target_dir=target_dir,
         dry_run=dry_run,
         cleanup_orphans=remove_orphans,
-        on_conflict=on_conflict,
     )
 
     # Preserve legacy fields for formatters and callers.

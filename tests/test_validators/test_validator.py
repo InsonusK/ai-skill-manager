@@ -42,7 +42,7 @@ class TestValidator(unittest.TestCase):
             file_path=self.skill_file,
             folder_path=None,
             format=SkillFormat.HumanFlat,
-            source=LocalSource(path=self.tmpdir),
+            source=LocalSource(scan_path=self.tmpdir),
             source_path=self.tmpdir,
         )
 

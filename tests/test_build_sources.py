@@ -31,7 +31,7 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
         sources = build_sources_from_config(config)
 
         self.assertIsInstance(sources[0], LocalSource)
-        self.assertEqual(sources[0].path, (root / "skills").resolve())
+        self.assertEqual(sources[0].scan_path, (root / "skills").resolve())
 
     def test_build_github_source(self):
         root = self._copy_mock("default")
@@ -43,12 +43,27 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
         self.assertEqual(sources[1].tree, "main")
         self.assertEqual(sources[1].subpath, "docs")
 
-    def test_unknown_type_defaults_to_local(self):
-        root = self._copy_mock("default")
-        config = root / "ai-skills.yaml"
+
+    def test_build_github_source_with_list_subpath(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: github\n"
+            "    path: https://github.com/owner/repo\n"
+            "    tree: main\n"
+            "    subpath:\n"
+            "      - skills\n"
+            "      - docs\n"
+        )
         sources = build_sources_from_config(config)
 
-        self.assertIsInstance(sources[2], LocalSource)
+        self.assertEqual(len(sources), 2)
+        for source in sources:
+            self.assertIsInstance(source, GitHubSource)
+            self.assertEqual(source.repo_url, "https://github.com/owner/repo")
+            self.assertEqual(source.tree, "main")
+        self.assertEqual(sources[0].subpath, "skills")
+        self.assertEqual(sources[1].subpath, "docs")
 
 
 if __name__ == "__main__":

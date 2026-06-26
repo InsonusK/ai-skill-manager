@@ -26,10 +26,11 @@ class TestLinkValidationRule(unittest.TestCase):
         return dst
 
     def _skill(self, file_path: Path, folder_path: Path | None = None) -> Skill:
+        repo_path = file_path.parent.parent if folder_path else file_path.parent
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent, repo_path=repo_path),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )
@@ -83,6 +84,19 @@ class TestLinkValidationRule(unittest.TestCase):
 
         rule = LinkValidationRule()
         result = rule.validate([a, b])
+
+        self.assertEqual(result, {})
+
+    def test_fragment_only_wiki_link_is_valid(self):
+        # EN: A wiki link that contains only a fragment (e.g. [[#Header]]) must
+        # be treated as a link to the current skill file and therefore be valid.
+        # RU: Wiki-ссылка, содержащая только фрагмент (например, [[#Заголовок]]),
+        # должна считаться ссылкой на текущий файл скилла и быть корректной.
+        root = self._copy_mock("fragment_only_link")
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
 
         self.assertEqual(result, {})
 

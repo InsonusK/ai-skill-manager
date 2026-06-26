@@ -9,7 +9,9 @@ Registers subcommands from the ``commands`` package.
 
 import argparse
 
-from .commands.discover.cli import add_parser as discover_add_parser
+from ..profiling import profile_command
+
+from .commands.check.cli import add_parser as check_add_parser
 from .commands.new.cli import add_parser as new_add_parser
 from .commands.sync.cli import add_parser as sync_add_parser
 
@@ -25,20 +27,35 @@ def main():
         prog='ai-skill-manager',
         description='AI skills manager CLI / CLI менеджера AI-навыков',
     )
+    # EN: Global profiling flag; applies to any subcommand.
+    # RU: Глобальный флаг профилирования; применяется к любой подкоманде.
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable profiling and print top calls by time / "
+             "Включить профилирование и вывести самые затратные вызовы",
+    )
+    parser.add_argument(
+        "--profile-output",
+        metavar="FILE",
+        default="ai-skill-manager.prof",
+        help="Raw profiling dump file (default: ai-skill-manager.prof) / "
+             "Файл для сохранения сырых данных профилирования",
+    )
     # EN: Require a subcommand; ``dest`` lets us know which one was chosen.
-    # RU: Требуем подкоманду; ``dest`` позволяет узнать, какая выбрана.
-    subparsers:argparse._SubParsersAction[argparse.ArgumentParser] = parser.add_subparsers(dest='command', required=True)
+    # RU: Требуем подкоманды; ``dest`` позволяет узнать, какая выбрана.
+    subparsers = parser.add_subparsers(dest='command', required=True)
 
     # Register subcommand parsers.
     # Регистрируем парсеры подкоманд.
     sync_add_parser(subparsers)
     new_add_parser(subparsers)
-    discover_add_parser(subparsers)
+    check_add_parser(subparsers)
 
     # EN: Parse CLI arguments and dispatch to the selected subcommand.
     # RU: Парсим аргументы CLI и передаём управление выбранной подкоманде.
     args = parser.parse_args()
-    args.func(args)
+    profile_command(args.func)(args)
 
 
 if __name__ == '__main__':

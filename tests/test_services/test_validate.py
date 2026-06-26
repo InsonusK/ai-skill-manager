@@ -27,7 +27,7 @@ class TestRunValidation(unittest.TestCase):
 
     def test_valid_skills_report_no_errors(self):
         root = self._copy_mock("valid")
-        source = LocalSource(path=root.resolve())
+        source = LocalSource(scan_path=root.resolve())
 
         report = run_validation([source])
 
@@ -36,7 +36,7 @@ class TestRunValidation(unittest.TestCase):
 
     def test_invalid_skills_report_errors(self):
         root = self._copy_mock("invalid")
-        source = LocalSource(path=root.resolve())
+        source = LocalSource(scan_path=root.resolve())
 
         report = run_validation([source])
 

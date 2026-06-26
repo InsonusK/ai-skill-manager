@@ -2,4 +2,4 @@
 name: skill
 ---
 # Skill
-[bad](../nowhere.md)
+[bad](./nowhere.md)

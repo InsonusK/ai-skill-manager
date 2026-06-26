@@ -18,7 +18,10 @@ class Skill:
 
     Представляет обнаруженный навык на диске.
     """
-
+    class Context:
+        files: Optional[Tuple[SkillFile]] = None
+        properties: Optional[SkillProperty] = None
+        
     file_path: Path
     """absolute Path to skill main file / абсолютный путь к основному файлу навыка"""
     folder_path: Path | None
@@ -27,20 +30,13 @@ class Skill:
     """absolute Path to source folder / абсолютный путь к директории источника"""
     source: Source
     format: SkillFormat  # Required skill format. / Обязательный формат навыка.
-    properties: SkillProperty = field(init=False)
-    _files: Tuple[SkillFile] = field(
-        default=None, init=False, repr=False, compare=False, hash=False
-    )
-
+    __context: Context = field(init=False, compare=False, hash=False, default_factory=Context)
+    
     def __post_init__(self):
         """Initialize derived attributes and validate paths.
 
         Инициализирует производные атрибуты и проверяет пути.
         """
-        # EN: Frozen dataclass requires object.__setattr__ for field assignment.
-        # RU: Для замороженного dataclass присвоение поля требует object.__setattr__.
-        object.__setattr__(self, "properties", SkillProperty(self.file_path))
-
         # EN: Validate that all stored paths have the expected shape.
         # RU: Проверяем, что все сохранённые пути имеют ожидаемый вид.
         assert self.file_path.is_absolute(
@@ -57,6 +53,16 @@ class Skill:
         assert self.source_path.is_dir(
         ), f"Source_path must lead to folder. Now it leads to {self.source_path}"
 
+    @property
+    def properties(self)->SkillProperty:
+        """
+        Skill header properties
+        Свойства скила в заголовке
+        """        
+        if self.__context.properties is None:
+            self.__context.properties = SkillProperty(self.file_path)
+        return self.__context.properties
+    
     @property
     def name(self) -> Optional[str]:
         """Return the skill name from frontmatter, if present.
@@ -79,7 +85,7 @@ class Skill:
         """
         # EN: Build the file list once and cache it inside the frozen dataclass.
         # RU: Собираем список файлов один раз и кешируем внутри замороженного dataclass.
-        if self._files is None:
+        if self.__context.files is None:
             paths = [self.file_path]
             if self.folder_path is not None:
                 # EN: For directory skills include every nested markdown file.
@@ -94,10 +100,10 @@ class Skill:
                 if p in seen:
                     continue
                 seen.add(p)
-                files.append(SkillFile(p))
+                files.append(SkillFile(p, skill=self))
 
-            object.__setattr__(self, "_files", tuple(files))
-        return self._files
+            self.__context.files = tuple(files)
+        return self.__context.files
 
     def is_flat(self) -> bool:
         """Return ``True`` if the skill is a single markdown file.
