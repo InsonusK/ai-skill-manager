@@ -5,16 +5,16 @@
 
 from typing import List, Optional, Tuple
 
-from ...entities import Skill, SkillFile, WebLink, absLink
-from ...models import LinkWithContext
-from ..models.adapter_message import AdapterMessage
-from .abs_adapter import absAdapter
+from ....entities import Skill, SkillFile, WebLink, absLink
+from ...models.adapter_message import AdapterMessage
+from ..abs_adapter import absAdapter
+from .converter import LinkConverter
 
 
 class LinkAdapter(absAdapter):
     """Rewrites internal links in copied skill files to skill-link targets."""
 
-    def __init__(self, adapter_context):
+    def __init__(self, adapter_context: absAdapter.Context):
         """Initialize the adapter and reset the replacement counter.
 
         Args:
@@ -25,6 +25,7 @@ class LinkAdapter(absAdapter):
         # Count of links replaced during the last adaptation.
         # Счётчик заменённых ссылок во время последней адаптации.
         self.links_replaced = 0
+        self._link_converter = LinkConverter()
 
     @classmethod
     def version(cls) -> str:
@@ -172,14 +173,14 @@ class LinkAdapter(absAdapter):
         if link.is_image:
             return None
 
-        # Build context and resolve the skill-format target.
-        # Формируем контекст и разрешаем цель в формате skill-link.
-        link_context = LinkWithContext.build(skill, skill_file, link)
-        new_target = link_context.to_skill_format(other_skills)
-
-        # Preserve the original link header/anchor if present.
-        # Сохраняем оригинальный якорь/заголовок ссылки, если он есть.
-        if link.header:
-            new_target += link.header
-
-        return new_target
+        # Resolve the skill-format target via the dedicated converter.
+        # Pass the source-to-target skill mapping so source links that still
+        # point to the original source paths can be resolved correctly.
+        # Разрешаем цель в формате skill-link через специализированный конвертер.
+        # Передаём маппинг исходных скиллов в целевые, чтобы source-ссылки,
+        # всё ещё указывающие на исходные пути, разрешались корректно.
+        return self._link_converter.convert(
+            link,
+            other_skills,
+            self._adapter_context.skill_mapping,
+        )

@@ -137,30 +137,6 @@ class TestLinkWithContext(unittest.TestCase):
         expected = (source.get_scan_location().repo_path / "other.skill.md").resolve()
         self.assertEqual(ctx.os_absolute_path, expected)
 
-    def test_to_skill_format_for_flat_self_link(self):
-        root = self._copy_mock("flat")
-        md = root / "guide.skill.md"
-        skill = self._skill(md)
-        ctx = self._context(skill, md)
-
-        self.assertEqual(ctx.to_skill_format([]), "./SKILL.md")
-
-    def test_to_skill_format_for_cross_skill(self):
-        root = self._copy_mock("dir")
-        skill_dir = root / "web"
-        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
-        other_dir = root / "other"
-        other_dir.mkdir()
-        (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
-        other = self._skill(other_dir / "SKILL.md", other_dir, repo_path=root)
-
-        skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
-        skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
-        link = skill_file.links[0]
-        ctx = LinkWithContext.build(skill, skill_file, link)
-
-        self.assertEqual(ctx.to_skill_format([skill, other]), "skill:other")
-
     def test_os_absolute_path_is_cached(self):
         """Repeated accesses return the same resolved Path instance."""
         root = self._copy_mock("flat")
@@ -186,27 +162,6 @@ class TestLinkWithContext(unittest.TestCase):
 
         self.assertIsNone(first)
         self.assertIs(first, second)
-
-    def test_web_link_to_skill_format_unchanged(self):
-        """Web links are returned unchanged by to_skill_format."""
-        root = self._copy_mock("flat")
-        md = root / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n[external](https://example.com#section)\n")
-        skill = self._skill(md)
-        ctx = self._context(skill, md)
-
-        self.assertEqual(ctx.to_skill_format([]), "https://example.com")
-
-    def test_to_skill_format_raises_for_invalid_link(self):
-        """A dangling file link raises ValueError."""
-        root = self._copy_mock("flat")
-        md = root / "guide.skill.md"
-        md.write_text("---\nname: guide\n---\n[missing](./missing.md)\n")
-        skill = self._skill(md)
-        ctx = self._context(skill, md)
-
-        with self.assertRaises(ValueError):
-            ctx.to_skill_format([])
 
     def test_is_link_to_another_skill_and_file(self):
         """Links to another skill are detected by helper methods."""

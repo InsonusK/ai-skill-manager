@@ -37,6 +37,12 @@ class TestLinkAdapter(unittest.TestCase):
         )
 
     def test_rewrites_flat_skill_self_link(self):
+        """RU: Ссылка на сам плоский скилл сохраняет относительный путь из absLink.
+
+        В реальном синхроне плоский HumanFlat-скилл копируется в Agent-формат,
+        поэтому исходная ссылка ``./guide.skill.md`` остаётся как есть в
+        разрешённом ``absLink.path.formatted``.
+        """
         root = self._copy_mock("flat_skill")
         md = root / "guide.skill.md"
         skill = self._skill(md)
@@ -45,7 +51,7 @@ class TestLinkAdapter(unittest.TestCase):
         adapter.adapt(skill, skill)
 
         content = md.read_text()
-        self.assertIn("[details](./SKILL.md)", content)
+        self.assertIn("[details](./guide.skill.md)", content)
 
     def test_rewrites_dir_skill_internal_link(self):
         root = self._copy_mock("dir_skill")

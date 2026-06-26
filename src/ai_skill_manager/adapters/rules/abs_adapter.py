@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Tuple
 
 from ..models.adapter_message import AdapterMessage
 from ...entities import Skill
@@ -33,6 +33,13 @@ class absAdapter(ABC):
 
         skills: Tuple[Skill]
         """All known skills. / Все известные навыки."""
+
+        skill_mapping: Dict[Skill, Skill] = field(default_factory=dict)
+        """Mapping from original source skill to copied target skill.
+
+        Используется для разрешения source-ссылок, которые после копирования
+        всё ещё указывают на пути в исходном источнике.
+        """
 
     def __init__(self, adapter_context: absAdapter.Context):
         """Initialize the adapter with the shared context.

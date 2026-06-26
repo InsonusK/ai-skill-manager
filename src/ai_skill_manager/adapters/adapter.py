@@ -13,7 +13,7 @@ from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
 from .models.adapter_message import AdapterMessage
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 
 class Adapter:
@@ -28,7 +28,12 @@ class Adapter:
     адаптер при миграции от старого навыка к новому.
     """
 
-    def __init__(self, skills: List[Skill], adapter_list: List[Type[absAdapter]] = DEFAULT_RULES):
+    def __init__(
+        self,
+        skills: List[Skill],
+        adapter_list: List[Type[absAdapter]] = DEFAULT_RULES,
+        skill_mapping: Optional[Dict[Skill, Skill]] = None,
+    ):
         """Initialize the adapter with the available skills and adapter classes.
 
         Args:
@@ -36,6 +41,12 @@ class Adapter:
                 / Все известные навыки, используемые как контекст для разрешения ссылок.
             adapter_list: Adapter classes to instantiate.
                 / Классы адаптеров для инстанцирования.
+            skill_mapping: Optional mapping from original source skill to copied
+                target skill. Used by link adapters to resolve source links that
+                still point to the original source paths after copying.
+                / Опциональное отображение исходного скилла в скопированный.
+                Используется адаптерами ссылок для разрешения source-ссылок,
+                которые всё ещё указывают на исходные пути.
 
         Raises:
             AssertionError: If two adapters share the same name.
@@ -51,7 +62,7 @@ class Adapter:
 
         # Build a shared context containing all skills.
         # Формируем общий контекст, содержащий все навыки.
-        self.__ac = absAdapter.Context(skills)
+        self.__ac = absAdapter.Context(skills=tuple(skills), skill_mapping=skill_mapping or {})
 
         # Instantiate each adapter with the shared context.
         # Инстанцируем каждый адаптер с общим контекстом.

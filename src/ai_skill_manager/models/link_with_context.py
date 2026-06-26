@@ -152,37 +152,20 @@ class LinkWithContext:
 
         Возвращает другой навык, на который указывает ссылка, если такой есть.
         """
-        # EN: Look for a skill whose main file matches the resolved link path.
-        # RU: Ищем навык, основной файл которого совпадает с разрешённым путем ссылки.
+        # EN: Look for a skill whose main file or folder matches the resolved
+        # link path. Folder match handles repo-absolute links written without
+        # the ``.md`` suffix.
+        # RU: Ищем навык, основной файл или папка которого совпадает с
+        # разрешённым путём ссылки. Совпадение с папкой обрабатывает
+        # repo-absolute ссылки, записанные без суффикса ``.md``.
         skill_candidates = [
-            skill for skill in other_skills if self.os_absolute_path == skill.file_path]
+            skill for skill in other_skills
+            if self.os_absolute_path == skill.file_path
+            or (skill.folder_path is not None and self.os_absolute_path == skill.folder_path)
+        ]
         if len(skill_candidates) == 0:
             return None
         assert len(skill_candidates) == 1, \
             f"More than 1 skill candidate for link {self.base.raw}"
         return skill_candidates[0]
 
-    def to_skill_format(self, other_skills: List[Skill]) -> str:
-        """Convert the link to the normalized skill format.
-
-        Преобразует ссылку в нормализованный формат навыка.
-        """
-        # EN: Web links are kept unchanged.
-        # RU: Веб-ссылки оставляем без изменений.
-        if isinstance(self.base, WebLink):
-            return self.base.path.formatted
-
-        # EN: Links inside the same skill are rewritten relative to the skill folder.
-        # RU: Ссылки внутри того же навыка переписываются относительно папки навыка.
-        if self.is_link_to_skill_file:
-            if self.context.skill.format.is_flat:
-                return "./SKILL.md"
-            return f"./{self.os_absolute_path.relative_to(self.context.skill.folder_path)}"
-
-        # EN: Links to another skill use the ``skill:<name>`` notation.
-        # RU: Ссылки на другой навык используют нотацию ``skill:<name>``.
-        skill = self.is_link_to_another_skill(other_skills)
-        if skill is not None:
-            return f"skill:{skill.properties.name}"
-
-        raise ValueError("Invalid link format")
