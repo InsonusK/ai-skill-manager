@@ -3,10 +3,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
+from ai_skill_manager.discovery.link.builder.wikilink import WikilinkBuilder
 from ai_skill_manager.discovery.link.link_factory import search_links_in_content
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink, WebLink
-from ai_skill_manager.entities.link_kind import LinkKind
+from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 
 
@@ -73,10 +76,10 @@ class TestLinkFactory(unittest.TestCase):
         expected = {
             "[relative](./file.md)": {
                 "path_raw": "./file.md",
-                "raw_kind": LinkKind.relative,
-                "kind": LinkKind.repo_absolute,
+                "raw_kind": PathKind.relative,
+                "kind": LinkKind.source,
                 "text": "relative",
-                "format": "markdown",
+                "format": MarkdownLinkBuilder,
                 "header": None,
                 "is_image": False,
                 "cls": PathLink,
@@ -84,29 +87,29 @@ class TestLinkFactory(unittest.TestCase):
             },
             "[absolute](/tmp/file.md)": {
                 "path_raw": "/tmp/file.md",
-                "raw_kind": LinkKind.os_absolute,
-                "kind": LinkKind.repo_absolute,
+                "raw_kind": PathKind.os_absolute,
+                "kind": LinkKind.source,
                 "text": "absolute",
-                "format": "markdown",
+                "format": MarkdownLinkBuilder,
                 "header": None,
                 "is_image": False,
                 "cls": PathLink,
                 "formatted": "tmp/file.md",
             },
             "[web](https://example.com)": {
-                "path": "https://example.com",
+                "url": "https://example.com",
                 "text": "web",
-                "format": "markdown",
+                "format": MarkdownLinkBuilder,
                 "header": None,
                 "is_image": False,
                 "cls": WebLink,
             },
             "![image](./img.png)": {
                 "path_raw": "./img.png",
-                "raw_kind": LinkKind.relative,
-                "kind": LinkKind.repo_absolute,
+                "raw_kind": PathKind.relative,
+                "kind": LinkKind.source,
                 "text": "image",
-                "format": "markdown",
+                "format": MarkdownLinkBuilder,
                 "header": None,
                 "is_image": True,
                 "cls": PathLink,
@@ -114,10 +117,10 @@ class TestLinkFactory(unittest.TestCase):
             },
             "[[wiki link|text]]": {
                 "path_raw": "wiki link",
-                "raw_kind": LinkKind.repo_absolute,
-                "kind": LinkKind.repo_absolute,
+                "raw_kind": PathKind.repo_absolute,
+                "kind": LinkKind.source,
                 "text": "text",
-                "format": "wiki",
+                "format": WikilinkBuilder,
                 "header": None,
                 "is_image": False,
                 "cls": PathLink,
@@ -131,7 +134,7 @@ class TestLinkFactory(unittest.TestCase):
             exp = expected[link.raw]
             self.assertIsInstance(link, exp["cls"])
             self.assertEqual(link.text, exp["text"])
-            self.assertEqual(link.format, exp["format"])
+            self.assertIs(link.format, exp["format"])
             self.assertEqual(link.header, exp["header"])
             self.assertEqual(link.is_image, exp["is_image"])
             if isinstance(link, PathLink):
@@ -140,7 +143,7 @@ class TestLinkFactory(unittest.TestCase):
                 self.assertEqual(link.path.kind, exp["kind"])
                 self.assertEqual(link.path.formatted, exp["formatted"])
             else:
-                self.assertEqual(link.path, exp["path"])
+                self.assertEqual(link.url, exp["url"])
 
         found_raws = {link.raw for link in links}
         self.assertEqual(found_raws, set(expected.keys()))

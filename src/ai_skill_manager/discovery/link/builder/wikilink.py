@@ -98,10 +98,11 @@ class WikilinkBuilder(absLinkBuilder):
             return WebLink(
                 raw=raw,
                 text=display_text,
-                path=path_clean,
-                format="wiki",
+                url=path_clean,
+                format=WikilinkBuilder,
                 start=start,
                 end=end,
+                skill_file_value=skill_file,
                 header_value=fragment or None,
                 is_image_value=self._is_image(raw),
             )
@@ -109,10 +110,10 @@ class WikilinkBuilder(absLinkBuilder):
         return PathLink(
             raw=raw,
             text=display_text,
-            format="wiki",
+            format=WikilinkBuilder,
             start=start,
             end=end,
-            skill_file=skill_file,
+            skill_file_value=skill_file,
             raw_path=path_clean,
             header_value=fragment or None,
             is_image_value=self._is_image(raw),

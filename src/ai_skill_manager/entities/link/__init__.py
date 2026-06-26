@@ -3,6 +3,8 @@
 Модели ссылки на уровне хранения.
 """
 
-from .absLink import absLink
-from .pathLink import PathInfo, PathLink, PathRaw
-from .webLink import WebLink
+from .link_path import LinkPath
+
+from .abs_link import absLink
+from .path_link import PathLink, PathRaw
+from .web_link import WebLink

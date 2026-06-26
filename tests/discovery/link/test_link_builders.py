@@ -7,8 +7,9 @@ from pathlib import Path
 
 from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink, WebLink
-from ai_skill_manager.entities.link_kind import LinkKind
+from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 
 
@@ -44,9 +45,10 @@ class TestMarkdownLinkBuilder(unittest.TestCase):
         links = builder.search("[text](./file.md)", skill_file)
         self.assertEqual(len(links), 1)
         self.assertIsInstance(links[0], PathLink)
+        self.assertIs(links[0].skill_file, skill_file)
         self.assertEqual(links[0].path_raw.path, "./file.md")
-        self.assertEqual(links[0].path_raw.kind, LinkKind.relative)
-        self.assertEqual(links[0].path.kind, LinkKind.relative)
+        self.assertEqual(links[0].path_raw.kind, PathKind.relative)
+        self.assertEqual(links[0].path.kind, LinkKind.skill)
         self.assertEqual(links[0].path.formatted, "./file.md")
 
     def test_finds_image_link(self):
@@ -89,7 +91,9 @@ class TestMarkdownLinkBuilder(unittest.TestCase):
         links = builder.search("[web](https://example.com)", skill_file)
         self.assertEqual(len(links), 1)
         self.assertIsInstance(links[0], WebLink)
-        self.assertEqual(links[0].path, "https://example.com")
+        self.assertIs(links[0].skill_file, skill_file)
+        self.assertEqual(links[0].url, "https://example.com")
+        self.assertEqual(links[0].path.formatted, "https://example.com")
 
     def test_skill_md_fallback(self):
         """A link to ``a-b-c.skill`` resolves to ``a-b-c.skill.md``."""
@@ -104,7 +108,6 @@ class TestMarkdownLinkBuilder(unittest.TestCase):
         builder = MarkdownLinkBuilder()
         links = builder.search("[text](./a-b-c.skill)", skill_file)
         self.assertEqual(len(links), 1)
-        self.assertTrue(links[0].path.exists)
         self.assertEqual(links[0].path.os_path, target.resolve())
         self.assertEqual(links[0].path.formatted, "./a-b-c.skill.md")
 

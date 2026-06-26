@@ -8,14 +8,18 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field, InitVar
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Optional
 
-from ..link_kind import LinkKind
-from .absLink import absLink
+from .link_path import LinkPath
+
+from ..path_kind import PathKind
+
+from .link_kind import LinkKind
+from .abs_link import absLink
 
 if TYPE_CHECKING:
-    from ...entities.skill import Skill
-    from ...entities.skill_file import SkillFile
+    from ..skill import Skill
+    from ..skill_file import SkillFile
 
 
 @dataclass(frozen=True)
@@ -32,37 +36,7 @@ class PathRaw:
     """
 
     path: str
-    kind: LinkKind
-
-
-@dataclass(frozen=True)
-class PathInfo:
-    """Processed path data for a file-system link.
-
-    Обработанные данные пути для файловой ссылки.
-
-    Attributes:
-        kind: The resolved link kind. A raw link first tries to become
-            ``relative`` (inside the skill folder), otherwise ``repo_absolute``.
-            Разрешённый вид ссылки. Ссылка из ``raw`` сначала пытается стать
-            ``relative`` (внутри папки скилла), иначе — ``repo_absolute``.
-        formatted: The path written in the format of ``kind``.
-            Путь в формате, соответствующем ``kind``.
-        repo_path: The path relative to ``ScanLocation.repo_path``.
-            Путь относительно ``ScanLocation.repo_path``.
-        os_path: The absolute OS path resolved from the raw link.
-            Абсолютный путь в ОС, разрешённый из сырой ссылки.
-        exists: ``True`` when the target file exists, including after the
-            ``.skill`` -> ``.skill.md`` fallback.
-            ``True``, когда целевой файл существует, включая fallback
-            ``.skill`` -> ``.skill.md``.
-    """
-
-    kind: LinkKind
-    formatted: str
-    repo_path: str
-    os_path: Path
-    exists: bool
+    kind: PathKind
 
 
 @dataclass(frozen=True)
@@ -80,21 +54,18 @@ class PathLink(absLink):
     Attributes:
         path_raw: Raw path and its original classification.
             Сырой путь и его исходная классификация.
-        path: Processed path resolved against the skill and repository.
-            Обработанный путь, разрешённый относительно скилла и репозитория.
     """
 
     path_raw: PathRaw = field(init=False)
-    path: PathInfo = field(init=False)
 
-    skill_file: InitVar["SkillFile"]
+    skill_file_value: InitVar["SkillFile"]
     raw_path: InitVar[str]
     header_value: InitVar[Optional[str]] = None
     is_image_value: InitVar[bool] = False
 
     def __post_init__(
         self,
-        skill_file: "SkillFile",
+        skill_file_value: "SkillFile",
         raw_path: str,
         header_value: Optional[str],
         is_image_value: bool,
@@ -105,21 +76,17 @@ class PathLink(absLink):
         """
         object.__setattr__(self, "header", header_value)
         object.__setattr__(self, "is_image", is_image_value)
+        object.__setattr__(self, "skill_file", skill_file_value)
 
         raw_kind = _classify_raw_path(raw_path)
-        path_info = _resolve_path(skill_file, raw_path, raw_kind)
+        path_info = _resolve_path(skill_file_value, raw_path, raw_kind)
+
         object.__setattr__(self, "path_raw", PathRaw(path=raw_path, kind=raw_kind))
+        #object.__setattr__(self, "kind", path_info.kind)
         object.__setattr__(self, "path", path_info)
 
-    @property
-    def target(self) -> str:
-        """Return the formatted path target.
 
-        Вернуть форматированную цель пути.
-        """
-        return self.path.formatted
-
-def _classify_raw_path(path: str) -> LinkKind:
+def _classify_raw_path(path: str) -> PathKind:
     """Classify a raw path string without doing any filesystem lookup.
 
     Классифицировать сырую строку пути без обращения к файловой системе.
@@ -128,7 +95,7 @@ def _classify_raw_path(path: str) -> LinkKind:
         path: Clean link path without fragment. / Очищенный путь без фрагмента.
 
     Returns:
-        The raw link kind. / Исходный вид ссылки.
+        The raw path kind. / Исходный вид пути.
 
     Raises:
         ValueError: If the path looks like a web URI.
@@ -138,10 +105,10 @@ def _classify_raw_path(path: str) -> LinkKind:
     if lower.startswith(("http://", "https://", "mailto:", "ftp://", "file://")):
         raise ValueError(f"Web links are represented by WebLink: {path}")
     if path.startswith(("./", "../")):
-        return LinkKind.relative
+        return PathKind.relative
     if path.startswith("/"):
-        return LinkKind.os_absolute
-    return LinkKind.repo_absolute
+        return PathKind.os_absolute
+    return PathKind.repo_absolute
 
 
 def _existing_file(path: Path) -> Optional[Path]:
@@ -174,20 +141,20 @@ def _existing_file(path: Path) -> Optional[Path]:
 def _resolve_path(
     skill_file: "SkillFile",
     raw_path: str,
-    raw_kind: LinkKind,
-) -> PathInfo:
+    raw_kind: PathKind,
+) -> LinkPath:
     """Resolve a raw path to a :class:`PathInfo`.
 
     Разрешить сырой путь в :class:`PathInfo`.
 
     The resolution order matches the user specification: a raw link first
-    attempts to become ``relative`` (inside the skill folder), otherwise it is
-    treated as ``repo_absolute``. OS-absolute raw paths are not applicable for
-    skill links and are normalised to repo-absolute resolution.
+    attempts to become ``skill`` (inside the skill folder), otherwise it is
+    treated as ``source`` (inside the repository but outside the skill).
+    OS-absolute raw paths are normalised to repo-root resolution.
 
-    Порядок разрешения соответствует спецификации: ссылка из ``raw`` сначала
-    пытается стать ``relative`` (внутри папки скилла), иначе считается
-    ``repo_absolute``. Абсолютные пути ОС для скилловых ссылок не применимы и
+    Порядок разрешения соответствует спецификации: сырая ссылка сначала
+    пытается стать ``skill`` (внутри папки скилла), иначе считается
+    ``source`` (внутри репозитория, но вне скилла). Абсолютные пути ОС
     нормализуются к разрешению от корня репозитория.
     """
     skill = skill_file.skill
@@ -199,25 +166,24 @@ def _resolve_path(
     if raw_path == "":
         resolved = file_path.resolve()
         repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
-        return PathInfo(
-            kind=LinkKind.relative,
+        return LinkPath(
+            kind=LinkKind.skill,
             formatted="./" + file_path.name,
             repo_path=repo_relative,
             os_path=resolved,
-            exists=True,
         )
 
-    if raw_kind == LinkKind.relative:
+    if raw_kind == PathKind.relative:
         candidate = (file_path.parent / raw_path).resolve()
-    elif raw_kind == LinkKind.repo_absolute:
+    elif raw_kind == PathKind.repo_absolute:
         candidate = (repo_path / raw_path).resolve()
-    elif raw_kind == LinkKind.os_absolute:
+    elif raw_kind == PathKind.os_absolute:
         # Normalize leading slash to repo-root resolution.
         # Нормализуем ведущий слеш к разрешению от корня репозитория.
         normalized = raw_path.lstrip("/")
         candidate = (repo_path / normalized).resolve() if normalized else repo_path.resolve()
     else:
-        raise ValueError(f"Unknown raw link kind: {raw_kind}")
+        raise ValueError(f"Unknown raw path kind: {raw_kind}")
 
     target = _existing_file(candidate)
     resolved = target if target is not None else candidate
@@ -229,27 +195,24 @@ def _resolve_path(
         )
 
     folder = skill.folder_path
-    is_self_link = target is not None and target == skill.file_path
-    is_inside_skill_folder = (
-        target is not None and folder is not None and target.is_relative_to(folder)
-    )
-
-    if is_self_link or is_inside_skill_folder:
-        kind = LinkKind.relative
-        if is_self_link:
-            formatted = "./" + skill.file_path.name
-        else:
-            formatted = "./" + target.relative_to(folder).as_posix()
-    else:
-        kind = LinkKind.repo_absolute
-        formatted = Path(os.path.relpath(resolved, repo_path)).as_posix()
+    is_self_link = resolved == skill.file_path
+    is_inside_skill_folder = folder is not None and resolved.is_relative_to(folder)
 
     repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
 
-    return PathInfo(
+    if is_self_link or is_inside_skill_folder:
+        kind = LinkKind.skill
+        if is_self_link:
+            formatted = "./" + skill.file_path.name
+        else:
+            formatted = "./" + resolved.relative_to(folder).as_posix()
+    else:
+        kind = LinkKind.source
+        formatted = repo_relative
+
+    return LinkPath(
         kind=kind,
         formatted=formatted,
         repo_path=repo_relative,
         os_path=resolved,
-        exists=target is not None,
     )

@@ -8,9 +8,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
+from ai_skill_manager.discovery.link.builder.wikilink import WikilinkBuilder
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink
-from ai_skill_manager.entities.link_kind import LinkKind
+from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 
 
@@ -51,10 +54,10 @@ class TestPathLink(unittest.TestCase):
         return PathLink(
             raw=f"[text]({raw_path})",
             text="text",
-            format="markdown",
+            format=MarkdownLinkBuilder,
             start=0,
             end=1,
-            skill_file=skill_file,
+            skill_file_value=skill_file,
             raw_path=raw_path,
             header_value=None,
             is_image_value=False,
@@ -71,10 +74,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Относительная ссылка из плоского скилла на его основной файл
         # должна быть относительной и иметь формат ./<имя_файла>.
         link = self._path_link(self._flat_skill_file(), "./guide.skill.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.relative)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./guide.skill.md")
-        self.assertTrue(link.path.exists)
 
     def test_relative_flat_other(self):
         # EN: A relative link from a flat skill to another file in the same
@@ -84,10 +86,9 @@ class TestPathLink(unittest.TestCase):
         # папке репозитория становится repo_absolute, потому что у плоского
         # скилла нет директории скилла.
         link = self._path_link(self._flat_skill_file(), "./other.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.relative)
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path_raw.kind, PathKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other.md")
-        self.assertTrue(link.path.exists)
 
     def test_relative_dir_self(self):
         # EN: A relative link from a directory skill to its own main file is
@@ -95,10 +96,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Относительная ссылка из директорийного скилла на его основной
         # файл является относительной и указывает на ./SKILL.md.
         link = self._path_link(self._dir_skill_file(), "./SKILL.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.relative)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./SKILL.md")
-        self.assertTrue(link.path.exists)
 
     def test_relative_dir_inside(self):
         # EN: A relative link to a file inside the skill directory stays
@@ -106,9 +106,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Относительная ссылка на файл внутри директории скилла остаётся
         # относительной.
         link = self._path_link(self._dir_skill_file(), "./details.md")
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./details.md")
-        self.assertTrue(link.path.exists)
 
     def test_relative_dir_sub(self):
         # EN: A relative link to a nested file inside the skill directory stays
@@ -116,9 +115,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Относительная ссылка на вложенный файл внутри директории скилла
         # остаётся относительной и сохраняет подпуть.
         link = self._path_link(self._dir_skill_file(), "./sub/nested.md")
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./sub/nested.md")
-        self.assertTrue(link.path.exists)
 
     def test_relative_dir_outside_inside_repo(self):
         # EN: A relative link that leaves the skill directory but stays inside
@@ -126,9 +124,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Относительная ссылка, выходящая из директории скилла, но
         # остающаяся внутри репозитория, становится repo_absolute.
         link = self._path_link(self._dir_skill_file(), "../other/SKILL.md")
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other/SKILL.md")
-        self.assertTrue(link.path.exists)
 
     # ==================================================================
     # Repo-absolute raw path
@@ -141,10 +138,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Ссылка от корня репозитория из плоского скилла на его основной
         # файл считается ссылкой на себя и становится относительной.
         link = self._path_link(self._flat_skill_file(), "guide.skill.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.repo_absolute)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./guide.skill.md")
-        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_flat_other(self):
         # EN: A repo-absolute link from a flat skill to another file in the same
@@ -152,10 +148,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Ссылка от корня репозитория из плоского скилла на другой файл в
         # той же папке остаётся repo_absolute.
         link = self._path_link(self._flat_skill_file(), "other.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.repo_absolute)
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other.md")
-        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_dir_self(self):
         # EN: A repo-absolute link that targets the directory skill's main file
@@ -164,10 +159,9 @@ class TestPathLink(unittest.TestCase):
         # директорийного скилла, становится относительной, так как цель — сам
         # файл скилла.
         link = self._path_link(self._dir_skill_file(), "dir/SKILL.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.repo_absolute)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./SKILL.md")
-        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_dir_inside(self):
         # EN: A repo-absolute link to a file inside the skill directory becomes
@@ -175,9 +169,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Ссылка от корня репозитория на файл внутри директории скилла
         # становится относительной.
         link = self._path_link(self._dir_skill_file(), "dir/details.md")
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./details.md")
-        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_dir_sub(self):
         # EN: A repo-absolute link to a nested file inside the skill directory
@@ -185,9 +178,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Ссылка от корня репозитория на вложенный файл внутри директории
         # скилла становится относительной и сохраняет подпуть.
         link = self._path_link(self._dir_skill_file(), "dir/sub/nested.md")
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./sub/nested.md")
-        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_dir_outside(self):
         # EN: A repo-absolute link to a file outside the skill directory but
@@ -195,9 +187,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Ссылка от корня репозитория на файл вне директории скилла, но
         # внутри репозитория, остаётся repo_absolute.
         link = self._path_link(self._dir_skill_file(), "other/SKILL.md")
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other/SKILL.md")
-        self.assertTrue(link.path.exists)
 
     # ==================================================================
     # OS-absolute raw path
@@ -211,10 +202,9 @@ class TestPathLink(unittest.TestCase):
         # указывает на собственный файл плоского скилла, он становится
         # относительным.
         link = self._path_link(self._flat_skill_file(), "/guide.skill.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.os_absolute)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./guide.skill.md")
-        self.assertTrue(link.path.exists)
 
     def test_os_absolute_flat_other(self):
         # EN: An OS-absolute raw link to another file in the repository becomes
@@ -222,10 +212,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Абсолютный путь ОС на другой файл в репозитории становится
         # repo_absolute.
         link = self._path_link(self._flat_skill_file(), "/other.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.os_absolute)
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other.md")
-        self.assertTrue(link.path.exists)
 
     def test_os_absolute_dir_self(self):
         # EN: An OS-absolute raw link to the directory skill's main file becomes
@@ -233,10 +222,9 @@ class TestPathLink(unittest.TestCase):
         # RU: Абсолютный путь ОС на основной файл директорийного скилла
         # становится относительным.
         link = self._path_link(self._dir_skill_file(), "/dir/SKILL.md")
-        self.assertEqual(link.path_raw.kind, LinkKind.os_absolute)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./SKILL.md")
-        self.assertTrue(link.path.exists)
 
     def test_os_absolute_dir_inside(self):
         # EN: An OS-absolute raw link to a file inside the skill directory
@@ -244,9 +232,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Абсолютный путь ОС на файл внутри директории скилла становится
         # относительным.
         link = self._path_link(self._dir_skill_file(), "/dir/details.md")
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./details.md")
-        self.assertTrue(link.path.exists)
 
     def test_os_absolute_dir_outside(self):
         # EN: An OS-absolute raw link to a file outside the skill directory but
@@ -254,9 +241,8 @@ class TestPathLink(unittest.TestCase):
         # RU: Абсолютный путь ОС на файл вне директории скилла, но внутри
         # репозитория, становится repo_absolute.
         link = self._path_link(self._dir_skill_file(), "/other/SKILL.md")
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other/SKILL.md")
-        self.assertTrue(link.path.exists)
 
     # ==================================================================
     # Outside repository
@@ -277,26 +263,22 @@ class TestPathLink(unittest.TestCase):
     # ==================================================================
 
     def test_skill_md_fallback(self):
-        # EN: A link ending with .skill resolves to an existing .skill.md file
-        # and reports exists=True.
-        # RU: Ссылка, заканчивающаяся на .skill, разрешается в существующий
-        # файл .skill.md и сообщает exists=True.
+        # EN: A link ending with .skill resolves to an existing .skill.md file.
+        # RU: Ссылка, заканчивающаяся на .skill, разрешается в существующий файл .skill.md.
         skill_file = self._dir_skill_file()
         target = self.dir_dir / "a-b-c.skill.md"
         target.write_text("# Skill\n")
         link = self._path_link(skill_file, "./a-b-c.skill")
-        self.assertTrue(link.path.exists)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./a-b-c.skill.md")
 
-    def test_missing_file_exists_false(self):
-        # EN: A link to a non-existent file that stays inside the repository
-        # gets exists=False and is treated as repo_absolute.
-        # RU: Ссылка на несуществующий файл внутри репозитория получает
-        # exists=False и считается repo_absolute.
+    def test_missing_file_inside_skill_folder(self):
+        # EN: A link to a non-existent file inside the skill folder is still
+        # classified as a skill-internal link.
+        # RU: Ссылка на несуществующий файл внутри папки скилла всё равно
+        # классифицируется как внутри-скилловая.
         link = self._path_link(self._dir_skill_file(), "./missing.md")
-        self.assertFalse(link.path.exists)
-        self.assertEqual(link.path.kind, LinkKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
 
     def test_web_path_raises(self):
         # EN: Passing a web URI as a raw path to PathLink must raise ValueError
@@ -327,20 +309,19 @@ class TestPathLink(unittest.TestCase):
         link = PathLink(
             raw="[[#Return ConflictResult<T> from the resolver]]",
             text="Return ConflictResult<T> from the resolver",
-            format="wiki",
+            format=WikilinkBuilder,
             start=0,
             end=1,
-            skill_file=skill_file,
+            skill_file_value=skill_file,
             raw_path="",
             header_value="#Return ConflictResult<T> from the resolver",
             is_image_value=False,
         )
         self.assertEqual(link.path_raw.path, "")
-        self.assertEqual(link.path_raw.kind, LinkKind.repo_absolute)
-        self.assertEqual(link.path.kind, LinkKind.relative)
+        self.assertEqual(link.path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./SKILL.md")
         self.assertEqual(link.path.os_path, skill_file.path)
-        self.assertTrue(link.path.exists)
         self.assertEqual(link.header, "#Return ConflictResult<T> from the resolver")
 
     def test_fragment_only_link_resolves_to_self_in_flat_skill(self):
@@ -350,17 +331,16 @@ class TestPathLink(unittest.TestCase):
         link = PathLink(
             raw="[[#Return ConflictResult<T> from the resolver]]",
             text="Return ConflictResult<T> from the resolver",
-            format="wiki",
+            format=WikilinkBuilder,
             start=0,
             end=1,
-            skill_file=skill_file,
+            skill_file_value=skill_file,
             raw_path="",
             header_value="#Return ConflictResult<T> from the resolver",
             is_image_value=False,
         )
         self.assertEqual(link.path.formatted, "./guide.skill.md")
         self.assertEqual(link.path.os_path, skill_file.path)
-        self.assertTrue(link.path.exists)
 
 
 if __name__ == "__main__":

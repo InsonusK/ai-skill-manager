@@ -112,25 +112,24 @@ class LinkWithContext:
 
     @property
     def is_link_to_skill_file(self) -> bool:
-        """Return ``True`` if the link points inside the current skill.
+        """Return ``True`` if the link points to an existing file of the current skill.
 
-        Возвращает ``True``, если ссылка указывает внутрь текущего навыка.
+        Возвращает ``True``, если ссылка указывает на существующий файл текущего навыка.
         """
-        # EN: Flat skills only accept links to their single markdown file.
-        # RU: Плоские навыки принимают только ссылки на свой единственный markdown-файл.
-        if self.context.skill.format.is_flat:
-            return self.os_absolute_path == self.context.skill.file_path
-
-        # EN: Non-directory formats cannot be skill-internal links.
-        # RU: Недиректорийные форматы не могут быть внутри-скилловыми ссылками.
-        if not self.context.skill.format.is_dir:
+        skill = self.context.skill
+        target = self.os_absolute_path
+        if target is None:
             return False
 
-        assert self.context.skill.folder_path is not None, "None folder path in dir skill"
+        # EN: Flat skills only accept links to their single markdown file.
+        # RU: Плоские навыки принимают только ссылки на свой единственный markdown-файл.
+        if skill.format.is_flat:
+            return target == skill.file_path
 
-        # EN: Directory skills accept links anywhere under the skill folder.
-        # RU: Директорийные навыки принимают ссылки внутри папки навыка.
-        return self.os_absolute_path.is_relative_to(self.context.skill.folder_path)
+        # EN: Directory skills accept links to any existing file under the skill folder.
+        # RU: Директорийные навыки принимают ссылки на любой существующий файл внутри папки навыка.
+        assert skill.folder_path is not None, "None folder path in dir skill"
+        return target.is_relative_to(skill.folder_path) and target.exists()
 
     def is_link_to_another_skill_file(self, other_skills: List[Skill]) -> Optional[Tuple[Skill, SkillFile]]:
         """Return the other skill and SkillFile this link targets, if any.
@@ -171,7 +170,7 @@ class LinkWithContext:
         # EN: Web links are kept unchanged.
         # RU: Веб-ссылки оставляем без изменений.
         if isinstance(self.base, WebLink):
-            return self.base.path
+            return self.base.path.formatted
 
         # EN: Links inside the same skill are rewritten relative to the skill folder.
         # RU: Ссылки внутри того же навыка переписываются относительно папки навыка.

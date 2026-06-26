@@ -5,8 +5,9 @@ from pathlib import Path
 
 from ai_skill_manager.discovery.link.builder.wikilink import WikilinkBuilder
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink
-from ai_skill_manager.entities.link_kind import LinkKind
+from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 from . import MOCK_DIR
 
@@ -46,9 +47,10 @@ class TestWikilinkBuilder(unittest.TestCase):
         links = builder.search("[[./file.md|text]]", skill_file)
         self.assertEqual(len(links), 1)
         self.assertIsInstance(links[0], PathLink)
+        self.assertIs(links[0].skill_file, skill_file)
         self.assertEqual(links[0].path_raw.path, "./file.md")
-        self.assertEqual(links[0].path_raw.kind, LinkKind.relative)
-        self.assertEqual(links[0].path.kind, LinkKind.relative)
+        self.assertEqual(links[0].path_raw.kind, PathKind.relative)
+        self.assertEqual(links[0].path.kind, LinkKind.skill)
 
     def test_finds_wiki_link_without_text(self):
         builder = WikilinkBuilder()
@@ -84,7 +86,8 @@ class TestWikilinkBuilder(unittest.TestCase):
         self.assertIsInstance(links[0], PathLink)
         self.assertEqual(links[0].raw, "[[skills/🧩validated/{solution}.skill.md|integration.solution.skill]]")
         self.assertEqual(links[0].path_raw.path, "skills/🧩validated/{solution}.skill.md")
-        self.assertEqual(links[0].path_raw.kind, LinkKind.repo_absolute)
+        self.assertEqual(links[0].path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(links[0].path.kind, LinkKind.skill)
         self.assertEqual(links[0].text, "integration.solution.skill")
 
 

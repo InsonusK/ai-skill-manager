@@ -167,6 +167,11 @@ class LinkAdapter(absAdapter):
         if isinstance(link, WebLink):
             return None
 
+        # Image links point to assets, not skill files, so leave them unchanged.
+        # Ссылки на изображения указывают на ассеты, а не файлы скиллов, поэтому оставляем их без изменений.
+        if link.is_image:
+            return None
+
         # Build context and resolve the skill-format target.
         # Формируем контекст и разрешаем цель в формате skill-link.
         link_context = LinkWithContext.build(skill, skill_file, link)

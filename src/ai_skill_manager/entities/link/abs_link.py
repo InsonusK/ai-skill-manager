@@ -5,9 +5,16 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
-from typing import Literal, Optional, Type
+from typing import TYPE_CHECKING, Optional, Type
+
+from .link_kind import LinkKind
+
+if TYPE_CHECKING:
+    from ...discovery.link.builder.abs_link_builder import absLinkBuilder
+    from ..skill_file import SkillFile
+    from .link_path import LinkPath
 
 
 @dataclass(frozen=True)
@@ -15,19 +22,26 @@ class absLink(ABC):
     """Abstract base class for all links found in markdown content.
 
     Holds the fields that are common to every kind of link: the raw source
-    text, display text, format, offsets and optional fragment.
+    text, resolved target information, display text, builder format, offsets,
+    optional fragment, image flag and owning skill file.
 
     Базовый абстрактный класс для всех ссылок, найденных в markdown-содержимом.
-    Содержит общие для любого вида ссылки поля: исходный текст, отображаемый
-    текст, формат, смещения и опциональный фрагмент.
+    Содержит общие для любого вида ссылки поля: исходный текст, разрешённую
+    информацию о цели, отображаемый текст, формат сборщика, смещения,
+    опциональный фрагмент, флаг изображения и файл скилла, которому принадлежит
+    ссылка.
 
     Attributes:
         raw: The exact link text as it appears in the source.
             Точный текст ссылки в исходнике.
+        kind: Where the resolved link points (skill, source or external).
+            Куда ведёт разрешённая ссылка (skill, source или external).
+        path: Resolved path information for the link target.
+            Разрешённая информация о пути цели ссылки.
         text: The display text of the link.
             Отображаемый текст ссылки.
-        format: Whether the link was written as markdown or wiki link.
-            Была ли ссылка записана как markdown- или wiki-ссылка.
+        format: Builder class that created this link (markdown or wiki).
+            Класс сборщика, создавшего эту ссылку (markdown или wiki).
         start: Character offset where the link starts in the source content.
             Смещение символа, с которого ссылка начинается в исходном тексте.
         end: Character offset where the link ends in the source content.
@@ -36,15 +50,19 @@ class absLink(ABC):
             Опциональная часть фрагмента ``#fragment`` цели ссылки.
         is_image: ``True`` for image links (``![...](...)``).
             ``True`` для ссылок-изображений (``![...](...)``).
+        skill_file: The skill file that contains the link.
+            Файл скилла, содержащий ссылку.
     """
 
     raw: str
+    path: "LinkPath" = field(init=False)
     text: str
-    format: Literal["markdown", "wiki"]
+    format: Type["absLinkBuilder"]
     start: int
     end: int
     header: Optional[str] = field(init=False)
     is_image: bool = field(init=False)
+    skill_file: Optional["SkillFile"] = field(init=False)
 
     @property
     def link_type(self) -> Type["absLink"]:
@@ -58,14 +76,13 @@ class absLink(ABC):
         return type(self)
 
     @property
-    @abstractmethod
     def target(self) -> str:
-        """Return the link target as a string.
+        """Return the normalized link target.
 
-        Вернуть цель ссылки в виде строки.
+        Вернуть нормализованную цель ссылки.
 
         Returns:
-            For path links the formatted path, for web links the URL.
-            Для путевых ссылок — форматированный путь, для веб-ссылок — URL.
+            The formatted target path or URL.
+            Отформатированный путь цели или URL.
         """
-        ...
+        return self.path.formatted

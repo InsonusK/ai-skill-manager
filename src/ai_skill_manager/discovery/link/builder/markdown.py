@@ -86,10 +86,11 @@ class MarkdownLinkBuilder(absLinkBuilder):
             return WebLink(
                 raw=raw,
                 text=text,
-                path=path_clean,
-                format="markdown",
+                url=path_clean,
+                format=MarkdownLinkBuilder,
                 start=start,
                 end=end,
+                skill_file_value=skill_file,
                 header_value=header or None,
                 is_image_value=self._is_image(raw),
             )
@@ -97,10 +98,10 @@ class MarkdownLinkBuilder(absLinkBuilder):
         return PathLink(
             raw=raw,
             text=text,
-            format="markdown",
+            format=MarkdownLinkBuilder,
             start=start,
             end=end,
-            skill_file=skill_file,
+            skill_file_value=skill_file,
             raw_path=path_clean,
             header_value=header or None,
             is_image_value=self._is_image(raw),

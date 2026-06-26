@@ -94,20 +94,6 @@ class LinkValidationRule(absValidationRule):
         if isinstance(link.base, WebLink):
             return None
 
-        # Internal links must point to an existing file.
-        # Внутренние ссылки должны указывать на существующий файл.
-        if isinstance(link.base, PathLink) and not link.base.path.exists:
-            return ValidationError(
-                message="Link {link_raw}\nfile {file}\nPos ({start}-{end}): doesn't have absolute OS path",
-                severity=ValidationSeverity.ERROR,
-                params={
-                    "link_raw": link.base.raw,
-                    "start": link.base.start,
-                    "end": link.base.end,
-                    "file": link.context.file.path
-                },
-            )
-
         # Links that point to a file inside the same skill are valid.
         # Ссылки, указывающие на файл внутри того же навыка, считаются корректными.
         if link.is_link_to_skill_file:

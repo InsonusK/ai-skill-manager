@@ -10,7 +10,7 @@ Provides shared helpers for classifying link paths and splitting fragments.
 from abc import ABC
 from typing import TYPE_CHECKING, List, Tuple
 
-from ....entities.link_kind import LinkKind
+from ....entities.path_kind import PathKind
 
 if TYPE_CHECKING:
     from ....entities.skill_file import SkillFile
@@ -82,32 +82,32 @@ class absLinkBuilder(ABC):
         """
         return raw.startswith("!")
 
-    def _get_kind(self, path: str) -> LinkKind:
-        """Classify a local link path into a :class:`LinkKind`.
+    def _get_kind(self, path: str) -> PathKind:
+        """Classify a local link path into a :class:`PathKind`.
 
-        Classify a local link path into a :class:`LinkKind`.
+        Classify a local link path into a :class:`PathKind`.
 
-        Классифицировать локальный путь ссылки по значению :class:`LinkKind`.
+        Классифицировать локальный путь ссылки по значению :class:`PathKind`.
 
         Args:
             path: Clean link path without fragment. /
                 Очищенный путь ссылки без фрагмента.
 
         Returns:
-            The determined link kind. / Определённый вид ссылки.
+            The determined path kind. / Определённый вид пути.
 
         Raises:
             ValueError: If the path cannot be classified or is a web URI. /
                 Если путь невозможно классифицировать или является веб-URI.
         """
         if self._is_relative(path):
-            return LinkKind.relative
+            return PathKind.relative
         elif self._is_os_absolute(path):
-            return LinkKind.os_absolute
+            return PathKind.os_absolute
         elif self._is_http_link(path):
             raise ValueError(f"Web links are represented by WebLink: {path}")
         else:
-            return LinkKind.repo_absolute
+            return PathKind.repo_absolute
 
     def _is_http_link(self, path: str) -> bool:
         """Return ``True`` for web/mailto/ftp/file links.
