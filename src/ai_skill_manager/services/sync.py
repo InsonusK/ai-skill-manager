@@ -27,6 +27,7 @@ def run_sync(
     adapters: Optional[Sequence[Type[absAdapter]]] = None,
     dry_run: bool = False,
     cleanup_orphans: bool = True,
+    force: bool = False,
     progress: Optional[ProgressCallback] = None,
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
@@ -47,6 +48,9 @@ def run_sync(
             Если ``True``, не записывать изменения.
         cleanup_orphans: If ``True``, remove orphan skills from target.
             Если ``True``, удалять осиротевшие скиллы из целевой директории.
+        force: If ``True``, ignore hash and adapter-version checks and copy
+            every skill. / Если ``True``, игнорировать проверки хеша и версий
+            адаптеров и копировать каждый скилл.
         progress: Optional ``(stage, current, total)`` callback for progress
             reporting. / Опциональный callback для отчёта о прогрессе.
 
@@ -116,7 +120,8 @@ def run_sync(
 
             skill_target_dir = target_dir / name
             source_hash = compute_skill_hash(skill)
-            if _is_skill_up_to_date(skill, skill_target_dir, adapters_version):
+            if not force and _is_skill_up_to_date(
+                    skill, skill_target_dir, adapters_version):
                 new_skill = _build_target_skill(
                     skill_target_dir / "SKILL.md", skill_target_dir)
             else:
@@ -166,7 +171,7 @@ def run_sync(
                 "validators": validator_versions,
                 "adapters": adapters_version
             }
-            write_managed_state(new_skill.folder_path, state)
+            _write_managed_state_if_changed(new_skill.folder_path, state)
             if progress is not None:
                 progress("write_managed_state", index, len(copied_skills))
 
@@ -279,6 +284,21 @@ def _is_skill_up_to_date(
         state.get("hash") == compute_skill_hash(skill)
         and state.get("adapters") == adapters_version
     )
+
+
+def _write_managed_state_if_changed(skill_dir: Path, state: dict) -> None:
+    """Write managed state only when it differs from the existing state.
+
+    Write managed state only when it differs from the existing state.
+
+    Записывает управляемое состояние только если оно отличается от уже
+    существующего. Это избавляет от лишнего перетирания файла для скиллов,
+    которые не изменились.
+    """
+    existing = read_managed_state(skill_dir)
+    if existing == state:
+        return
+    write_managed_state(skill_dir, state)
 
 
 def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:

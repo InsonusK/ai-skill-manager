@@ -245,6 +245,39 @@ class TestRunSync(unittest.TestCase):
 
         self.assertNotIn("# stale", (unmanaged_target / "SKILL.md").read_text())
 
+    def test_force_copies_unchanged_skill(self):
+        skill = self._dir_skill("skill")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        target_file = self.target_dir / "skill" / "SKILL.md"
+        target_file.write_text("---\nname: skill\n---\n# stale\n")
+
+        result = run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            self.target_dir,
+            force=True,
+        )
+
+        self.assertNotIn("# stale", target_file.read_text())
+        self.assertEqual(result["skipped_count"], 0)
+
+    def test_force_copies_unchanged_flat_skill(self):
+        md = self.source_dir / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n# Guide\n")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        target_file = self.target_dir / "guide" / "SKILL.md"
+        target_file.write_text("---\nname: guide\n---\n# stale\n")
+
+        result = run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            self.target_dir,
+            force=True,
+        )
+
+        self.assertNotIn("# stale", target_file.read_text())
+        self.assertEqual(result["skipped_count"], 0)
+
 
 class TestRemoveOrphans(unittest.TestCase):
     def setUp(self):

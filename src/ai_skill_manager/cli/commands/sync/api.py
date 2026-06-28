@@ -120,6 +120,7 @@ def run_sync(
         target_dir=target_dir,
         dry_run=dry_run,
         cleanup_orphans=remove_orphans,
+        force=force,
         progress=progress,
     )
 
