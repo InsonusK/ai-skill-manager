@@ -12,6 +12,7 @@ from typing import Optional, Sequence
 
 from ....config import build_sources_from_config, load_config
 from ....entities import Source
+from ....progress import ProgressCallback
 from ....services.sync import run_sync as run_sync_service
 
 DEFAULT_CONFIG = "ai-skills.yaml"
@@ -28,6 +29,7 @@ def run_sync(
     remove_orphans: Optional[bool] = None,
     dry_run: bool = False,
     force: bool = False,
+    progress: Optional[ProgressCallback] = None,
 ) -> dict:
     """Run synchronization and return the result dictionary.
 
@@ -52,6 +54,8 @@ def run_sync(
             Если ``True``, не записывать изменения.
         force: If ``True``, skip hash and version checks. /
             Если ``True``, пропустить проверку хеша и версии.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         Result dictionary from the sync service. / Словарь результата от сервиса синхронизации.
@@ -116,6 +120,7 @@ def run_sync(
         target_dir=target_dir,
         dry_run=dry_run,
         cleanup_orphans=remove_orphans,
+        progress=progress,
     )
 
     # Preserve legacy fields for formatters and callers.
