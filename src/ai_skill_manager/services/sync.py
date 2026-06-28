@@ -107,7 +107,14 @@ def run_sync(
         # Run adapters on the copied skills and count replaced links.
         # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
         skill_mapping = dict(zip(skills, copied_skills))
-        adapter = Adapter(copied_skills, adapter_list, skill_mapping=skill_mapping)
+        copied_files: Dict[Path, Path] = {}
+        adapter = Adapter(
+            copied_skills,
+            adapter_list,
+            skill_mapping=skill_mapping,
+            target_dir=target_dir,
+            copied_files=copied_files,
+        )
         adapters_version = [
             {"name": registered_adapter[0],
              "version": registered_adapter[1]}

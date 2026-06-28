@@ -196,51 +196,61 @@ class TestPathLink(unittest.TestCase):
     # ==================================================================
 
     def test_os_absolute_flat_self(self):
-        # EN: An OS-absolute raw link is normalized to the repository root. If
-        # it points to the flat skill's own file, it becomes relative.
-        # RU: Абсолютный путь ОС нормализуется к корню репозитория. Если он
-        # указывает на собственный файл плоского скилла, он становится
-        # относительным.
-        link = self._path_link(self._flat_skill_file(), "/guide.skill.md")
+        # EN: An OS-absolute raw link that resolves inside the repository root
+        # is treated as repo-absolute. If it points to the flat skill's own
+        # file, it becomes relative.
+        # RU: Абсолютный путь ОС, разрешающийся внутри корня репозитория,
+        # считается repo-absolute. Если он указывает на собственный файл
+        # плоского скилла, он становится относительным.
+        link = self._path_link(
+            self._flat_skill_file(), str(self.flat_dir / "guide.skill.md")
+        )
         self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
         self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./guide.skill.md")
 
     def test_os_absolute_flat_other(self):
-        # EN: An OS-absolute raw link to another file in the repository becomes
-        # repo_absolute.
-        # RU: Абсолютный путь ОС на другой файл в репозитории становится
-        # repo_absolute.
-        link = self._path_link(self._flat_skill_file(), "/other.md")
+        # EN: An OS-absolute raw link inside the repository root to another file
+        # becomes repo_absolute.
+        # RU: Абсолютный путь ОС внутри корня репозитория на другой файл
+        # становится repo_absolute.
+        link = self._path_link(self._flat_skill_file(), str(self.flat_dir / "other.md"))
         self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
         self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other.md")
 
     def test_os_absolute_dir_self(self):
-        # EN: An OS-absolute raw link to the directory skill's main file becomes
-        # relative.
-        # RU: Абсолютный путь ОС на основной файл директорийного скилла
-        # становится относительным.
-        link = self._path_link(self._dir_skill_file(), "/dir/SKILL.md")
+        # EN: An OS-absolute raw link inside the repository root to the
+        # directory skill's main file becomes relative.
+        # RU: Абсолютный путь ОС внутри корня репозитория на основной файл
+        # директорийного скилла становится относительным.
+        link = self._path_link(
+            self._dir_skill_file(), str(self.repo_root / "dir/SKILL.md")
+        )
         self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
         self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./SKILL.md")
 
     def test_os_absolute_dir_inside(self):
-        # EN: An OS-absolute raw link to a file inside the skill directory
-        # becomes relative.
-        # RU: Абсолютный путь ОС на файл внутри директории скилла становится
-        # относительным.
-        link = self._path_link(self._dir_skill_file(), "/dir/details.md")
+        # EN: An OS-absolute raw link inside the repository root to a file
+        # inside the skill directory becomes relative.
+        # RU: Абсолютный путь ОС внутри корня репозитория на файл внутри
+        # директории скилла становится относительным.
+        link = self._path_link(
+            self._dir_skill_file(), str(self.repo_root / "dir/details.md")
+        )
         self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./details.md")
 
     def test_os_absolute_dir_outside(self):
-        # EN: An OS-absolute raw link to a file outside the skill directory but
-        # inside the repository becomes repo_absolute.
-        # RU: Абсолютный путь ОС на файл вне директории скилла, но внутри
-        # репозитория, становится repo_absolute.
-        link = self._path_link(self._dir_skill_file(), "/other/SKILL.md")
+        # EN: An OS-absolute raw link inside the repository root to a file
+        # outside the skill directory but inside the repository becomes
+        # repo_absolute.
+        # RU: Абсолютный путь ОС внутри корня репозитория на файл вне
+        # директории скилла, но внутри репозитория, становится repo_absolute.
+        link = self._path_link(
+            self._dir_skill_file(), str(self.repo_root / "other/SKILL.md")
+        )
         self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other/SKILL.md")
 
@@ -256,6 +266,18 @@ class TestPathLink(unittest.TestCase):
         # репозитория, должна выбрасывать ValueError.
         with self.assertRaises(ValueError):
             self._path_link(self._dir_skill_file(), "../../outside.md")
+
+    def test_os_absolute_outside_repo(self):
+        # EN: An OS-absolute raw link that resolves outside the repository root
+        # becomes an OS link and records that it is outside the repository.
+        # RU: Абсолютный путь ОС, разрешающийся за пределами корня репозитория,
+        # становится OS-ссылкой и фиксирует, что он вне репозитория.
+        link = self._path_link(self._dir_skill_file(), "/tmp/outside-repo.md")
+        self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
+        self.assertEqual(link.path.kind, LinkKind.os)
+        self.assertFalse(link.path.is_inside_repo)
+        self.assertEqual(link.path.repo_path, None)
+        self.assertEqual(link.path.formatted, "/tmp/outside-repo.md")
 
     # ==================================================================
     # Additional cases
@@ -299,6 +321,39 @@ class TestPathLink(unittest.TestCase):
         # RU: PathLink.link_type возвращает класс PathLink.
         link = self._path_link(self._flat_skill_file(), "./guide.skill.md")
         self.assertIs(link.link_type, PathLink)
+
+    def test_exists_property_true(self):
+        # EN: PathLink.exists is True when the target file exists.
+        # RU: PathLink.exists равен True, когда целевой файл существует.
+        link = self._path_link(self._flat_skill_file(), "./guide.skill.md")
+        self.assertTrue(link.exists)
+        self.assertTrue(link.path.exists)
+
+    def test_exists_property_false(self):
+        # EN: PathLink.exists is False when the target file does not exist.
+        # RU: PathLink.exists равен False, когда целевой файл не существует.
+        link = self._path_link(self._dir_skill_file(), "./missing.md")
+        self.assertFalse(link.exists)
+        self.assertFalse(link.path.exists)
+
+    def test_has_explicit_md_suffix_true(self):
+        # EN: A link with an explicit .md suffix records the flag as True.
+        # RU: Ссылка с явным суффиксом .md фиксирует флаг как True.
+        link = self._path_link(self._dir_skill_file(), "./details.md")
+        self.assertTrue(link.has_explicit_md_suffix)
+        self.assertTrue(link.path.has_explicit_md_suffix)
+
+    def test_has_explicit_md_suffix_false(self):
+        # EN: A link without an explicit .md suffix records the flag as False,
+        # even when the fallback resolves to an existing .md file.
+        # RU: Ссылка без явного суффикса .md фиксирует флаг как False, даже
+        # если fallback разрешается в существующий .md файл.
+        skill_file = self._dir_skill_file()
+        target = self.dir_dir / "a-b-c.skill.md"
+        target.write_text("# Skill\n")
+        link = self._path_link(skill_file, "./a-b-c.skill")
+        self.assertFalse(link.has_explicit_md_suffix)
+        self.assertTrue(link.exists)
 
     def test_fragment_only_link_resolves_to_self_in_dir_skill(self):
         # EN: A fragment-only wiki link such as [[#Header]] must resolve to the

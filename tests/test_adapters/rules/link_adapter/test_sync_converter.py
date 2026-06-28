@@ -180,17 +180,36 @@ class TestOsAbsolute(_SyncFixtureHelper):
 
     path_type = "os_absolute"
 
-    def test_os_absolute_to_skill_main_file(self):
-        """RU: OS-absolute ссылка на основной файл другого скилла.
+    def test_os_absolute_outside_repo_copies_to_files(self):
+        """RU: OS-absolute ссылка на файл вне репозитория копируется в files/.
 
-        Исходный путь: ``/skills/category/skill-b.skill/skill-b.skill.md``
-        После синхронизации: ``skill:skill-b``
+        Исходный путь: ``/tmp/.../external.md``
+        После синхронизации: ``./files/external.md`` и файл в ``files/``.
         """
-        target_dir = self._run_sync_case("os_absolute")
-        expected_dir = MOCKS_DIR / self.path_type / "os_absolute" / "target"
+        case_dir = MOCKS_DIR / self.path_type / "os_absolute"
+        source_dir = self.tmpdir / "source"
+        shutil.copytree(case_dir / "source", source_dir)
+        target_dir = self.tmpdir / "target"
 
-        self._assert_skill_md_equal(target_dir, expected_dir, "skill-a")
-        self._assert_skill_md_equal(target_dir, expected_dir, "skill-b")
+        external_file = self.tmpdir / "external.md"
+        external_file.write_text("# External\n", encoding="utf-8")
+
+        skill_a_md = source_dir / "skills" / "category" / "skill-a.skill" / "skill-a.skill.md"
+        skill_a_md.write_text(
+            f"---\nname: skill-a\n---\n# Skill A\n[link]({external_file.as_posix()})\n",
+            encoding="utf-8",
+        )
+
+        result = run_sync([LocalSource(scan_path=source_dir)], target_dir)
+        self.assertEqual(result["skills_count"], 2)
+
+        actual = (target_dir / "skill-a" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(f"[link](./files/external.md)", actual)
+        self.assertTrue((target_dir / "skill-a" / "files" / "external.md").exists())
+        self.assertEqual(
+            (target_dir / "skill-a" / "files" / "external.md").read_text(encoding="utf-8"),
+            "# External\n",
+        )
 
 
 if __name__ == "__main__":

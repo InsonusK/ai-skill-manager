@@ -169,3 +169,29 @@ class LinkWithContext:
             f"More than 1 skill candidate for link {self.base.raw}"
         return skill_candidates[0]
 
+    def target_skill(self, skills: List[Skill]) -> Optional[Skill]:
+        """Return the skill whose folder contains the link target, if any.
+
+        Возвращает навык, папка которого содержит цель ссылки, если такой есть.
+
+        Unlike :meth:`is_link_to_another_skill`, this matches any file inside
+        a skill directory, not only the skill's main file or folder itself.
+
+        В отличие от :meth:`is_link_to_another_skill`, этот метод находит любой
+        файл внутри директории скилла, а не только основной файл или саму папку.
+        """
+        target = self.os_absolute_path
+        if target is None:
+            return None
+        candidates = []
+        for skill in skills:
+            if skill.folder_path is not None and target.is_relative_to(skill.folder_path):
+                candidates.append(skill)
+            elif target == skill.file_path:
+                candidates.append(skill)
+        if len(candidates) == 0:
+            return None
+        assert len(candidates) == 1, \
+            f"More than 1 skill candidate for link {self.base.raw}"
+        return candidates[0]
+

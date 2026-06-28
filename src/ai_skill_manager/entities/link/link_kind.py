@@ -18,5 +18,8 @@ class LinkKind(Enum):
     source = "source"
     """Inside the repository but outside the skill. / Внутри репозитория, но вне скилла."""
 
+    os = "os"
+    """Absolute filesystem path outside the repository root. / Абсолютный путь файловой системы за пределами корня репозитория."""
+
     external = "external"
     """Outside the repository (web, mailto, etc.). / Вне репозитория (web, mailto и т.д.)."""

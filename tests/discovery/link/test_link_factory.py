@@ -88,13 +88,13 @@ class TestLinkFactory(unittest.TestCase):
             "[absolute](/tmp/file.md)": {
                 "path_raw": "/tmp/file.md",
                 "raw_kind": PathKind.os_absolute,
-                "kind": LinkKind.source,
+                "kind": LinkKind.os,
                 "text": "absolute",
                 "format": MarkdownLinkBuilder,
                 "header": None,
                 "is_image": False,
                 "cls": PathLink,
-                "formatted": "tmp/file.md",
+                "formatted": "/tmp/file.md",
             },
             "[web](https://example.com)": {
                 "url": "https://example.com",

@@ -27,11 +27,11 @@ class TestLinkAdapter(unittest.TestCase):
         shutil.copytree(src, dst)
         return dst
 
-    def _skill(self, file_path: Path, folder_path: Path | None = None) -> Skill:
+    def _skill(self, file_path: Path, folder_path: Path | None = None, repo_path: Path | None = None) -> Skill:
         return Skill(
             file_path=file_path,
             folder_path=folder_path,
-            source=LocalSource(scan_path=file_path.parent),
+            source=LocalSource(scan_path=file_path.parent, repo_path=repo_path),
             format=SkillFormat.Agent if folder_path else SkillFormat.HumanFlat,
             source_path=file_path.parent,
         )
@@ -86,6 +86,97 @@ class TestLinkAdapter(unittest.TestCase):
 
         self.assertEqual(msg.params["count"], 0)
         self.assertIn("https://example.com", md.read_text())
+
+    def test_copies_source_file_to_files(self):
+        # EN: A link to a file outside any skill is copied into files/.
+        # RU: Ссылка на файл вне любого скилла копируется в files/.
+        root = self.tmpdir / "source_file"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n[extra](../extra.md)\n"
+        )
+        (root / "extra.md").write_text("# Extra\n")
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        msg = adapter.adapt(skill, skill)["LinkAdapter"]
+
+        self.assertEqual(msg.params["count"], 1)
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[extra](./files/extra.md)", content)
+        self.assertTrue((skill_dir / "files" / "extra.md").exists())
+
+    def test_copies_os_file_to_files(self):
+        # EN: An OS-absolute link to a file outside the repo is copied into files/.
+        # RU: OS-абсолютная ссылка на файл вне репозитория копируется в files/.
+        root = self.tmpdir / "os_file"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        external = self.tmpdir / "external.md"
+        external.write_text("# External\n")
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: skill\n---\n# Skill\n[external]({external.as_posix()})\n"
+        )
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        msg = adapter.adapt(skill, skill)["LinkAdapter"]
+
+        self.assertEqual(msg.params["count"], 1)
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[external](./files/external.md)", content)
+        self.assertTrue((skill_dir / "files" / "external.md").exists())
+
+    def test_renames_colliding_external_file_names(self):
+        # EN: Two external files with the same name get unique target names.
+        # RU: Два внешних файла с одинаковым именем получают уникальные целевые имена.
+        root = self.tmpdir / "collision"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (root / "a" / "extra.md").parent.mkdir(parents=True)
+        (root / "a" / "extra.md").write_text("# A\n")
+        (root / "b" / "extra.md").parent.mkdir(parents=True)
+        (root / "b" / "extra.md").write_text("# B\n")
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n"
+            "[a](../a/extra.md)\n[b](../b/extra.md)\n"
+        )
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        msg = adapter.adapt(skill, skill)["LinkAdapter"]
+
+        self.assertEqual(msg.params["count"], 2)
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[a](./files/extra_1.md)", content)
+        self.assertIn("[b](./files/extra.md)", content)
+        self.assertTrue((skill_dir / "files" / "extra.md").exists())
+        self.assertTrue((skill_dir / "files" / "extra_1.md").exists())
+
+    def test_copies_image_link_to_files(self):
+        # EN: An image link to a file outside any skill is copied into files/.
+        # RU: Ссылка на изображение вне любого скилла копируется в files/.
+        root = self.tmpdir / "image"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n![diagram](../diagram.png)\n"
+        )
+        (root / "diagram.png").write_text("png")
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        msg = adapter.adapt(skill, skill)["LinkAdapter"]
+
+        self.assertEqual(msg.params["count"], 1)
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("![diagram](./files/diagram.png)", content)
+        self.assertTrue((skill_dir / "files" / "diagram.png").exists())
 
 
 if __name__ == "__main__":
