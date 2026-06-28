@@ -125,26 +125,17 @@ class LinkValidationRule(absValidationRule):
         if link.is_link_to_another_skill_file(skills) is not None:
             return None
 
-        # Links to files that belong to a skill outside the current sync set are
-        # not allowed. If a target lies inside a skill directory but that skill
-        # is not in the provided list, report an error.
-        # Ссылки на файлы скилла, который не входит в текущее копирование,
-        # запрещены. Если цель лежит внутри директории скилла, но этот скилл
-        # отсутствует в переданном списке, сообщаем об ошибке.
+        # Links to files inside another skill that is part of the current sync
+        # set are valid. This includes non-markdown files such as implementation
+        # templates, which are not listed as skill files but are still copied
+        # together with the skill.
+        # Ссылки на файлы внутри другого скилла, входящего в текущее копирование,
+        # считаются корректными. Это включает не-markdown файлы, например шаблоны
+        # реализации, которые не являются skill-файлами, но копируются вместе со
+        # скиллом.
         target_skill = link.target_skill(skills)
-        if target_skill is not None and target_skill is not link.context.skill:
-            return ValidationError(
-                message="Link {link_raw}\nPath {link}\nFile {file}\nPos ({start}-{end}): target belongs to skill '{target_skill}' which is not included in the current sync",
-                severity=ValidationSeverity.ERROR,
-                params={
-                    "link_raw": link.base.raw,
-                    "link": link.base.path.formatted,
-                    "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
-                    "target_skill": target_skill.properties.name or target_skill.file_path.as_posix(),
-                    "start": link.base.start,
-                    "end": link.base.end,
-                },
-            )
+        if target_skill is not None:
+            return None
 
         # Anything else (source or OS file) is allowed as long as the file exists.
         # Всё остальное (source- или OS-файл) разрешено, пока файл существует.
