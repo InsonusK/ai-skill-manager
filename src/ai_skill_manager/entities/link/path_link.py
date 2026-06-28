@@ -41,9 +41,10 @@ class PathRaw:
 
 @dataclass(frozen=True)
 class PathLink(absLink):
-    """A link that points to a file inside the scanned source.
+    """A link that points to a file inside the scanned source or on the OS.
 
-    Ссылка, указывающая на файл внутри сканируемого источника.
+    Ссылка, указывающая на файл внутри сканируемого источника или в файловой
+    системе.
 
     The constructor requires a :class:`SkillFile` because resolving a path link
     needs the owning skill, the file path and the repository root.
@@ -82,8 +83,23 @@ class PathLink(absLink):
         path_info = _resolve_path(skill_file_value, raw_path, raw_kind)
 
         object.__setattr__(self, "path_raw", PathRaw(path=raw_path, kind=raw_kind))
-        #object.__setattr__(self, "kind", path_info.kind)
         object.__setattr__(self, "path", path_info)
+
+    @property
+    def exists(self) -> bool:
+        """Return whether the link target file exists on disk.
+
+        Вернуть, существует ли целевой файл ссылки на диске.
+        """
+        return self.path.exists
+
+    @property
+    def has_explicit_md_suffix(self) -> bool:
+        """Return whether the raw link had an explicit ``.md`` suffix.
+
+        Вернуть, заканчивался ли исходный путь явным суффиксом ``.md``.
+        """
+        return self.path.has_explicit_md_suffix
 
 
 def _classify_raw_path(path: str) -> PathKind:
@@ -109,6 +125,14 @@ def _classify_raw_path(path: str) -> PathKind:
     if path.startswith("/"):
         return PathKind.os_absolute
     return PathKind.repo_absolute
+
+
+def _has_explicit_md_suffix(path: str) -> bool:
+    """Return ``True`` if the raw path ends with an explicit ``.md`` suffix.
+
+    Вернуть ``True``, если исходный путь заканчивается явным суффиксом ``.md``.
+    """
+    return path.lower().endswith(".md")
 
 
 def _existing_file(path: Path) -> Optional[Path]:
@@ -143,23 +167,28 @@ def _resolve_path(
     raw_path: str,
     raw_kind: PathKind,
 ) -> LinkPath:
-    """Resolve a raw path to a :class:`PathInfo`.
+    """Resolve a raw path to a :class:`LinkPath`.
 
-    Разрешить сырой путь в :class:`PathInfo`.
+    Разрешить сырой путь в :class:`LinkPath`.
 
     The resolution order matches the user specification: a raw link first
     attempts to become ``skill`` (inside the skill folder), otherwise it is
     treated as ``source`` (inside the repository but outside the skill).
-    OS-absolute raw paths are normalised to repo-root resolution.
+    OS-absolute raw paths are resolved as real filesystem paths; when they fall
+    inside the repository root they are classified like repo-absolute paths,
+    otherwise they become ``LinkKind.os``.
 
     Порядок разрешения соответствует спецификации: сырая ссылка сначала
     пытается стать ``skill`` (внутри папки скилла), иначе считается
     ``source`` (внутри репозитория, но вне скилла). Абсолютные пути ОС
-    нормализуются к разрешению от корня репозитория.
+    разрешаются как реальные пути файловой системы; если они попадают внутрь
+    корня репозитория, классифицируются как repo-absolute, иначе становятся
+    ``LinkKind.os``.
     """
     skill = skill_file.skill
     file_path = skill_file.path
     repo_path = skill.source.get_scan_location().repo_path
+    explicit_md = _has_explicit_md_suffix(raw_path)
 
     # A fragment-only link (e.g. [[#header]]) points to the containing skill file.
     # Ссылка только на фрагмент (например, [[#заголовок]]) указывает на файл скилла.
@@ -171,6 +200,9 @@ def _resolve_path(
             formatted="./" + file_path.name,
             repo_path=repo_relative,
             os_path=resolved,
+            exists=resolved.exists(),
+            has_explicit_md_suffix=explicit_md,
+            is_inside_repo=True,
         )
 
     if raw_kind == PathKind.relative:
@@ -178,20 +210,38 @@ def _resolve_path(
     elif raw_kind == PathKind.repo_absolute:
         candidate = (repo_path / raw_path).resolve()
     elif raw_kind == PathKind.os_absolute:
-        # Normalize leading slash to repo-root resolution.
-        # Нормализуем ведущий слеш к разрешению от корня репозитория.
-        normalized = raw_path.lstrip("/")
-        candidate = (repo_path / normalized).resolve() if normalized else repo_path.resolve()
+        # Resolve as a real OS path, not relative to the repository root.
+        # Разрешаем как реальный путь ОС, а не относительно корня репозитория.
+        candidate = Path(raw_path).resolve()
     else:
         raise ValueError(f"Unknown raw path kind: {raw_kind}")
 
     target = _existing_file(candidate)
     resolved = target if target is not None else candidate
+    exists = target is not None
 
-    if not resolved.is_relative_to(repo_path):
-        raise ValueError(
-            f"Link target {resolved.as_posix()!r} is outside the repository root "
-            f"{repo_path.as_posix()!r}"
+    is_inside_repo = resolved.is_relative_to(repo_path)
+
+    if not is_inside_repo:
+        # Relative paths must stay inside the repository; OS-absolute paths may
+        # leave it and become OS links.
+        # Относительные пути должны оставаться внутри репозитория;
+        # абсолютные пути ОС могут выходить за его пределы и становиться OS-ссылками.
+        if raw_kind == PathKind.relative:
+            raise ValueError(
+                f"Relative link target {resolved.as_posix()!r} is outside the repository root "
+                f"{repo_path.as_posix()!r}"
+            )
+        # Target is outside the repository root -> OS link.
+        # Цель за пределами корня репозитория -> OS-ссылка.
+        return LinkPath(
+            kind=LinkKind.os,
+            formatted=resolved.as_posix(),
+            repo_path=None,
+            os_path=resolved,
+            exists=exists,
+            has_explicit_md_suffix=explicit_md,
+            is_inside_repo=False,
         )
 
     folder = skill.folder_path
@@ -215,4 +265,7 @@ def _resolve_path(
         formatted=formatted,
         repo_path=repo_relative,
         os_path=resolved,
+        exists=exists,
+        has_explicit_md_suffix=explicit_md,
+        is_inside_repo=True,
     )

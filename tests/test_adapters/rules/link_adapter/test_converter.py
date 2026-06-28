@@ -13,6 +13,7 @@ from ai_skill_manager.adapters.rules.link_adapter.converter import (
     SkillLinkConverter,
     SourceLinkConverter,
     ExternalLinkConverter,
+    ExternalFileConverter,
 )
 from ai_skill_manager.entities import LocalSource, Skill, SkillFile, SkillFormat
 
@@ -257,6 +258,51 @@ class TestLinkConverter(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.converter.convert(link, [skill_a])
 
+    def test_source_link_to_orphan_file_copies_to_files(self):
+        """RU: Ссылка kind=source на файл вне скиллов копируется в files/."""
+        target = self.tmpdir / "target"
+        skill_a = self._make_agent_skill(target, "skill-a")
+        orphan = target / "orphan.md"
+        orphan.write_text("# Orphan\n", encoding="utf-8")
+        skill_file = self._skill_file(
+            skill_a, "SKILL.md", "[orphan](../orphan.md)\n"
+        )
+        link = self._first_link(skill_file)
+        copied_files = {}
+
+        result = self.converter.convert(
+            link,
+            [skill_a],
+            target_skill_folder=skill_a.folder_path,
+            copied_files=copied_files,
+        )
+
+        self.assertEqual(result, "./files/orphan.md")
+        self.assertTrue((skill_a.folder_path / "files" / "orphan.md").exists())
+        self.assertEqual(copied_files[orphan.resolve()], skill_a.folder_path / "files" / "orphan.md")
+
+    def test_os_link_copies_to_files(self):
+        """RU: OS-absolute ссылка на файл вне репозитория копируется в files/."""
+        target = self.tmpdir / "target"
+        skill_a = self._make_agent_skill(target, "skill-a")
+        external = self.tmpdir / "external.md"
+        external.write_text("# External\n", encoding="utf-8")
+        skill_file = self._skill_file(
+            skill_a, "SKILL.md", f"[external]({external.as_posix()})\n"
+        )
+        link = self._first_link(skill_file)
+        copied_files = {}
+
+        result = self.converter.convert(
+            link,
+            [skill_a],
+            target_skill_folder=skill_a.folder_path,
+            copied_files=copied_files,
+        )
+
+        self.assertEqual(result, "./files/external.md")
+        self.assertTrue((skill_a.folder_path / "files" / "external.md").exists())
+
 
 class TestSkillLinkConverter(unittest.TestCase):
     """Direct tests for SkillLinkConverter."""
@@ -320,6 +366,76 @@ class TestExternalLinkConverter(unittest.TestCase):
         result = self.converter.convert(link, [skill])
 
         self.assertEqual(result, "https://example.com")
+
+
+class TestExternalFileConverter(unittest.TestCase):
+    """Direct tests for ExternalFileConverter."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_copies_file_and_returns_relative_link(self):
+        """RU: ExternalFileConverter копирует файл и возвращает относительную ссылку."""
+        target = self.tmpdir / "skill"
+        target.mkdir()
+        source = self.tmpdir / "source.md"
+        source.write_text("# Source\n", encoding="utf-8")
+
+        from ai_skill_manager.entities.skill_file import SkillFile
+        skill_file_path = target / "SKILL.md"
+        skill_file_path.write_text(
+            f"---\nname: skill\n---\n[link]({source.as_posix()})\n", encoding="utf-8"
+        )
+        skill = Skill(
+            file_path=skill_file_path,
+            folder_path=target,
+            source=LocalSource(scan_path=self.tmpdir),
+            format=SkillFormat.Agent,
+            source_path=self.tmpdir,
+        )
+        skill_file = SkillFile(path=skill_file_path, skill=skill)
+        link = skill_file.links[0]
+        copied_files = {}
+
+        converter = ExternalFileConverter(copied_files)
+        result = converter.convert(link, target)
+
+        self.assertEqual(result, "./files/source.md")
+        self.assertTrue((target / "files" / "source.md").exists())
+        self.assertEqual(copied_files[source.resolve()], target / "files" / "source.md")
+
+    def test_reuses_already_copied_file(self):
+        """RU: ExternalFileConverter повторно использует уже скопированный файл."""
+        target = self.tmpdir / "skill"
+        target.mkdir()
+        source = self.tmpdir / "source.md"
+        source.write_text("# Source\n", encoding="utf-8")
+
+        from ai_skill_manager.entities.skill_file import SkillFile
+        skill_file_path = target / "SKILL.md"
+        skill_file_path.write_text(
+            f"---\nname: skill\n---\n[link]({source.as_posix()})\n", encoding="utf-8"
+        )
+        skill = Skill(
+            file_path=skill_file_path,
+            folder_path=target,
+            source=LocalSource(scan_path=self.tmpdir),
+            format=SkillFormat.Agent,
+            source_path=self.tmpdir,
+        )
+        skill_file = SkillFile(path=skill_file_path, skill=skill)
+        link = skill_file.links[0]
+        copied_files = {}
+
+        converter = ExternalFileConverter(copied_files)
+        first = converter.convert(link, target)
+        second = converter.convert(link, target)
+
+        self.assertEqual(first, second)
+        self.assertEqual(len(list((target / "files").iterdir())), 1)
 
 
 class TestSourceLinkConverter(unittest.TestCase):

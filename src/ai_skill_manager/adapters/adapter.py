@@ -9,6 +9,8 @@ to the target location.
 в целевое расположение.
 """
 
+from pathlib import Path
+
 from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
@@ -33,6 +35,8 @@ class Adapter:
         skills: List[Skill],
         adapter_list: List[Type[absAdapter]] = DEFAULT_RULES,
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        target_dir: Optional[Path] = None,
+        copied_files: Optional[Dict[Path, Path]] = None,
     ):
         """Initialize the adapter with the available skills and adapter classes.
 
@@ -46,7 +50,13 @@ class Adapter:
                 still point to the original source paths after copying.
                 / Опциональное отображение исходного скилла в скопированный.
                 Используется адаптерами ссылок для разрешения source-ссылок,
-                которые всё ещё указывают на исходные пути.
+                которые после копирования всё ещё указывают на исходные пути.
+            target_dir: Root target directory of the current sync.
+                / Корневая целевая директория текущего синка.
+            copied_files: Shared registry of external files already copied into
+                target skills. Maps original source path -> copied path.
+                / Общий реестр внешних файлов, уже скопированных в целевые
+                скиллы. Отображает исходный путь -> скопированный путь.
 
         Raises:
             AssertionError: If two adapters share the same name.
@@ -62,7 +72,12 @@ class Adapter:
 
         # Build a shared context containing all skills.
         # Формируем общий контекст, содержащий все навыки.
-        self.__ac = absAdapter.Context(skills=tuple(skills), skill_mapping=skill_mapping or {})
+        self.__ac = absAdapter.Context(
+            skills=tuple(skills),
+            skill_mapping=skill_mapping or {},
+            target_dir=target_dir,
+            copied_files=copied_files if copied_files is not None else {},
+        )
 
         # Instantiate each adapter with the shared context.
         # Инстанцируем каждый адаптер с общим контекстом.

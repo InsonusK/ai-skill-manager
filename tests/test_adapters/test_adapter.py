@@ -26,7 +26,7 @@ class TestAdapter(unittest.TestCase):
     def test_registered_adapters_name_version(self):
         adapter = Adapter(skills=[])
         names = adapter.registered_adapters_name_version
-        self.assertIn(("LinkAdapter", "1.0.1"), names)
+        self.assertIn(("LinkAdapter", "1.1.0"), names)
 
     def test_adapt_runs_registered_adapters(self):
         adapter = Adapter(skills=[], adapter_list=[DummyAdapter])

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from ....entities import LinkKind, absLink
 
@@ -80,6 +80,7 @@ class SkillLinkConverter(absLinkConverter):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        **kwargs,
     ) -> str:
         """Return the already-relative skill path, preserving any header."""
         # EN: Links inside the same skill keep their relative path.
@@ -98,6 +99,7 @@ class ExternalLinkConverter(absLinkConverter):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        **kwargs,
     ) -> str:
         """Return the external URL unchanged, preserving any header."""
         # EN: External links are kept as-is.
@@ -105,11 +107,70 @@ class ExternalLinkConverter(absLinkConverter):
         return _append_header(link.path.formatted, link.header)
 
 
+class ExternalFileConverter:
+    """Copies a non-skill file into ``files/`` and returns the relative link.
+
+    Копирует файл, не принадлежащий скиллу, в ``files/`` и возвращает
+    относительную ссылку.
+    """
+
+    def __init__(self, copied_files: Dict[Path, Path]):
+        """Initialize with a shared copy registry.
+
+        Args:
+            copied_files: Maps original source path -> copied target path.
+                Реестр скопированных файлов: исходный путь -> целевой путь.
+        """
+        self._copied_files = copied_files
+
+    def convert(
+        self,
+        link: absLink,
+        target_skill_folder: Path,
+    ) -> str:
+        """Return ``./files/<name>`` for the linked file, copying if needed.
+
+        If the same source file has already been copied, reuse the existing
+        target name to avoid duplicates.
+
+        Returns:
+            Relative target string such as ``./files/diagram.png``.
+        """
+        source_path = link.path.os_path
+        if source_path in self._copied_files:
+            copied_path = self._copied_files[source_path]
+            rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
+            return _append_header(rel, link.header)
+
+        files_dir = target_skill_folder / "files"
+        files_dir.mkdir(parents=True, exist_ok=True)
+
+        original_name = source_path.name
+        target_path = files_dir / original_name
+        counter = 1
+        stem = source_path.stem
+        suffix = source_path.suffix
+        while target_path.exists():
+            target_path = files_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+
+        import shutil
+        shutil.copy2(source_path, target_path)
+        self._copied_files[source_path] = target_path
+
+        rel = "./" + target_path.relative_to(target_skill_folder).as_posix()
+        return _append_header(rel, link.header)
+
+
 class SourceLinkConverter(absLinkConverter):
     """Converts links that point to files inside another known skill.
 
     Для ссылок, которые указывают на файлы внутри другого известного скилла.
     """
+
+    def __init__(self) -> None:
+        """Initialize the converter."""
+        self._external_converter: Optional[ExternalFileConverter] = None
 
     def _resolve_skill(
         self,
@@ -147,7 +208,7 @@ class SourceLinkConverter(absLinkConverter):
         # file (e.g. a repo-absolute path without the ``.md`` extension).
         # RU: Сначала точное совпадение со скопированными навыками. Ссылка,
         # указывающая на папку скилла, считается ссылкой на основной файл
-        # (например, repo-absolute путь без расширения ``.md``).
+        # (например, repo-absolute путь без суффикса ``.md``).
         for skill in skills:
             norm_file = _norm(skill.file_path)
             if norm_target == norm_file:
@@ -267,63 +328,102 @@ class SourceLinkConverter(absLinkConverter):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        target_skill_folder: Optional[Path] = None,
+        copied_files: Optional[Dict[Path, Path]] = None,
     ) -> str:
         """Resolve a source link against known skills.
 
         Если цель совпадает с основным файлом навыка — используем ``skill:<name>``.
         Если цель находится внутри папки навыка — добавляем ``;file:<relative>``.
+        Если цель не принадлежит известному навыку и передан ``target_skill_folder``,
+        копируем файл в ``files/``.
         """
         target_path = link.path.os_path
         resolved = self._resolve_skill(target_path, skills, skill_mapping)
 
-        if resolved is None:
-            skill_infos = [
-                f"  {s.properties.name}: file={s.file_path.as_posix()}, folder={s.folder_path.as_posix() if s.folder_path else None}"
-                for s in skills
-            ]
-            mapping_infos = []
-            if skill_mapping:
-                for old, new in skill_mapping.items():
-                    mapping_infos.append(
-                        f"  old({old.format.value}) name={old.properties.name} "
-                        f"file={old.file_path.as_posix()} "
-                        f"folder={old.folder_path.as_posix() if old.folder_path else None} "
-                        f"-> new({new.format.value}) name={new.properties.name} "
-                        f"file={new.file_path.as_posix()} "
-                        f"folder={new.folder_path.as_posix() if new.folder_path else None}"
-                    )
-            raise ValueError(
-                f"Cannot convert source link {link.raw!r} into skill format: "
-                f"no matching skill for {target_path.as_posix()!r}\n"
-                f"Known target skills:\n" + "\n".join(skill_infos) + "\n"
-                f"Source-to-target mapping:\n" + "\n".join(mapping_infos)
+        if resolved is not None:
+            skill, is_main_file, rel_path_override = resolved
+            skill_name = skill.properties.name
+            if skill_name is None:
+                raise ValueError(
+                    f"Cannot convert source link {link.raw!r} into skill format: "
+                    f"skill {skill.file_path.as_posix()!r} has no name"
+                )
+
+            # EN: Link points directly to the skill's main file.
+            # RU: Ссылка ведёт прямо на основной файл скилла.
+            if is_main_file or target_path == skill.file_path:
+                return _append_header(f"skill:{skill_name}", link.header)
+
+            # EN: The target path points inside the skill folder.
+            # RU: Цель указывает внутрь папки скилла.
+            if rel_path_override is not None:
+                rel_path = rel_path_override.as_posix()
+            else:
+                folder = skill.folder_path
+                assert folder is not None, "skill with nested file must have a folder"
+                rel_path = target_path.relative_to(folder).as_posix()
+            return _append_header(
+                f"skill:{skill_name};file:./{rel_path}",
+                link.header,
             )
 
-        skill, is_main_file, rel_path_override = resolved
-        skill_name = skill.properties.name
-        if skill_name is None:
-            raise ValueError(
-                f"Cannot convert source link {link.raw!r} into skill format: "
-                f"skill {skill.file_path.as_posix()!r} has no name"
-            )
+        # EN: Not part of any known skill: copy to files/ if the adapter
+        # provided the target skill folder.
+        # RU: Не является частью известного скилла: копируем в files/, если
+        # адаптер предоставил целевую папку скилла.
+        if target_skill_folder is not None and copied_files is not None:
+            self._external_converter = ExternalFileConverter(copied_files)
+            return self._external_converter.convert(link, target_skill_folder)
 
-        # EN: Link points directly to the skill's main file.
-        # RU: Ссылка ведёт прямо на основной файл скилла.
-        if is_main_file or target_path == skill.file_path:
-            return _append_header(f"skill:{skill_name}", link.header)
-
-        # EN: The target path points inside the skill folder.
-        # RU: Цель указывает внутрь папки скилла.
-        if rel_path_override is not None:
-            rel_path = rel_path_override.as_posix()
-        else:
-            folder = skill.folder_path
-            assert folder is not None, "skill with nested file must have a folder"
-            rel_path = target_path.relative_to(folder).as_posix()
-        return _append_header(
-            f"skill:{skill_name};file:./{rel_path}",
-            link.header,
+        skill_infos = [
+            f"  {s.properties.name}: file={s.file_path.as_posix()}, folder={s.folder_path.as_posix() if s.folder_path else None}"
+            for s in skills
+        ]
+        mapping_infos = []
+        if skill_mapping:
+            for old, new in skill_mapping.items():
+                mapping_infos.append(
+                    f"  old({old.format.value}) name={old.properties.name} "
+                    f"file={old.file_path.as_posix()} "
+                    f"folder={old.folder_path.as_posix() if old.folder_path else None} "
+                    f"-> new({new.format.value}) name={new.properties.name} "
+                    f"file={new.file_path.as_posix()} "
+                    f"folder={new.folder_path.as_posix() if new.folder_path else None}"
+                )
+        raise ValueError(
+            f"Cannot convert source link {link.raw!r} into skill format: "
+            f"no matching skill for {target_path.as_posix()!r}\n"
+            f"Known target skills:\n" + "\n".join(skill_infos) + "\n"
+            f"Source-to-target mapping:\n" + "\n".join(mapping_infos)
         )
+
+
+class OsLinkConverter(absLinkConverter):
+    """Converts OS-absolute links that live outside the repository.
+
+    Для OS-абсолютных ссылок за пределами репозитория.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the converter."""
+        self._external_converter: Optional[ExternalFileConverter] = None
+
+    def convert(
+        self,
+        link: absLink,
+        skills: List[Skill],
+        skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        target_skill_folder: Optional[Path] = None,
+        copied_files: Optional[Dict[Path, Path]] = None,
+    ) -> str:
+        """Copy the linked OS file into ``files/`` and return relative path."""
+        if target_skill_folder is None or copied_files is None:
+            raise ValueError(
+                f"Cannot convert OS link {link.raw!r}: target skill folder is not provided"
+            )
+        self._external_converter = ExternalFileConverter(copied_files)
+        return self._external_converter.convert(link, target_skill_folder)
 
 
 class LinkConverter:
@@ -338,6 +438,7 @@ class LinkConverter:
             LinkKind.skill: SkillLinkConverter(),
             LinkKind.external: ExternalLinkConverter(),
             LinkKind.source: SourceLinkConverter(),
+            LinkKind.os: OsLinkConverter(),
         }
 
     def convert(
@@ -345,6 +446,8 @@ class LinkConverter:
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        target_skill_folder: Optional[Path] = None,
+        copied_files: Optional[Dict[Path, Path]] = None,
     ) -> str:
         """Convert ``link`` to the agent skill-link format.
 
@@ -356,6 +459,12 @@ class LinkConverter:
             skill_mapping: Optional mapping from original source skill to copied
                 target skill.
                 / Опциональное отображение исходного скилла в скопированный.
+            target_skill_folder: Folder of the skill currently being adapted.
+                Used to copy external files into ``files/``.
+                / Папка скилла, который сейчас адаптируется. Используется для
+                копирования внешних файлов в ``files/``.
+            copied_files: Shared registry of already copied external files.
+                / Общий реестр уже скопированных внешних файлов.
 
         Returns:
             New link target in agent skill-link notation.
@@ -368,4 +477,10 @@ class LinkConverter:
         converter = self._converters.get(link.path.kind)
         if converter is None:
             raise ValueError(f"Unknown link kind: {link.path.kind}")
-        return converter.convert(link, skills, skill_mapping)
+        return converter.convert(
+            link,
+            skills,
+            skill_mapping,
+            target_skill_folder=target_skill_folder,
+            copied_files=copied_files,
+        )

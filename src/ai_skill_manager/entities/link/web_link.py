@@ -55,5 +55,8 @@ class WebLink(absLink):
                 formatted=self.url,
                 repo_path=self.url,
                 os_path=Path(self.url),
+                exists=False,
+                has_explicit_md_suffix=False,
+                is_inside_repo=False,
             ),
         )

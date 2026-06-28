@@ -33,7 +33,7 @@ class LinkAdapter(absAdapter):
 
         Версия адаптера для обнаружения изменений.
         """
-        return "1.0.1"
+        return "1.1.0"
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Rewrite links in ``new_skill`` files to the skill-link format.
@@ -168,19 +168,20 @@ class LinkAdapter(absAdapter):
         if isinstance(link, WebLink):
             return None
 
-        # Image links point to assets, not skill files, so leave them unchanged.
-        # Ссылки на изображения указывают на ассеты, а не файлы скиллов, поэтому оставляем их без изменений.
-        if link.is_image:
-            return None
-
         # Resolve the skill-format target via the dedicated converter.
         # Pass the source-to-target skill mapping so source links that still
         # point to the original source paths can be resolved correctly.
+        # Pass the target skill folder and the shared copy registry so that
+        # links to files outside any skill can be copied into files/.
         # Разрешаем цель в формате skill-link через специализированный конвертер.
         # Передаём маппинг исходных скиллов в целевые, чтобы source-ссылки,
         # всё ещё указывающие на исходные пути, разрешались корректно.
+        # Передаём целевую папку скилла и общий реестр копирования, чтобы
+        # ссылки на файлы вне скиллов можно было скопировать в files/.
         return self._link_converter.convert(
             link,
             other_skills,
             self._adapter_context.skill_mapping,
+            target_skill_folder=skill.folder_path,
+            copied_files=self._adapter_context.copied_files,
         )
