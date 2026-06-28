@@ -63,6 +63,20 @@ class TestValidator(unittest.TestCase):
         self.assertTrue(report.has_errors)
         self.assertIn(skill, report.errors)
 
+    def test_progress_callback_called(self):
+        skill = self._skill()
+        validator = Validator(rule_list=[AlwaysError(), AlwaysWarning()])
+        events = []
+        validator.validate([skill], progress=lambda *args: events.append(args))
+        self.assertEqual(
+            events,
+            [
+                ("validate", 0, 2),
+                ("validate", 1, 2),
+                ("validate", 2, 2),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

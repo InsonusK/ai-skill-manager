@@ -9,10 +9,11 @@ and returns the combined list of skills.
 """
 
 from pathlib import Path
-from typing import Iterator, List, Sequence
+from typing import Iterator, List, Optional, Sequence
 
 from ..discovery.skill import AutoDiscovery
 from ..entities import GitHubSource, LocalSource, Skill, Source
+from ..progress import ProgressCallback
 
 
 def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
@@ -40,7 +41,10 @@ def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
             yield src
 
 
-def discover(sources: Sequence[Source]) -> List[Skill]:
+def discover(
+    sources: Sequence[Source],
+    progress: Optional[ProgressCallback] = None,
+) -> List[Skill]:
     """Discover skills from a list of sources.
 
     Discover skills from a list of sources.
@@ -49,6 +53,8 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
 
     Args:
         sources: Skill sources to scan. / Источники навыков для сканирования.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         List of discovered ``Skill`` objects. / Список обнаруженных объектов ``Skill``.
@@ -58,8 +64,12 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
         ValueError: Если встречен неизвестный тип источника.
     """
     all_skills: List[Skill] = []
+    normalized_sources = list(_normalize_github_sources(sources))
 
-    for src in _normalize_github_sources(sources):
+    if progress is not None:
+        progress("discover", 0, len(normalized_sources))
+
+    for index, src in enumerate(normalized_sources, start=1):
         # Local paths are resolved to absolute form before scanning.
         # Локальные пути разрешаются в абсолютную форму перед сканированием.
         if isinstance(src, LocalSource):
@@ -74,5 +84,7 @@ def discover(sources: Sequence[Source]) -> List[Skill]:
             source=src,
         )
         all_skills.extend(strategy.discover())
+        if progress is not None:
+            progress("discover", index, len(normalized_sources))
 
     return all_skills

@@ -13,6 +13,7 @@ from typing import Optional
 from ...tools.source_parser import add_source_arguments, build_sources_from_args
 from ...tools.validation_report_printer import print_validation_report
 
+from ....progress import progress_context
 from ....validators import ValidationFailedError
 
 from .api import DEFAULT_CONFIG, run_sync
@@ -105,22 +106,25 @@ def run(args):
         # Разрешаем источники из --config, --type/--path или конфигурации по умолчанию.
         sources, config_path = build_sources_from_args(args)
 
-        if config_path is not None:
-            result = run_sync(
-                config_path=config_path,
-                target_dir=Path(args.target) if args.target else None,
-                remove_orphans=remove if remove is not None else True,
-                dry_run=args.dry_run,
-                force=args.force,
-            )
-        else:
-            result = run_sync(
-                sources=sources,
-                target_dir=Path(args.target) if args.target else None,
-                remove_orphans=remove if remove is not None else True,
-                dry_run=args.dry_run,
-                force=args.force,
-            )
+        with progress_context() as progress:
+            if config_path is not None:
+                result = run_sync(
+                    config_path=config_path,
+                    target_dir=Path(args.target) if args.target else None,
+                    remove_orphans=remove if remove is not None else True,
+                    dry_run=args.dry_run,
+                    force=args.force,
+                    progress=progress,
+                )
+            else:
+                result = run_sync(
+                    sources=sources,
+                    target_dir=Path(args.target) if args.target else None,
+                    remove_orphans=remove if remove is not None else True,
+                    dry_run=args.dry_run,
+                    force=args.force,
+                    progress=progress,
+                )
         print(format_sync_result(result))
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
