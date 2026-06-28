@@ -33,7 +33,7 @@ class LinkAdapter(absAdapter):
 
         Версия адаптера для обнаружения изменений.
         """
-        return "1.1.0"
+        return "1.1.1"
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Rewrite links in ``new_skill`` files to the skill-link format.
@@ -57,12 +57,25 @@ class LinkAdapter(absAdapter):
         other_skills = [s for s in self._adapter_context.skills if s is not old_skill]
 
         for skill_file in new_skill.files:
+            links = skill_file.links
+            if not links:
+                # Nothing to rewrite in this file.
+                # В этом файле нечего переписывать.
+                continue
+
+            # Skip files where every link is an external URL; they are never
+            # rewritten, so reading the file would be wasted work.
+            # Пропускаем файлы, где все ссылки — внешние URL; они никогда не
+            # переписываются, поэтому чтение файла было бы лишней работой.
+            if all(isinstance(link, WebLink) for link in links):
+                continue
+
             # Read the full file content once.
             # Читаем полное содержимое файла один раз.
             content = skill_file.path.read_text(encoding="utf-8")
 
             new_content, count = self._replace_links(
-                content, skill_file.links, skill_file, new_skill, other_skills
+                content, links, skill_file, new_skill, other_skills
             )
 
             # Write only if at least one link was replaced.
@@ -114,8 +127,21 @@ class LinkAdapter(absAdapter):
         replaced = 0
 
         # Sort links by start position descending to keep string offsets valid.
-        # Сортируем ссылки по начальной позиции по убыванию, чтобы смещения строк оставались корректными.
+        # The original order is preserved so that external file name collision
+        # resolution stays deterministic.
+        # Сортируем ссылки по начальной позиции по убыванию, чтобы смещения
+        # строк оставались корректными. Исходный порядок сохраняем, чтобы
+        # разрешение коллизий имён внешних файлов оставалось детерминированным.
         sorted_links = sorted(links, key=lambda link: link.start, reverse=True)
+
+        # Collect content fragments and replacements while walking from the end
+        # of the string toward the beginning, then join once. This avoids the
+        # O(n²) cost of repeated string slicing.
+        # Собираем фрагменты содержимого и замены, двигаясь от конца строки к
+        # началу, затем один раз объединяем. Это позволяет избежать
+        # квадратичной сложности повторной нарезки строк.
+        fragments: List[str] = []
+        last_start = len(content)
 
         for link in sorted_links:
             new_target = self._compute_new_target(link, skill_file, skill, other_skills)
@@ -129,12 +155,27 @@ class LinkAdapter(absAdapter):
             prefix = "!" if link.is_image else ""
             new_raw = f"{prefix}[{link.text}]({new_target})"
 
-            # Replace the original link slice with the new markdown text.
-            # Заменяем исходный фрагмент ссылки на новый markdown-текст.
-            content = content[: link.start] + new_raw + content[link.end :]
+            # Append the unchanged text after this link and the replacement.
+            # The collected fragments are reversed at the end to restore the
+            # natural left-to-right order.
+            # Добавляем неизменённый текст после ссылки и саму замену. Собранные
+            # фрагменты в конце переворачиваются, чтобы восстановить естественный
+            # порядок слева направо.
+            fragments.append(content[link.end : last_start])
+            fragments.append(new_raw)
+            last_start = link.start
             replaced += 1
 
-        return content, replaced
+        # Append the leading part of the content before the first replacement.
+        # Добавляем начальную часть содержимого перед первой заменой.
+        fragments.append(content[:last_start])
+
+        # Reverse the fragments so they read from the start of the file to the
+        # end, then build the final string in one shot.
+        # Переворачиваем фрагменты, чтобы они шли от начала файла к концу, и
+        # собираем итоговую строку за один приём.
+        fragments.reverse()
+        return "".join(fragments), replaced
 
     def _compute_new_target(
         self,
