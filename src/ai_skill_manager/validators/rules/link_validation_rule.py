@@ -12,16 +12,17 @@ from .abs_validation_rule import absValidationRule
 
 
 class LinkValidationRule(absValidationRule):
-    """Validate that every link points to another skill or inside its own skill.
+    """Validate that every link points to an existing target and, when the
+    target belongs to a skill, that the skill is included in the current sync.
 
-    Проверяет, что каждая ссылка ведёт либо на другой скилл, либо на файл
-    внутри своей директории скилла.
+    Проверяет, что каждая ссылка ведёт на существующую цель и, когда цель
+    принадлежит скиллу, что этот скилл входит в текущее копирование.
     """
 
     @property
     def version(self) -> str:
         """Return the rule version. / Возвращает версию правила."""
-        return "1.0.0"
+        return "1.1.0"
 
     def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
         """Validate links for all provided skills.
@@ -94,6 +95,21 @@ class LinkValidationRule(absValidationRule):
         if isinstance(link.base, WebLink):
             return None
 
+        # Path links must point to an existing file.
+        # Путевые ссылки должны указывать на существующий файл.
+        if isinstance(link.base, PathLink) and not link.base.path.exists:
+            return ValidationError(
+                message="Link {link_raw}\nPath {link}\nFile {file}\nPos ({start}-{end}): target file does not exist",
+                severity=ValidationSeverity.ERROR,
+                params={
+                    "link_raw": link.base.raw,
+                    "link": link.base.path.formatted,
+                    "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
+                    "start": link.base.start,
+                    "end": link.base.end,
+                },
+            )
+
         # Links that point to a file inside the same skill are valid.
         # Ссылки, указывающие на файл внутри того же навыка, считаются корректными.
         if link.is_link_to_skill_file:
@@ -109,17 +125,27 @@ class LinkValidationRule(absValidationRule):
         if link.is_link_to_another_skill_file(skills) is not None:
             return None
 
-        # Anything else is a dangling link.
-        # Всё остальное — висячая ссылка.
-        return ValidationError(
-            message="Link {link_raw}\nPath {link}\nFile {file}\nRepos {repo}\nPos ({start}-{end}): doesn't lead to subfiles or other skills",
-            severity=ValidationSeverity.ERROR,
-            params={
-                "link_raw": link.base.raw,
-                "repo": link.context.skill.source.get_scan_location().repo_path,
-                "link": link.base.path.formatted,
-                "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
-                "start": link.base.start,
-                "end": link.base.end
-            },
-        )
+        # Links to files that belong to a skill outside the current sync set are
+        # not allowed. If a target lies inside a skill directory but that skill
+        # is not in the provided list, report an error.
+        # Ссылки на файлы скилла, который не входит в текущее копирование,
+        # запрещены. Если цель лежит внутри директории скилла, но этот скилл
+        # отсутствует в переданном списке, сообщаем об ошибке.
+        target_skill = link.target_skill(skills)
+        if target_skill is not None and target_skill is not link.context.skill:
+            return ValidationError(
+                message="Link {link_raw}\nPath {link}\nFile {file}\nPos ({start}-{end}): target belongs to skill '{target_skill}' which is not included in the current sync",
+                severity=ValidationSeverity.ERROR,
+                params={
+                    "link_raw": link.base.raw,
+                    "link": link.base.path.formatted,
+                    "file": link.context.file.path.relative_to(link.context.skill.file_path.parent),
+                    "target_skill": target_skill.properties.name or target_skill.file_path.as_posix(),
+                    "start": link.base.start,
+                    "end": link.base.end,
+                },
+            )
+
+        # Anything else (source or OS file) is allowed as long as the file exists.
+        # Всё остальное (source- или OS-файл) разрешено, пока файл существует.
+        return None

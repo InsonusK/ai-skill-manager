@@ -24,11 +24,11 @@ class absAdapter(ABC):
     должны реализовать ``adapt``.
     """
 
-    @dataclass(frozen=True)
+    @dataclass
     class Context:
-        """Shared read-only context passed to every adapter.
+        """Shared context passed to every adapter.
 
-        Разделяемый контекст только для чтения, передаваемый каждому адаптеру.
+        Разделяемый контекст, передаваемый каждому адаптеру.
         """
 
         skills: Tuple[Skill]
@@ -39,6 +39,20 @@ class absAdapter(ABC):
 
         Используется для разрешения source-ссылок, которые после копирования
         всё ещё указывают на пути в исходном источнике.
+        """
+
+        target_dir: Optional[Path] = None
+        """Root target directory of the current sync. / Корневая целевая директория текущего синка."""
+
+        copied_files: Dict[Path, Path] = field(default_factory=dict)
+        """Registry of external files already copied into target skills.
+
+        Maps original source path -> copied path inside ``files/``.
+        Shared between adapter instances to avoid duplicates and name collisions.
+
+        Реестр внешних файлов, уже скопированных в целевые скиллы.
+        Отображает исходный путь -> скопированный путь внутри ``files/``.
+        Общий между экземплярами адаптеров, чтобы избежать дублирования и коллизий имён.
         """
 
     def __init__(self, adapter_context: absAdapter.Context):

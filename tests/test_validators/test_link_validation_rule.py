@@ -77,6 +77,61 @@ class TestLinkValidationRule(unittest.TestCase):
         self.assertIn(skill, result)
         self.assertTrue(result[skill].has_errors)
 
+    def test_missing_file_is_invalid(self):
+        # EN: A link to a file that does not exist must produce a validation error.
+        # RU: Ссылка на несуществующий файл должна давать ошибку валидации.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n[missing](./missing.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertIn(skill, result)
+        self.assertTrue(result[skill].has_errors)
+
+    def test_source_file_outside_skill_is_valid(self):
+        # EN: A link to an existing file outside any skill is valid even though
+        # the file is not part of a skill directory.
+        # RU: Ссылка на существующий файл вне любого скилла валидна, даже
+        # если файл не входит в директорию скилла.
+        root = self._copy_mock("outside_skill")
+        (root / "orphan.md").write_text("# Orphan\n")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n[orphan](../orphan.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
+    def test_os_file_is_valid(self):
+        # EN: A link to an existing OS-absolute file outside the repository is
+        # valid.
+        # RU: Ссылка на существующий OS-абсолютный файл вне репозитория валидна.
+        root = self._copy_mock("internal_link")
+        external = self.tmpdir / "external.md"
+        external.write_text("# External\n")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            f"---\nname: skill\n---\n# Skill\n[external]({external.as_posix()})\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
     def test_wiki_link_to_other_skill_is_valid(self):
         root = self._copy_mock("wiki_link")
         a = self._dir_skill(root, "skill-a")

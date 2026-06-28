@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.entities import GitHubSource, LocalSource, Skill, SkillFormat
+from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 from ai_skill_manager.models.link_with_context import LinkWithContext
 from ai_skill_manager.services.discover import discover
@@ -83,13 +84,35 @@ class TestLinkWithContext(unittest.TestCase):
 
         self.assertEqual(ctx.os_absolute_path, (root / "other.skill.md").resolve())
 
-    def test_os_absolute_raw_resolves_as_repo_absolute(self):
+    def test_os_absolute_raw_outside_repo_resolves_as_os(self):
+        # EN: An OS-absolute path outside the repository root is kept as a real
+        # OS path and classified as LinkKind.os.
+        # RU: Абсолютный путь ОС за пределами корня репозитория сохраняется как
+        # реальный путь ОС и классифицируется как LinkKind.os.
         root = self._copy_mock("os_abs")
         md = root / "guide.skill.md"
         skill = self._skill(md)
         ctx = self._context(skill, md)
 
-        self.assertEqual(ctx.os_absolute_path, (root / "tmp" / "absolute.md").resolve())
+        self.assertEqual(ctx.os_absolute_path, Path("/tmp/absolute.md"))
+        self.assertEqual(ctx.base.path.kind, LinkKind.os)
+        self.assertFalse(ctx.base.path.is_inside_repo)
+
+    def test_os_absolute_raw_inside_repo_resolves_as_repo_absolute(self):
+        # EN: An OS-absolute path that physically lies inside the repository
+        # root is treated as repo-absolute.
+        # RU: Абсолютный путь ОС, физически лежащий внутри корня репозитория,
+        # обрабатывается как repo-absolute.
+        root = self._copy_mock("os_abs")
+        md = root / "guide.skill.md"
+        absolute_target = (root / "tmp" / "absolute.md").resolve()
+        md.write_text(f"---\nname: guide\n---\n# Guide\n[absolute]({absolute_target.as_posix()})\n")
+        skill = self._skill(md)
+        ctx = self._context(skill, md)
+
+        self.assertEqual(ctx.os_absolute_path, absolute_target)
+        self.assertEqual(ctx.base.path.kind, LinkKind.source)
+        self.assertTrue(ctx.base.path.is_inside_repo)
 
     def test_repo_absolute_path_uses_repo_path(self):
         root = self._copy_mock("repo_abs")
@@ -191,6 +214,38 @@ class TestLinkWithContext(unittest.TestCase):
         self.assertEqual(ctx.target, "./guide.skill.md")
         with self.assertRaises(AttributeError):
             _ = ctx.nonexistent_attribute
+
+    def test_target_skill_finds_owning_skill(self):
+        """target_skill returns the skill whose folder contains the link target."""
+        root = self._copy_mock("dir")
+        skill_dir = root / "web"
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+        other_dir = root / "other"
+        other_dir.mkdir()
+        (other_dir / "SKILL.md").write_text("---\nname: other\n---\n# Other\n")
+        other = self._skill(other_dir / "SKILL.md", other_dir, repo_path=root)
+
+        skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
+        skill_file.path.write_text("---\nname: web\n---\n# Web\n[other](../other/SKILL.md)\n")
+        link = skill_file.links[0]
+        ctx = LinkWithContext.build(skill, skill_file, link)
+
+        self.assertEqual(ctx.target_skill([skill, other]), other)
+
+    def test_target_skill_returns_none_for_source_file(self):
+        """target_skill returns None when the target is not inside any skill."""
+        root = self._copy_mock("dir")
+        skill_dir = root / "web"
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+        orphan = root / "orphan.md"
+        orphan.write_text("# Orphan\n")
+
+        skill_file = SkillFile(path=skill_dir / "SKILL.md", skill=skill)
+        skill_file.path.write_text("---\nname: web\n---\n# Web\n[orphan](../orphan.md)\n")
+        link = skill_file.links[0]
+        ctx = LinkWithContext.build(skill, skill_file, link)
+
+        self.assertIsNone(ctx.target_skill([skill]))
 
 
 if __name__ == "__main__":
