@@ -58,6 +58,21 @@ class TestLinkValidationRule(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+    def test_cross_skill_non_md_file_link_is_valid(self):
+        # EN: A link to a non-markdown file inside another included skill must
+        # be valid, because such files are copied together with the skill.
+        # RU: Ссылка на не-markdown файл внутри другого включённого скилла
+        # должна считаться корректной, так как такие файлы копируются вместе со
+        # скиллом.
+        root = self._copy_mock("cross_skill_non_md")
+        a = self._dir_skill(root, "skill-a")
+        b = self._dir_skill(root, "skill-b")
+
+        rule = LinkValidationRule()
+        result = rule.validate([a, b])
+
+        self.assertEqual(result, {})
+
     def test_external_url_is_valid(self):
         root = self._copy_mock("external_url")
         skill = self._dir_skill(root, "skill")
