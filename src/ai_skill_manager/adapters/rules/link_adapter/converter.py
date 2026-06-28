@@ -171,6 +171,90 @@ class SourceLinkConverter(absLinkConverter):
     def __init__(self) -> None:
         """Initialize the converter."""
         self._external_converter: Optional[ExternalFileConverter] = None
+        self._norm_cache: dict[Path, Path] = {}
+        self._resolve_indexes: Optional[dict] = None
+        self._resolve_indexes_key: Optional[tuple] = None
+
+    def _build_resolve_indexes(
+        self,
+        skills: List[Skill],
+        skill_mapping: Optional[Dict[Skill, Skill]],
+    ) -> dict:
+        """Build lookup tables for fast skill resolution.
+
+        The original implementation compared the link target against every
+        known skill path for every link. These indexes turn the same lookup
+        into a handful of dictionary accesses and a short parent walk.
+        """
+        _norm = self._norm
+
+        target_file_to_skill: dict[Path, "Skill"] = {}
+        target_folder_to_skill: dict[Path, "Skill"] = {}
+        for skill in skills:
+            target_file_to_skill[_norm(skill.file_path)] = skill
+            if skill.folder_path is not None:
+                target_folder_to_skill[_norm(skill.folder_path)] = skill
+
+        old_file_to_new: dict[Path, Tuple["Skill", bool, Optional[Path]]] = {}
+        old_folder_full: dict[Path, Tuple["Skill", Path]] = {}
+        old_folder_name: dict[str, List[Tuple["Skill", Path]]] = {}
+        old_identities: List[Tuple[Path, Tuple[str, ...], "Skill", Path]] = []
+        old_flat_identities: List[Tuple[Path, Tuple[str, ...], "Skill"]] = []
+        old_file_names: dict[str, List[Tuple["Skill", bool, Optional[Path]]]] = {}
+        old_stem_names: dict[str, List[Tuple["Skill", bool, Optional[Path]]]] = {}
+
+        norm_source_path: Optional[Path] = None
+        if skill_mapping:
+            if skills:
+                norm_source_path = _norm(skills[0].source_path)
+
+            for old_skill, new_skill in skill_mapping.items():
+                norm_old_file = _norm(old_skill.file_path)
+                old_file_to_new[norm_old_file] = (new_skill, True, None)
+
+                if old_skill.folder_path is not None:
+                    norm_old_folder = _norm(old_skill.folder_path)
+                    old_main_rel = old_skill.file_path.relative_to(old_skill.folder_path)
+
+                    # Exact old folder -> main file link.
+                    old_folder_full[norm_old_folder] = (new_skill, old_main_rel)
+
+                    # Name-based match for skills moved to a different root.
+                    old_folder_name.setdefault(norm_old_folder.name, []).append(
+                        (new_skill, old_main_rel)
+                    )
+
+                    norm_old_source_path = _norm(old_skill.source_path)
+                    old_identity = norm_old_folder.relative_to(norm_old_source_path)
+                    old_identities.append(
+                        (old_identity, tuple(old_identity.parts), new_skill, old_main_rel)
+                    )
+                else:
+                    norm_old_source_path = _norm(old_skill.source_path)
+                    old_identity = norm_old_file.relative_to(norm_old_source_path)
+                    old_flat_identities.append(
+                        (old_identity, tuple(old_identity.parts), new_skill)
+                    )
+
+                    old_file_names.setdefault(old_skill.file_path.name, []).append(
+                        (new_skill, True, None)
+                    )
+                    old_stem_names.setdefault(old_skill.file_path.stem, []).append(
+                        (new_skill, True, None)
+                    )
+
+        return {
+            "norm_source_path": norm_source_path,
+            "target_file_to_skill": target_file_to_skill,
+            "target_folder_to_skill": target_folder_to_skill,
+            "old_file_to_new": old_file_to_new,
+            "old_folder_full": old_folder_full,
+            "old_folder_name": old_folder_name,
+            "old_identities": old_identities,
+            "old_flat_identities": old_flat_identities,
+            "old_file_names": old_file_names,
+            "old_stem_names": old_stem_names,
+        }
 
     def _resolve_skill(
         self,
@@ -183,145 +267,102 @@ class SourceLinkConverter(absLinkConverter):
         Возвращает тройку (skill, is_main_file, rel_path). ``rel_path``
         заполняется, когда цель найдена по старому имени папки/файла, и
         указывает путь внутри скопированного скилла.
-
-        Сначала ищем точное совпадение среди скопированных навыков, затем
-        ищем исходный навык через ``skill_mapping`` (он точнее знает, является
-        ли цель основным файлом), и только потом соглашаемся на любое
-        вхождение в папку скопированного навыка.
         """
-        # EN: Normalise paths so comparisons are not affected by symlinks or
-        # redundant separators. Resolve only when the path exists to avoid
-        # raising for links that still point to the original source tree.
-        # RU: Нормализуем пути, чтобы сравнения не зависели от symlink или
-        # лишних разделителей. Resolve вызываем только для существующих путей,
-        # чтобы не падать на ссылках, которые всё ещё указывают на исходное
-        # дерево.
-        def _norm(path: Path) -> Path:
-            if path.exists():
-                return path.resolve()
-            return path
+        norm_target = self._norm(target_path)
 
-        norm_target = _norm(target_path)
+        cache_key = (id(skills), id(skill_mapping))
+        if cache_key != self._resolve_indexes_key:
+            self._resolve_indexes = self._build_resolve_indexes(skills, skill_mapping)
+            self._resolve_indexes_key = cache_key
+        idx = self._resolve_indexes
+        assert idx is not None
 
-        # EN: Exact match against copied target skills first. A link pointing
-        # to the skill folder itself is treated as a link to the skill's main
-        # file (e.g. a repo-absolute path without the ``.md`` extension).
-        # RU: Сначала точное совпадение со скопированными навыками. Ссылка,
-        # указывающая на папку скилла, считается ссылкой на основной файл
-        # (например, repo-absolute путь без суффикса ``.md``).
-        for skill in skills:
-            norm_file = _norm(skill.file_path)
-            if norm_target == norm_file:
-                return skill, True, None
-            if skill.folder_path is not None:
-                norm_folder = _norm(skill.folder_path)
-                if norm_target == norm_folder:
-                    return skill, True, None
+        # EN: Exact match against copied target skills first.
+        # RU: Сначала точное совпадение со скопированными навыками.
+        skill = idx["target_file_to_skill"].get(norm_target)
+        if skill is not None:
+            return skill, True, None
+        skill = idx["target_folder_to_skill"].get(norm_target)
+        if skill is not None:
+            return skill, True, None
 
-        # EN: Fallback using the source-to-target mapping. This is more precise
-        # because it knows the original skill layout and can detect links to
-        # the old main file name even after it was renamed to ``SKILL.md``.
-        # RU: Fallback через маппинг исходных скиллов в целевые. Это точнее,
-        # потому что знает исходную структуру и может распознать ссылку на
-        # старое имя основного файла даже после переименования в ``SKILL.md``.
         if skill_mapping:
-            source_path = skills[0].source_path if skills else None
-            norm_source_path = _norm(source_path) if source_path else None
-            target_rel = (
-                norm_target.relative_to(norm_source_path)
-                if norm_source_path and norm_target.is_relative_to(norm_source_path)
-                else None
-            )
+            # EN: Exact match against original source skill paths.
+            result = idx["old_file_to_new"].get(norm_target)
+            if result is not None:
+                return result
 
-            for old_skill, new_skill in skill_mapping.items():
-                norm_old_file = _norm(old_skill.file_path)
-                norm_old_folder = _norm(old_skill.folder_path) if old_skill.folder_path else None
-
-                # EN: Exact path match against the original source skill. A
-                # link pointing to the original skill folder is also a main-file
-                # link (common for repo-absolute paths without the ``.md`` suffix).
-                # RU: Точное совпадение с исходным скиллом. Ссылка, указывающая
-                # на исходную папку скилла, тоже считается ссылкой на основной
-                # файл (типично для repo-absolute путей без суффикса ``.md``).
-                if norm_target == norm_old_file or norm_target == norm_old_folder:
-                    return new_skill, True, None
-
-                if norm_old_folder is not None and norm_target.is_relative_to(norm_old_folder):
-                    rel_path = norm_target.relative_to(norm_old_folder)
-                    old_main_rel = old_skill.file_path.relative_to(old_skill.folder_path)
+            # EN: Target is inside an original source skill folder.
+            for parent in norm_target.parents:
+                entry = idx["old_folder_full"].get(parent)
+                if entry is not None:
+                    new_skill, old_main_rel = entry
+                    rel_path = norm_target.relative_to(parent)
                     is_main = rel_path == Path(".") or rel_path == old_main_rel
                     return new_skill, is_main, None if is_main else rel_path
 
-                # EN: Match by the relative identity of the original skill inside
-                # the repository. This handles repo-absolute links where the
-                # target tree keeps the same nested structure as the source tree.
-                # RU: Сопоставление по относительному пути исходного скилла в
-                # репозитории. Покрывает repo-absolute ссылки, где target-дерево
-                # сохраняет ту же вложенную струстуру, что и source.
-                norm_old_source_path = _norm(old_skill.source_path)
-                if old_skill.folder_path is not None:
-                    old_identity = norm_old_folder.relative_to(norm_old_source_path)
-                else:
-                    old_identity = norm_old_file.relative_to(norm_old_source_path)
+            # EN: Match by the relative identity of the original skill inside
+            # the repository (repo-absolute links with preserved structure).
+            norm_source_path = idx["norm_source_path"]
+            if norm_source_path is not None and norm_target.is_relative_to(norm_source_path):
+                target_rel = norm_target.relative_to(norm_source_path)
+                target_rel_parts = target_rel.parts
 
-                if target_rel is not None and len(target_rel.parts) >= len(old_identity.parts):
-                    if target_rel.parts[-len(old_identity.parts):] == old_identity.parts:
-                        if old_skill.folder_path is not None:
-                            rel_path = target_rel.relative_to(old_identity)
-                            is_main = (
-                                rel_path == Path(".")
-                                or rel_path == old_skill.file_path.relative_to(old_skill.folder_path)
-                            )
-                            return new_skill, is_main, None if is_main else rel_path
-                        else:
-                            return new_skill, True, None
+                for old_identity, old_identity_parts, new_skill, old_main_rel in idx["old_identities"]:
+                    n = len(old_identity_parts)
+                    if len(target_rel_parts) >= n and target_rel_parts[-n:] == old_identity_parts:
+                        rel_path = target_rel.relative_to(old_identity)
+                        is_main = rel_path == Path(".") or rel_path == old_main_rel
+                        return new_skill, is_main, None if is_main else rel_path
 
-                # EN: The link may point directly to the original skill folder
-                # by name (repo-absolute paths without ``.md`` often resolve to
-                # the folder itself).
-                # RU: Ссылка может указывать прямо на исходную папку скилла по
-                # имени (repo-absolute пути без ``.md`` часто разрешаются в саму
-                # папку).
-                if norm_old_folder is not None and norm_target.name == norm_old_folder.name:
-                    return new_skill, True, None
-
-                # EN: The copied target tree may still use the old source folder
-                # or file names. Walk up the target path and look for the old
-                # skill's folder/file name. This handles cases where the skill
-                # was moved to a different root directory during sync.
-                # RU: Скопированное дерево может всё ещё использовать старые
-                # имена папок/файлов. Идём вверх по target_path и ищем имя
-                # старой папки/файла скилла. Это покрывает случаи, когда скилл
-                # был перемещён в другой корневой каталог при синхронизации.
-                if norm_old_folder is not None:
-                    old_folder_name = norm_old_folder.name
-                    for parent in norm_target.parents:
-                        if parent.name == old_folder_name:
-                            rel_path = norm_target.relative_to(parent)
-                            old_main_rel = old_skill.file_path.relative_to(old_skill.folder_path)
-                            is_main = rel_path == Path(".") or rel_path == old_main_rel
-                            return new_skill, is_main, None if is_main else rel_path
-                else:
-                    if norm_target.name == old_skill.file_path.name:
+                for old_identity, old_identity_parts, new_skill in idx["old_flat_identities"]:
+                    n = len(old_identity_parts)
+                    if len(target_rel_parts) >= n and target_rel_parts[-n:] == old_identity_parts:
                         return new_skill, True, None
-                    # EN: A repo-absolute link may resolve to the folder that
-                    # shares its name with a flat skill's file stem (without
-                    # the ``.md`` suffix).
-                    # RU: Repo-absolute ссылка может разрешиться в папку,
-                    # имя которой совпадает с stem имени файла плоского скилла
-                    # (без суффикса ``.md``).
-                    if norm_target.name == old_skill.file_path.stem:
-                        return new_skill, True, None
+
+            # EN: Skill moved to a different root directory -- match by folder
+            # or file name while walking up the target path.
+            for parent in norm_target.parents:
+                entries = idx["old_folder_name"].get(parent.name)
+                if entries:
+                    for new_skill, old_main_rel in entries:
+                        rel_path = norm_target.relative_to(parent)
+                        is_main = rel_path == Path(".") or rel_path == old_main_rel
+                        return new_skill, is_main, None if is_main else rel_path
+
+            # EN: Flat skill fallback by file name or stem.
+            entries = idx["old_file_names"].get(norm_target.name)
+            if entries:
+                return entries[0]
+            entries = idx["old_stem_names"].get(norm_target.name)
+            if entries:
+                return entries[0]
 
         # EN: Last resort: the target is somewhere inside a copied skill folder.
-        # RU: Последняя инстанция: цель где-то внутри папки скопированного скилла.
-        for skill in skills:
-            if skill.folder_path is not None:
-                norm_folder = _norm(skill.folder_path)
-                if norm_target.is_relative_to(norm_folder):
-                    return skill, False, None
+        for parent in norm_target.parents:
+            skill = idx["target_folder_to_skill"].get(parent)
+            if skill is not None:
+                return skill, False, None
 
         return None
+
+    @property
+    def _norm(self):
+        """Return a cached path normaliser."""
+        cache = self._norm_cache
+
+        def _norm_path(path: Path) -> Path:
+            cached = cache.get(path)
+            if cached is not None:
+                return cached
+            if path.exists():
+                result = path.resolve()
+            else:
+                result = path
+            cache[path] = result
+            return result
+
+        return _norm_path
 
     def convert(
         self,
