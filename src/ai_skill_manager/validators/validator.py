@@ -9,8 +9,9 @@ producing a ``ValidationReport``.
 формируя ``ValidationReport``.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 
+from ..progress import ProgressCallback
 from .models.validation_report import Skill, ValidationReport, Dict, ValidationResult
 from .rules import absValidationRule, DEFAULT_RULES, List
 
@@ -54,7 +55,11 @@ class Validator:
         """
         return [(rule.name, rule.version) for rule in self.__rules]
 
-    def validate(self, skills: List[Skill]) -> ValidationReport:
+    def validate(
+        self,
+        skills: List[Skill],
+        progress: Optional[ProgressCallback] = None,
+    ) -> ValidationReport:
         """Validate all skills against every registered rule.
 
         Validates all skills against every registered rule and returns a
@@ -66,6 +71,8 @@ class Validator:
         Args:
             skills: List of skills to validate.
                 / Список навыков для валидации.
+            progress: Optional ``(stage, current, total)`` callback for progress
+                reporting. / Опциональный callback для отчёта о прогрессе.
 
         Returns:
             Aggregated validation report.
@@ -75,7 +82,10 @@ class Validator:
         # Сопоставляем каждому навыку отображение имя_правила -> ValidationResult.
         report_dict: Dict[Skill, Dict[absValidationRule, ValidationResult]] = {}
 
-        for rule in self.__rules:
+        if progress is not None:
+            progress("validate", 0, len(self.__rules))
+
+        for index, rule in enumerate(self.__rules, start=1):
             # Run the current rule against all skills.
             # Запускаем текущее правило для всех навыков.
             rule_report = rule.validate(skills)
@@ -91,5 +101,8 @@ class Validator:
                 # Write the updated map back to the report.
                 # Записываем обновлённую карту обратно в отчёт.
                 report_dict[skill] = skill_validation_results
+
+            if progress is not None:
+                progress("validate", index, len(self.__rules))
 
         return ValidationReport(report_dict)

@@ -125,6 +125,25 @@ class TestRunSync(unittest.TestCase):
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
         self.assertIn("[link](skill:skill-b#section)", synced_a)
 
+    def test_progress_callback_called(self):
+        self._dir_skill("skill-a")
+        self._dir_skill("skill-b")
+        events = []
+
+        run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            self.target_dir,
+            progress=lambda *args: events.append(args),
+        )
+
+        stages = [stage for stage, _, _ in events]
+        self.assertIn("discover", stages)
+        self.assertIn("validate", stages)
+        self.assertIn("copy", stages)
+        self.assertIn("adapt", stages)
+        self.assertIn("write_managed_state", stages)
+        self.assertIn("remove_orphans", stages)
+
 
 class TestRemoveOrphans(unittest.TestCase):
     def setUp(self):
@@ -180,3 +199,26 @@ class TestRemoveOrphans(unittest.TestCase):
         remove_orphans(self.target_dir, [skill])
 
         self.assertTrue(skill.folder_path.exists())
+
+    def test_progress_callback_called(self):
+        orphan = self.target_dir / "orphan"
+        orphan.mkdir()
+        tag_managed(orphan)
+
+        kept = self._skill("kept")
+        events = []
+
+        remove_orphans(
+            self.target_dir,
+            [kept],
+            progress=lambda *args: events.append(args),
+        )
+
+        self.assertEqual(
+            events,
+            [
+                ("remove_orphans", 0, 2),
+                ("remove_orphans", 1, 2),
+                ("remove_orphans", 2, 2),
+            ],
+        )

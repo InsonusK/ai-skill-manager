@@ -8,12 +8,13 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from ...tools.source_parser import add_source_arguments, build_sources_from_args
 from ...tools.validation_report_printer import print_validation_report
 
 from ....entities.skill import Skill
+from ....progress import ProgressCallback, progress_context
 from ....services.discover import discover
 from ....services.validate import validate
 from ....validators import ValidationFailedError
@@ -53,19 +54,21 @@ def add_parser(subparsers):
     return parser
 
 
-def _check(args) -> List[Skill]:
+def _check(args, progress: Optional[ProgressCallback] = None) -> List[Skill]:
     """Resolve CLI arguments to a list of skills.
 
     Преобразует аргументы CLI в список навыков.
 
     Args:
         args: Parsed argparse namespace. / Разобранное пространство имён argparse.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         Discovered skills. / Обнаруженные навыки.
     """
     sources, _ = build_sources_from_args(args)
-    return discover(sources)
+    return discover(sources, progress=progress)
 
 
 def run(args):
@@ -82,8 +85,9 @@ def run(args):
         logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
     try:
-        skills = _check(args)
-        report = validate(skills)
+        with progress_context() as progress:
+            skills = _check(args, progress=progress)
+            report = validate(skills, progress=progress)
 
         if report.has_errors:
             print_skills(skills)

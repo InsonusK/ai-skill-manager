@@ -43,6 +43,16 @@ class TestRunValidation(unittest.TestCase):
         self.assertTrue(report.has_errors)
         self.assertGreater(len(report.errors), 0)
 
+    def test_progress_callback_called(self):
+        root = self._copy_mock("valid")
+        source = LocalSource(scan_path=root.resolve())
+        events = []
+
+        run_validation([source], progress=lambda *args: events.append(args))
+
+        self.assertTrue(any(stage == "discover" for stage, _, _ in events))
+        self.assertTrue(any(stage == "validate" for stage, _, _ in events))
+
 
 if __name__ == "__main__":
     unittest.main()

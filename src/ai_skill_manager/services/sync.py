@@ -6,7 +6,7 @@
 from logging import Logger
 import shutil
 from pathlib import Path
-from typing import List, Optional, Sequence, Type
+from typing import Dict, List, Optional, Sequence, Type
 
 from ..utils import compute_skill_hash, is_managed, write_managed_state
 
@@ -14,6 +14,7 @@ from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
 from ..entities import LocalSource, Skill, Source
 from ..entities.skill_format import SkillFormat
+from ..progress import ProgressCallback
 from ..validators import ValidationFailedError, Validator
 from .discover import discover
 
@@ -26,6 +27,7 @@ def run_sync(
     adapters: Optional[Sequence[Type[absAdapter]]] = None,
     dry_run: bool = False,
     cleanup_orphans: bool = True,
+    progress: Optional[ProgressCallback] = None,
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
 
@@ -45,18 +47,20 @@ def run_sync(
             Если ``True``, не записывать изменения.
         cleanup_orphans: If ``True``, remove orphan skills from target.
             Если ``True``, удалять осиротевшие скиллы из целевой директории.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         Summary dict with counts and the target directory.
         Сводный словарь с количеством и целевой директорией.
     """
-    skills: List[Skill] = discover(sources)
+    skills: List[Skill] = discover(sources, progress=progress)
 
     try:
         # Validate all discovered skills before copying anything.
         # Валидируем все обнаруженные навыки перед копированием.
         validator = Validator()
-        validation_report = validator.validate(skills)
+        validation_report = validator.validate(skills, progress=progress)
         if validation_report.has_errors:
             raise ValidationFailedError(validation_report)
 
@@ -90,7 +94,9 @@ def run_sync(
 
         # Copy each skill into the target directory.
         # Копируем каждый навык в целевую директорию.
-        for skill in skills:
+        if progress is not None:
+            progress("copy", 0, len(skills))
+        for index, skill in enumerate(skills, start=1):
             name = skill.properties.name
             if name is None:
                 raise ValueError(
@@ -103,6 +109,8 @@ def run_sync(
                 new_skill = _copy_dir_skill(skill, skill_target_dir)
 
             copied_skills.append(new_skill)
+            if progress is not None:
+                progress("copy", index, len(skills))
 
         # Run adapters on the copied skills and count replaced links.
         # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
@@ -120,26 +128,34 @@ def run_sync(
              "version": registered_adapter[1]}
             for registered_adapter in adapter.registered_adapters_name_version
         ]
-        for old_skill, new_skill in zip(skills, copied_skills):
+        if progress is not None:
+            progress("adapt", 0, len(skills))
+        for index, (old_skill, new_skill) in enumerate(zip(skills, copied_skills), start=1):
             adapter_msg = adapter.adapt(old_skill, new_skill)
             link_msg = adapter_msg.get(LinkAdapter.name())
             if link_msg is not None:
                 links_replaced += link_msg.params.get("count", 0)
+            if progress is not None:
+                progress("adapt", index, len(skills))
 
         # Persist managed state for each copied skill.
         # Сохраняем управляемое состояние для каждого скопированного навыка.
-        for new_skill in copied_skills:
+        if progress is not None:
+            progress("write_managed_state", 0, len(copied_skills))
+        for index, new_skill in enumerate(copied_skills, start=1):
             state = {
                 "hash": compute_skill_hash(new_skill),
                 "validators": validator_versions,
                 "adapters": adapters_version
             }
             write_managed_state(new_skill.folder_path, state)
+            if progress is not None:
+                progress("write_managed_state", index, len(copied_skills))
 
         # Remove previously copied skills that are no longer present.
         # Удаляем ранее скопированные навыки, которых больше нет в источниках.
         if cleanup_orphans:
-            remove_orphans(target_dir, copied_skills)
+            remove_orphans(target_dir, copied_skills, progress=progress)
 
         return {
             "skills_count": len(skills),
@@ -153,7 +169,11 @@ def run_sync(
             src.cleanup()
 
 
-def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Path]:
+def remove_orphans(
+    target_dir: Path,
+    copied_skills: Sequence[Skill],
+    progress: Optional[ProgressCallback] = None,
+) -> List[Path]:
     """Remove previously copied skills that are no longer present in sources.
 
     Remove previously copied skills that are no longer present in sources.
@@ -167,6 +187,8 @@ def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Pat
             Целевая директория, содержащая скопированные скиллы.
         copied_skills: Skills that were copied during this sync run.
             Скиллы, скопированные в текущем запуске синхронизации.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         Paths of removed orphan directories. /
@@ -182,15 +204,15 @@ def remove_orphans(target_dir: Path, copied_skills: Sequence[Skill]) -> List[Pat
     # Iterate target entries and remove managed directories not in copied_skills.
     # Перебираем записи целевой директории и удаляем управляемые директории,
     # отсутствующие среди скопированных навыков.
-    for entry in target_dir.iterdir():
-        if not entry.is_dir():
-            continue
-        if not is_managed(entry):
-            continue
-        if entry in copied_dirs:
-            continue
-        shutil.rmtree(entry)
-        removed.append(entry)
+    target_entries = list(target_dir.iterdir())
+    if progress is not None:
+        progress("remove_orphans", 0, len(target_entries))
+    for index, entry in enumerate(target_entries, start=1):
+        if entry.is_dir() and is_managed(entry) and entry not in copied_dirs:
+            shutil.rmtree(entry)
+            removed.append(entry)
+        if progress is not None:
+            progress("remove_orphans", index, len(target_entries))
     return removed
 
 
