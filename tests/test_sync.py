@@ -5,9 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.adapters.models.adapter_message import AdapterMessage
+from ai_skill_manager.adapters.rules.abs_adapter import absAdapter
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
 from ai_skill_manager.services.sync import remove_orphans, run_sync
-from ai_skill_manager.utils import tag_managed
+from ai_skill_manager.utils import compute_skill_hash, tag_managed
 from ai_skill_manager.validators import ValidationFailedError
 
 
@@ -143,6 +145,105 @@ class TestRunSync(unittest.TestCase):
         self.assertIn("adapt", stages)
         self.assertIn("write_managed_state", stages)
         self.assertIn("remove_orphans", stages)
+
+    def test_skips_unchanged_skill_on_second_sync(self):
+        skill = self._dir_skill("skill")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        target_file = self.target_dir / "skill" / "SKILL.md"
+        target_file.write_text("---\nname: skill\n---\n# stale\n")
+
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertIn("# stale", target_file.read_text())
+        self.assertEqual(result["skipped_count"], 1)
+
+    def test_skips_unchanged_flat_skill_on_second_sync(self):
+        md = self.source_dir / "guide.skill.md"
+        md.write_text("---\nname: guide\n---\n# Guide\n")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        target_file = self.target_dir / "guide" / "SKILL.md"
+        target_file.write_text("---\nname: guide\n---\n# stale\n")
+
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertIn("# stale", target_file.read_text())
+        self.assertEqual(result["skipped_count"], 1)
+
+    def test_re_copies_when_source_changes(self):
+        skill = self._dir_skill("skill")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        (skill / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill updated\n"
+        )
+
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertIn("# Skill updated", (self.target_dir / "skill" / "SKILL.md").read_text())
+        self.assertEqual(result["skipped_count"], 0)
+
+    def test_managed_state_hash_is_source_hash(self):
+        skill = self._dir_skill("skill")
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        from ai_skill_manager.services.discover import discover
+
+        discovered = discover([LocalSource(scan_path=self.source_dir)])
+        source_skill = discovered[0]
+        state_file = self.target_dir / "skill" / ".ai-skills-managed"
+        import json
+
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        self.assertEqual(state["hash"], compute_skill_hash(source_skill))
+
+    def test_re_copies_when_adapter_version_changes(self):
+        class NoopAdapterV1(absAdapter):
+            @classmethod
+            def version(cls):
+                return "1.0.0"
+
+            def adapt(self, old_skill, new_skill):
+                return AdapterMessage(message="noop", params={})
+
+        class NoopAdapterV2(absAdapter):
+            @classmethod
+            def version(cls):
+                return "2.0.0"
+
+            def adapt(self, old_skill, new_skill):
+                return AdapterMessage(message="noop", params={})
+
+        skill = self._dir_skill("skill")
+        run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            self.target_dir,
+            adapters=[NoopAdapterV1],
+        )
+
+        target_file = self.target_dir / "skill" / "SKILL.md"
+        target_file.write_text("---\nname: skill\n---\n# stale\n")
+
+        run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            self.target_dir,
+            adapters=[NoopAdapterV2],
+        )
+
+        self.assertNotIn("# stale", target_file.read_text())
+
+    def test_copies_when_target_is_unmanaged(self):
+        skill = self._dir_skill("skill")
+        unmanaged_target = self.target_dir / "skill"
+        unmanaged_target.mkdir(parents=True)
+        (unmanaged_target / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# stale\n"
+        )
+
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertNotIn("# stale", (unmanaged_target / "SKILL.md").read_text())
 
 
 class TestRemoveOrphans(unittest.TestCase):

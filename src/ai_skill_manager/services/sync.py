@@ -6,9 +6,9 @@
 from logging import Logger
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Type
+from typing import Dict, List, Optional, Sequence, Tuple, Type
 
-from ..utils import compute_skill_hash, is_managed, write_managed_state
+from ..utils import compute_skill_hash, is_managed, read_managed_state, write_managed_state
 
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
@@ -79,6 +79,8 @@ def run_sync(
         target_dir.mkdir(parents=True, exist_ok=True)
 
         copied_skills: List[Skill] = []
+        skills_to_adapt: List[Tuple[Skill, Skill]] = []
+        source_hashes: Dict[Skill, str] = {}
         links_replaced = 0
         # Capture validator versions for the managed state file.
         # Сохраняем версии валидаторов для файла управляемого состояния.
@@ -92,6 +94,16 @@ def run_sync(
 
         adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
 
+        # Capture adapter versions before copying so we can skip skills that
+        # have not changed since the last sync.
+        # Запоминаем версии адаптеров до копирования, чтобы пропускать скиллы,
+        # которые не изменились с последнего запуска.
+        adapters_version = [
+            {"name": registered_adapter[0],
+             "version": registered_adapter[1]}
+            for registered_adapter in Adapter([], adapter_list).registered_adapters_name_version
+        ]
+
         # Copy each skill into the target directory.
         # Копируем каждый навык в целевую директорию.
         if progress is not None:
@@ -103,17 +115,24 @@ def run_sync(
                     f"Skill {skill.file_path} has no 'name' in frontmatter")
 
             skill_target_dir = target_dir / name
-            if skill.is_flat():
-                new_skill = _copy_flat_skill(skill, skill_target_dir)
+            source_hash = compute_skill_hash(skill)
+            if _is_skill_up_to_date(skill, skill_target_dir, adapters_version):
+                new_skill = _build_target_skill(
+                    skill_target_dir / "SKILL.md", skill_target_dir)
             else:
-                new_skill = _copy_dir_skill(skill, skill_target_dir)
+                if skill.is_flat():
+                    new_skill = _copy_flat_skill(skill, skill_target_dir)
+                else:
+                    new_skill = _copy_dir_skill(skill, skill_target_dir)
+                skills_to_adapt.append((skill, new_skill))
 
             copied_skills.append(new_skill)
+            source_hashes[new_skill] = source_hash
             if progress is not None:
                 progress("copy", index, len(skills))
 
-        # Run adapters on the copied skills and count replaced links.
-        # Запускаем адаптеры на скопированных навыках и считаем заменённые ссылки.
+        # Run adapters only on skills that were actually copied.
+        # Запускаем адаптеры только на тех скиллах, которые реально скопировались.
         skill_mapping = dict(zip(skills, copied_skills))
         copied_files: Dict[Path, Path] = {}
         adapter = Adapter(
@@ -123,28 +142,27 @@ def run_sync(
             target_dir=target_dir,
             copied_files=copied_files,
         )
-        adapters_version = [
-            {"name": registered_adapter[0],
-             "version": registered_adapter[1]}
-            for registered_adapter in adapter.registered_adapters_name_version
-        ]
         if progress is not None:
-            progress("adapt", 0, len(skills))
-        for index, (old_skill, new_skill) in enumerate(zip(skills, copied_skills), start=1):
+            progress("adapt", 0, len(skills_to_adapt))
+        for index, (old_skill, new_skill) in enumerate(skills_to_adapt, start=1):
             adapter_msg = adapter.adapt(old_skill, new_skill)
             link_msg = adapter_msg.get(LinkAdapter.name())
             if link_msg is not None:
                 links_replaced += link_msg.params.get("count", 0)
             if progress is not None:
-                progress("adapt", index, len(skills))
+                progress("adapt", index, len(skills_to_adapt))
 
         # Persist managed state for each copied skill.
+        # The stored hash represents the *source* skill, so unchanged sources
+        # can be detected on the next run.
         # Сохраняем управляемое состояние для каждого скопированного навыка.
+        # Хранимый хеш относится к *исходному* скиллу, чтобы при следующем
+        # запуске обнаружить неизменённые источники.
         if progress is not None:
             progress("write_managed_state", 0, len(copied_skills))
         for index, new_skill in enumerate(copied_skills, start=1):
             state = {
-                "hash": compute_skill_hash(new_skill),
+                "hash": source_hashes[new_skill],
                 "validators": validator_versions,
                 "adapters": adapters_version
             }
@@ -161,6 +179,7 @@ def run_sync(
             "skills_count": len(skills),
             "target_dir": str(target_dir),
             "links_replaced": links_replaced,
+            "skipped_count": len(skills) - len(skills_to_adapt),
         }
     finally:
         # Release temporary resources acquired by remote sources.
@@ -214,6 +233,52 @@ def remove_orphans(
         if progress is not None:
             progress("remove_orphans", index, len(target_entries))
     return removed
+
+
+def _is_skill_up_to_date(
+    skill: Skill,
+    skill_target_dir: Path,
+    adapters_version: List[dict],
+) -> bool:
+    """Check if the target copy is still valid.
+
+    Check if the target copy is still valid.
+
+    Проверяет, актуальна ли целевая копия скилла.
+
+    A skill is considered up-to-date when the target directory exists, was
+    created by this tool, the source skill hash has not changed and the list
+    of adapter versions is identical to the one stored in the managed state.
+
+    Args:
+        skill: Source skill to check. / Исходный скилл для проверки.
+        skill_target_dir: Target directory used by a previous sync.
+            Целевая директория из предыдущего запуска синхронизации.
+        adapters_version: Current adapter versions to compare against.
+            Текущие версии адаптеров для сравнения.
+
+    Returns:
+        ``True`` if copying and adapting can be skipped.
+        ``True``, если копирование и адаптацию можно пропустить.
+    """
+    if not skill_target_dir.is_dir():
+        return False
+
+    target_skill_file = skill_target_dir / "SKILL.md"
+    if not target_skill_file.is_file():
+        return False
+
+    if not is_managed(skill_target_dir):
+        return False
+
+    state = read_managed_state(skill_target_dir)
+    if state is None:
+        return False
+
+    return (
+        state.get("hash") == compute_skill_hash(skill)
+        and state.get("adapters") == adapters_version
+    )
 
 
 def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:
