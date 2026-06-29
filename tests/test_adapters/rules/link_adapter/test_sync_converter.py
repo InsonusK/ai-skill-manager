@@ -62,7 +62,7 @@ class TestRelative(_SyncFixtureHelper):
         """RU: Относительная ссылка на другой скилл корректно маппится.
 
         Исходный путь: ``../skill-b/skill-b.skill.md``
-        После синхронизации: ``skill:skill-b``
+        После синхронизации: ``skill-b/SKILL.md``
         """
         target_dir = self._run_sync_case("cross_skill_source_to_target")
         expected_dir = MOCKS_DIR / self.path_type / "cross_skill_source_to_target" / "target"
@@ -74,7 +74,7 @@ class TestRelative(_SyncFixtureHelper):
         """RU: Относительная ссылка на вложенный файл другого скилла.
 
         Исходный путь: ``../skill-b.skill/docs/extra.md``
-        После синхронизации: ``skill:skill-b;file:./docs/extra.md``
+        После синхронизации: ``skill-b/docs/extra.md``
         """
         target_dir = self._run_sync_case("source_link_to_nested_file")
         expected_dir = MOCKS_DIR / self.path_type / "source_link_to_nested_file" / "target"
@@ -90,7 +90,7 @@ class TestRelative(_SyncFixtureHelper):
         """RU: Относительная ссылка на HumanFlat-скилл после копирования.
 
         Исходный путь: ``../skill-b.skill.md``
-        После синхронизации: ``skill:skill-b``
+        После синхронизации: ``skill-b/SKILL.md``
         """
         target_dir = self._run_sync_case("human_flat_to_agent")
         expected_dir = MOCKS_DIR / self.path_type / "human_flat_to_agent" / "target"
@@ -102,7 +102,7 @@ class TestRelative(_SyncFixtureHelper):
         """RU: Относительная ссылка на HumanDir-скилл после копирования.
 
         Исходный путь: ``../skill-b.skill/skill-b.skill.md``
-        После синхронизации: ``skill:skill-b``
+        После синхронизации: ``skill-b/SKILL.md``
         """
         target_dir = self._run_sync_case("human_dir_to_agent")
         expected_dir = MOCKS_DIR / self.path_type / "human_dir_to_agent" / "target"
@@ -120,7 +120,7 @@ class TestRepoAbsolute(_SyncFixtureHelper):
         """RU: repo-absolute ссылка на папку HumanDir-скилла без .md.
 
         Исходный путь: ``skills/category/module-api-csproj.skill``
-        После синхронизации: ``skill:module-api-csproj``
+        После синхронизации: ``module-api-csproj/SKILL.md``
         """
         target_dir = self._run_sync_case("repo_absolute_to_skill_folder")
         expected_dir = MOCKS_DIR / self.path_type / "repo_absolute_to_skill_folder" / "target"
@@ -133,7 +133,7 @@ class TestRepoAbsolute(_SyncFixtureHelper):
 
         Исходный путь:
         ``skills/dotnet/architecture/plateau/default/{Module}.Api/module-api-csproj.skill``
-        После синхронизации: ``skill:module-api-csproj``
+        После синхронизации: ``module-api-csproj/SKILL.md``
         """
         target_dir = self._run_sync_case("curly_braces_skill_folder")
         expected_dir = MOCKS_DIR / self.path_type / "curly_braces_skill_folder" / "target"
@@ -147,7 +147,7 @@ class TestRepoAbsolute(_SyncFixtureHelper):
         Исходный путь:
         ``skills/category/solution-structure-solution/Implementation/Repository.create.md``
         После синхронизации:
-        ``skill:solution-structure-solution;file:./Implementation/Repository.create.md``
+        ``solution-structure-solution/Implementation/Repository.create.md``
         """
         target_dir = self._run_sync_case("source_link_to_deep_nested_file")
         expected_dir = MOCKS_DIR / self.path_type / "source_link_to_deep_nested_file" / "target"
@@ -164,7 +164,7 @@ class TestRepoAbsolute(_SyncFixtureHelper):
 
         Исходный путь:
         ``skills/dotnet/architecture/solutions/🧩validated/entity-concurrency-change-solution.skill/entity-concurrency-change-solution.skill.md``
-        После синхронизации: ``skill:entity-concurrency-change-solution``
+        После синхронизации: ``entity-concurrency-change-solution/SKILL.md``
         """
         target_dir = self._run_sync_case("deep_nested_source_to_target")
         expected_dir = MOCKS_DIR / self.path_type / "deep_nested_source_to_target" / "target"

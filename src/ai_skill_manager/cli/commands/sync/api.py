@@ -122,6 +122,7 @@ def run_sync(
         cleanup_orphans=remove_orphans,
         force=force,
         progress=progress,
+        repo_path=config_base if config_base is not None else Path.cwd(),
     )
 
     # Preserve legacy fields for formatters and callers.

@@ -33,12 +33,12 @@ class LinkAdapter(absAdapter):
 
         Версия адаптера для обнаружения изменений.
         """
-        return "1.1.1"
+        return "1.2.0"
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
-        """Rewrite links in ``new_skill`` files to the skill-link format.
+        """Rewrite links in ``new_skill`` files to the repo-absolute format.
 
-        Переписывает ссылки в файлах ``new_skill`` в формат skill-link.
+        Переписывает ссылки в файлах ``new_skill`` в формат repo-absolute.
 
         Args:
             old_skill: Original skill before copying.
@@ -98,9 +98,9 @@ class LinkAdapter(absAdapter):
         skill: Skill,
         other_skills: List[Skill],
     ) -> Tuple[str, int]:
-        """Replace all links in ``content`` with skill-link format.
+        """Replace all links in ``content`` with repo-absolute format.
 
-        Заменяет все ссылки в ``content`` на формат skill-link.
+        Заменяет все ссылки в ``content`` на формат repo-absolute.
 
         Replacements are applied from the end of the content to the start so that
         offsets remain valid.
@@ -184,9 +184,9 @@ class LinkAdapter(absAdapter):
         skill: Skill,
         other_skills: List[Skill],
     ) -> Optional[str]:
-        """Compute the skill-link replacement target for a link.
+        """Compute the repo-absolute replacement target for a link.
 
-        Вычисляет цель замены ссылки в формате skill-link.
+        Вычисляет цель замены ссылки в формате repo-absolute.
 
         Args:
             link: Link to rewrite.
@@ -209,12 +209,12 @@ class LinkAdapter(absAdapter):
         if isinstance(link, WebLink):
             return None
 
-        # Resolve the skill-format target via the dedicated converter.
+        # Resolve the repo-absolute target via the dedicated converter.
         # Pass the source-to-target skill mapping so source links that still
         # point to the original source paths can be resolved correctly.
         # Pass the target skill folder and the shared copy registry so that
         # links to files outside any skill can be copied into files/.
-        # Разрешаем цель в формате skill-link через специализированный конвертер.
+        # Разрешаем цель в формате repo-absolute через специализированный конвертер.
         # Передаём маппинг исходных скиллов в целевые, чтобы source-ссылки,
         # всё ещё указывающие на исходные пути, разрешались корректно.
         # Передаём целевую папку скилла и общий реестр копирования, чтобы

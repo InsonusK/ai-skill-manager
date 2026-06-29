@@ -2,4 +2,4 @@
 name: other-skill
 ---
 # Other
-[api](skill:module-api-csproj)
+[api](module-api-csproj/SKILL.md)
