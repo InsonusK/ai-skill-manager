@@ -109,6 +109,28 @@ class TestSyncAPI(unittest.TestCase):
 
         self.assertTrue(ctx.exception.report.has_errors)
 
+    def test_sync_link_includes_target_dir_relative_to_config_base(self):
+        # EN: When target is a subdirectory of the config base (repo root),
+        # repo-absolute links include the target_dir prefix.
+        # RU: Когда target — поддиректория config base (корня репо),
+        # repo-absolute ссылки включают префикс target_dir.
+        src = self.tmp / "skills"
+        src.mkdir()
+        skill_a = src / "skill-a"
+        skill_a.mkdir()
+        (skill_a / "SKILL.md").write_text(
+            "---\nname: skill-a\n---\n# A\n[link to b](../skill-b/SKILL.md)\n"
+        )
+        skill_b = src / "skill-b"
+        skill_b.mkdir()
+        (skill_b / "SKILL.md").write_text("---\nname: skill-b\n---\n# B\n")
+
+        config = self._write_config(target="./agents/skills")
+        run_sync(config_path=config)
+
+        synced_a = (self.tmp / "agents" / "skills" / "skill-a" / "SKILL.md").read_text()
+        self.assertIn("[link to b](agents/skills/skill-b/SKILL.md)", synced_a)
+
 
 class TestSyncCLI(unittest.TestCase):
     def setUp(self):

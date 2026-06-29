@@ -29,6 +29,7 @@ def run_sync(
     cleanup_orphans: bool = True,
     force: bool = False,
     progress: Optional[ProgressCallback] = None,
+    repo_path: Optional[Path] = None,
 ) -> dict:
     """Discover, validate, copy and adapt all skills.
 
@@ -69,6 +70,8 @@ def run_sync(
             raise ValidationFailedError(validation_report)
 
         target_dir = Path(target_dir).resolve()
+        if repo_path is None:
+            repo_path = target_dir
 
         # In dry-run mode return a summary without touching the filesystem.
         # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
@@ -123,12 +126,12 @@ def run_sync(
             if not force and _is_skill_up_to_date(
                     skill, skill_target_dir, adapters_version):
                 new_skill = _build_target_skill(
-                    skill_target_dir / "SKILL.md", skill_target_dir)
+                    skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
             else:
                 if skill.is_flat():
-                    new_skill = _copy_flat_skill(skill, skill_target_dir)
+                    new_skill = _copy_flat_skill(skill, skill_target_dir, repo_path=repo_path)
                 else:
-                    new_skill = _copy_dir_skill(skill, skill_target_dir)
+                    new_skill = _copy_dir_skill(skill, skill_target_dir, repo_path=repo_path)
                 skills_to_adapt.append((skill, new_skill))
 
             copied_skills.append(new_skill)
@@ -301,7 +304,7 @@ def _write_managed_state_if_changed(skill_dir: Path, state: dict) -> None:
     write_managed_state(skill_dir, state)
 
 
-def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:
+def _copy_flat_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Skill:
     """Copy a flat skill to the target directory as an Agent-format skill.
 
     Copy a flat skill to the target directory as an Agent-format skill.
@@ -320,10 +323,10 @@ def _copy_flat_skill(skill: Skill, skill_target_dir: Path) -> Skill:
     skill_target_dir.mkdir(parents=True, exist_ok=True)
     target_path = skill_target_dir / "SKILL.md"
     shutil.copy2(skill.file_path, target_path)
-    return _build_target_skill(target_path, skill_target_dir)
+    return _build_target_skill(target_path, skill_target_dir, repo_path=repo_path)
 
 
-def _copy_dir_skill(skill: Skill, skill_target_dir: Path) -> Skill:
+def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Skill:
     """Copy a directory skill to the target directory as an Agent-format skill.
 
     Copy a directory skill to the target directory as an Agent-format skill.
@@ -357,10 +360,10 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path) -> Skill:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_file, dst)
 
-    return _build_target_skill(skill_target_dir / "SKILL.md", skill_target_dir)
+    return _build_target_skill(skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
 
 
-def _build_target_skill(file_path: Path, folder_path: Path) -> Skill:
+def _build_target_skill(file_path: Path, folder_path: Path, repo_path: Path) -> Skill:
     """Build a Skill object for a copied Agent-format skill.
 
     Build a Skill object for a copied Agent-format skill.
@@ -372,13 +375,15 @@ def _build_target_skill(file_path: Path, folder_path: Path) -> Skill:
             Путь к файлу SKILL.md навыка.
         folder_path: Path to the skill's target directory. /
             Путь к целевой директории навыка.
+        repo_path: Repository root used for repo-absolute link formatting. /
+            Корень репозитория для формирования repo-absolute ссылок.
 
     Returns:
         A new :class:`Skill` instance representing the copied skill. /
         Новый экземпляр :class:`Skill`, представляющий скопированный навык.
     """
     source_path = folder_path.parent
-    source = LocalSource(scan_path=source_path)
+    source = LocalSource(scan_path=source_path, repo_path=repo_path)
     return Skill(
         file_path=file_path,
         folder_path=folder_path,

@@ -2,4 +2,4 @@
 name: skill-a
 ---
 # Skill A
-[extra](skill:skill-b;file:./docs/extra.md)
+[extra](skill-b/docs/extra.md)

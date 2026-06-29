@@ -37,11 +37,11 @@ class TestLinkAdapter(unittest.TestCase):
         )
 
     def test_rewrites_flat_skill_self_link(self):
-        """RU: Ссылка на сам плоский скилл сохраняет относительный путь из absLink.
+        """RU: Ссылка на сам плоский скилл переписывается в repo-absolute путь.
 
         В реальном синхроне плоский HumanFlat-скилл копируется в Agent-формат,
-        поэтому исходная ссылка ``./guide.skill.md`` остаётся как есть в
-        разрешённом ``absLink.path.formatted``.
+        поэтому исходная ссылка ``./guide.skill.md`` становится repo-absolute
+        путём ``guide.skill.md``.
         """
         root = self._copy_mock("flat_skill")
         md = root / "guide.skill.md"
@@ -51,29 +51,29 @@ class TestLinkAdapter(unittest.TestCase):
         adapter.adapt(skill, skill)
 
         content = md.read_text()
-        self.assertIn("[details](./guide.skill.md)", content)
+        self.assertIn("[details](guide.skill.md)", content)
 
     def test_rewrites_dir_skill_internal_link(self):
         root = self._copy_mock("dir_skill")
         skill_dir = root / "web"
-        skill = self._skill(skill_dir / "web.skill.md", skill_dir)
+        skill = self._skill(skill_dir / "web.skill.md", skill_dir, repo_path=root)
 
         adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
         adapter.adapt(skill, skill)
 
         content = (skill_dir / "web.skill.md").read_text()
-        self.assertIn("[internal](./details.md)", content)
+        self.assertIn("[internal](web/details.md)", content)
 
     def test_preserves_image_prefix(self):
         root = self._copy_mock("image_link")
         skill_dir = root / "skill"
-        skill = self._skill(skill_dir / "SKILL.md", skill_dir)
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
 
         adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
         adapter.adapt(skill, skill)
 
         content = (skill_dir / "SKILL.md").read_text()
-        self.assertIn("![alt](./diagram.png)", content)
+        self.assertIn("![alt](skill/diagram.png)", content)
 
     def test_skips_external_urls(self):
         root = self._copy_mock("flat_skill")
