@@ -148,6 +148,102 @@ class TestLinkFactory(unittest.TestCase):
         found_raws = {link.raw for link in links}
         self.assertEqual(found_raws, set(expected.keys()))
 
+    def test_links_inside_example_block_are_ignored(self):
+        # EN: Markdown/wiki links inside a ```example fenced code block must
+        # not be treated as real links.
+        # RU: Markdown/wiki-ссылки внутри fenced code block ```example не должны
+        # считаться настоящими ссылками.
+        root = self.tmpdir / "repo"
+        root.mkdir()
+        md = root / "SKILL.md"
+        md.write_text("# Skill\n")
+        (root / "outside.md").write_text("# Outside\n")
+        skill_file = self._skill_file(md)
+
+        content = (
+            "# Skill\n"
+            "[valid](./outside.md)\n"
+            "```example\n"
+            "[[ignored link]]\n"
+            "[ignored too](./missing.md)\n"
+            "```\n"
+            "[also valid](./outside.md)\n"
+        )
+        links = search_links_in_content(content, skill_file)
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0].raw, "[valid](./outside.md)")
+        self.assertEqual(links[1].raw, "[also valid](./outside.md)")
+
+    def test_example_block_without_closing_fence_is_ignored_to_eof(self):
+        # EN: An unclosed ```example block must hide links up to the end of
+        # the file.
+        # RU: Незакрытый блок ```example должен скрывать ссылки до конца файла.
+        root = self.tmpdir / "repo"
+        root.mkdir()
+        md = root / "SKILL.md"
+        md.write_text("# Skill\n")
+        (root / "outside.md").write_text("# Outside\n")
+        skill_file = self._skill_file(md)
+
+        content = (
+            "[valid](./outside.md)\n"
+            "```example\n"
+            "[ignored](./missing.md)\n"
+        )
+        links = search_links_in_content(content, skill_file)
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0].raw, "[valid](./outside.md)")
+
+    def test_example_block_preserves_offsets_for_replacement(self):
+        # EN: Masking ```example blocks must not change link offsets so that
+        # later adapters can still replace links correctly.
+        # RU: Маскирование блоков ```example не должно менять смещения ссылок,
+        # чтобы последующие адаптеры могли корректно заменять ссылки.
+        root = self.tmpdir / "repo"
+        root.mkdir()
+        md = root / "SKILL.md"
+        md.write_text("# Skill\n")
+        (root / "outside.md").write_text("# Outside\n")
+        skill_file = self._skill_file(md)
+
+        content = (
+            "[first](./outside.md)\n"
+            "```example\n"
+            "[ignored](./missing.md)\n"
+            "```\n"
+            "[second](./outside.md)\n"
+        )
+        links = search_links_in_content(content, skill_file)
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0].raw, "[first](./outside.md)")
+        self.assertEqual(links[0].start, content.index("[first"))
+        self.assertEqual(links[1].raw, "[second](./outside.md)")
+        self.assertEqual(links[1].start, content.index("[second"))
+
+    def test_indented_example_block_is_ignored(self):
+        # EN: A ```example block indented by up to three spaces must also hide
+        # its links.
+        # RU: Блок ```example с отступом до трёх пробелов также должен скрывать
+        # находящиеся в нём ссылки.
+        root = self.tmpdir / "repo"
+        root.mkdir()
+        md = root / "SKILL.md"
+        md.write_text("# Skill\n")
+        (root / "outside.md").write_text("# Outside\n")
+        skill_file = self._skill_file(md)
+
+        content = (
+            "[valid](./outside.md)\n"
+            "   ```example\n"
+            "   [[ignored]]\n"
+            "   ```\n"
+            "[also valid](./outside.md)\n"
+        )
+        links = search_links_in_content(content, skill_file)
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0].raw, "[valid](./outside.md)")
+        self.assertEqual(links[1].raw, "[also valid](./outside.md)")
+
 
 if __name__ == "__main__":
     unittest.main()
