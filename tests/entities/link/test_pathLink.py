@@ -127,6 +127,27 @@ class TestPathLink(unittest.TestCase):
         self.assertEqual(link.path.kind, LinkKind.source)
         self.assertEqual(link.path.formatted, "other/SKILL.md")
 
+    def test_relative_dir_inside_with_windows_separators(self):
+        # EN: A relative link authored on Windows using backslashes must be
+        # treated exactly like a POSIX relative link.
+        # RU: Относительная ссылка, созданная на Windows с обратными слешами,
+        # должна обрабатываться так же, как POSIX-ссылка.
+        link = self._path_link(self._dir_skill_file(), ".\\sub\\nested.md")
+        self.assertEqual(link.path_raw.kind, PathKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.skill)
+        self.assertEqual(link.path.formatted, "./sub/nested.md")
+        self.assertTrue(link.path.exists)
+
+    def test_relative_dir_parent_with_windows_separators(self):
+        # EN: A parent-relative link using Windows backslashes must leave the
+        # skill directory and become repo_absolute.
+        # RU: Родительская относительная ссылка с обратными слешами Windows
+        # должна выходить из директории скилла и становиться repo_absolute.
+        link = self._path_link(self._dir_skill_file(), "..\\other\\SKILL.md")
+        self.assertEqual(link.path_raw.kind, PathKind.relative)
+        self.assertEqual(link.path.kind, LinkKind.source)
+        self.assertEqual(link.path.formatted, "other/SKILL.md")
+
     # ==================================================================
     # Repo-absolute raw path
     # Путь от корня репозитория
@@ -180,6 +201,17 @@ class TestPathLink(unittest.TestCase):
         link = self._path_link(self._dir_skill_file(), "dir/sub/nested.md")
         self.assertEqual(link.path.kind, LinkKind.skill)
         self.assertEqual(link.path.formatted, "./sub/nested.md")
+
+    def test_repo_absolute_dir_with_windows_separators(self):
+        # EN: A repo-absolute link authored on Windows using backslashes must
+        # resolve to the same target as a POSIX link.
+        # RU: Ссылка от корня репозитория, созданная на Windows с обратными
+        # слешами, должна разрешаться в ту же цель, что и POSIX-ссылка.
+        link = self._path_link(self._dir_skill_file(), "dir\\sub\\nested.md")
+        self.assertEqual(link.path_raw.kind, PathKind.repo_absolute)
+        self.assertEqual(link.path.kind, LinkKind.skill)
+        self.assertEqual(link.path.formatted, "./sub/nested.md")
+        self.assertTrue(link.path.exists)
 
     def test_repo_absolute_dir_outside(self):
         # EN: A repo-absolute link to a file outside the skill directory but

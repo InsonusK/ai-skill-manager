@@ -138,6 +138,44 @@ class TestMarkdownLinkBuilder(unittest.TestCase):
         self.assertIs(path_link.link_type, PathLink)
         self.assertIs(web_link.link_type, WebLink)
 
+    def test_finds_windows_separator_link(self):
+        # EN: Markdown links written with Windows backslashes must resolve
+        # exactly like POSIX links.
+        # RU: Markdown-ссылки с обратными слешами Windows должны разрешаться
+        # точно так же, как POSIX-ссылки.
+        root = self.tmpdir / "skill"
+        root.mkdir()
+        md = root / "SKILL.md"
+        md.write_text("# Skill\n")
+        target = root / "sub" / "file.md"
+        target.parent.mkdir()
+        target.write_text("# File\n")
+        skill_file = self._skill_file(md, root)
+
+        builder = MarkdownLinkBuilder()
+        links = builder.search("[text](.\\sub\\file.md)", skill_file)
+        self.assertEqual(len(links), 1)
+        self.assertIsInstance(links[0], PathLink)
+        self.assertEqual(links[0].path_raw.path, ".\\sub\\file.md")
+        self.assertEqual(links[0].path_raw.kind, PathKind.relative)
+        self.assertEqual(links[0].path.kind, LinkKind.skill)
+        self.assertEqual(links[0].path.formatted, "./sub/file.md")
+        self.assertTrue(links[0].path.exists)
+
+    def test_base_helper_methods_handle_windows_separators(self):
+        # EN: The protected helpers used by builders must accept Windows
+        # backslashes the same way as POSIX separators.
+        # RU: Защищённые хелперы, используемые сборщиками, должны принимать
+        # обратные слеши Windows так же, как POSIX-разделители.
+        builder = MarkdownLinkBuilder()
+        self.assertTrue(builder._is_relative(".\\file.md"))
+        self.assertTrue(builder._is_relative("..\\file.md"))
+        self.assertTrue(builder._is_relative("./file.md"))
+        self.assertTrue(builder._is_os_absolute("/tmp/file.md"))
+        self.assertEqual(builder._get_kind(".\\file.md"), PathKind.relative)
+        self.assertEqual(builder._get_kind("/tmp/file.md"), PathKind.os_absolute)
+        self.assertEqual(builder._get_kind("file.md"), PathKind.repo_absolute)
+
 
 if __name__ == "__main__":
     unittest.main()
