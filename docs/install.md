@@ -37,6 +37,14 @@ pip install -e .
 This installs the package along with its runtime dependency (`pyyaml`).
 Это устанавливает пакет вместе с его runtime-зависимостью (`pyyaml`).
 
+### Possible errors
+**filename too long error: cannot stat**
+In case file path is too long, you can fix it by:
+В случае если длинна путей слишком большая, то можно пофиксить
+```shell
+git config --global core.longpaths true
+```
+
 ## Install dependencies only / Установка только зависимостей
 
 If you prefer to run the code without installing the package, install the requirements file:
