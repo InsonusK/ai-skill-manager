@@ -2,4 +2,4 @@
 name: other-skill
 ---
 # Other
-[link](skill:entity-concurrency-change-solution)
+[link](entity-concurrency-change-solution/SKILL.md)

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
@@ -31,6 +32,25 @@ def _append_header(target: str, header: Optional[str]) -> str:
     if header:
         return f"{target}{header}"
     return target
+
+
+def _repo_absolute_path(os_path: Path, repo_path: Path) -> str:
+    """Return ``os_path`` relative to the repository root as a POSIX path.
+
+    The result is the ``repo_absolute`` link format: a path starting from the
+    repository root without a leading ``./``.
+
+    Args:
+        os_path: Absolute target path inside the repository.
+            Абсолютный путь цели внутри репозитория.
+        repo_path: Absolute path to the repository root.
+            Абсолютный путь к корню репозитория.
+
+    Returns:
+        Repository-relative POSIX path.
+            Путь относительно корня репозитория в POSIX-формате.
+    """
+    return Path(os.path.relpath(os_path, repo_path)).as_posix()
 
 
 class absLinkConverter(ABC):
@@ -82,10 +102,12 @@ class SkillLinkConverter(absLinkConverter):
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         **kwargs,
     ) -> str:
-        """Return the already-relative skill path, preserving any header."""
-        # EN: Links inside the same skill keep their relative path.
-        # RU: Ссылки внутри того же скилла сохраняют свой относительный путь.
-        return _append_header(link.path.formatted, link.header)
+        """Return the repo-absolute path to the target, preserving any header."""
+        # EN: Internal skill links are rewritten to repo-absolute paths.
+        # RU: Внутренние ссылки скилла переписываются в repo-absolute пути.
+        repo_path = link.skill_file.skill.source.get_scan_location().repo_path
+        target = _repo_absolute_path(link.path.os_path, repo_path)
+        return _append_header(target, link.header)
 
 
 class ExternalLinkConverter(absLinkConverter):
@@ -374,40 +396,40 @@ class SourceLinkConverter(absLinkConverter):
     ) -> str:
         """Resolve a source link against known skills.
 
-        Если цель совпадает с основным файлом навыка — используем ``skill:<name>``.
-        Если цель находится внутри папки навыка — добавляем ``;file:<relative>``.
-        Если цель не принадлежит известному навыку и передан ``target_skill_folder``,
-        копируем файл в ``files/``.
+        If the target belongs to a known skill, rewrite it as a repo-absolute
+        path (e.g. ``skill-b/SKILL.md`` or ``skill-b/docs/extra.md``).
+        If the target is not part of any known skill and ``target_skill_folder``
+        is provided, copy the file into ``files/`` and return a relative link.
+
+        Если цель принадлежит известному навыку, переписываем ссылку в
+        repo-absolute путь (например, ``skill-b/SKILL.md`` или
+        ``skill-b/docs/extra.md``).
+        Если цель не принадлежит известному навыку и передан
+        ``target_skill_folder``, копируем файл в ``files/``.
         """
         target_path = link.path.os_path
         resolved = self._resolve_skill(target_path, skills, skill_mapping)
 
         if resolved is not None:
             skill, is_main_file, rel_path_override = resolved
-            skill_name = skill.properties.name
-            if skill_name is None:
-                raise ValueError(
-                    f"Cannot convert source link {link.raw!r} into skill format: "
-                    f"skill {skill.file_path.as_posix()!r} has no name"
-                )
 
-            # EN: Link points directly to the skill's main file.
-            # RU: Ссылка ведёт прямо на основной файл скилла.
+            # EN: Determine the absolute target path inside the resolved skill.
+            # RU: Определяем абсолютный путь цели внутри разрешённого скилла.
             if is_main_file or target_path == skill.file_path:
-                return _append_header(f"skill:{skill_name}", link.header)
-
-            # EN: The target path points inside the skill folder.
-            # RU: Цель указывает внутрь папки скилла.
-            if rel_path_override is not None:
-                rel_path = rel_path_override.as_posix()
+                final_path = skill.file_path
             else:
                 folder = skill.folder_path
                 assert folder is not None, "skill with nested file must have a folder"
-                rel_path = target_path.relative_to(folder).as_posix()
-            return _append_header(
-                f"skill:{skill_name};file:./{rel_path}",
-                link.header,
-            )
+                if rel_path_override is not None:
+                    final_path = folder / rel_path_override
+                else:
+                    final_path = target_path
+
+            # EN: Rewrite the link as a repo-absolute path.
+            # RU: Переписываем ссылку в repo-absolute путь.
+            repo_path = link.skill_file.skill.source.get_scan_location().repo_path
+            target = _repo_absolute_path(final_path, repo_path)
+            return _append_header(target, link.header)
 
         # EN: Not part of any known skill: copy to files/ if the adapter
         # provided the target skill folder.
@@ -490,7 +512,7 @@ class LinkConverter:
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
     ) -> str:
-        """Convert ``link`` to the agent skill-link format.
+        """Convert ``link`` to the repo-absolute format.
 
         Args:
             link: Parsed link to convert.
@@ -508,8 +530,8 @@ class LinkConverter:
                 / Общий реестр уже скопированных внешних файлов.
 
         Returns:
-            New link target in agent skill-link notation.
-                Новая цель ссылки в нотации агентской skill-link.
+            New link target in repo-absolute notation.
+                Новая цель ссылки в repo-absolute нотации.
 
         Raises:
             ValueError: If the link kind is unknown or the source link cannot

@@ -2,4 +2,4 @@
 name: skill-a
 ---
 # Skill A
-[link](skill:skill-b)
+[link](skill-b/SKILL.md)

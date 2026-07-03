@@ -2,4 +2,4 @@
 name: other-skill
 ---
 # Other
-[repo-create](skill:solution-structure-solution;file:./Implementation/Repository.create.md)
+[repo-create](solution-structure-solution/Implementation/Repository.create.md)

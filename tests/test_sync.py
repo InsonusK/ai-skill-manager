@@ -41,7 +41,30 @@ class TestRunSync(unittest.TestCase):
         self.assertEqual(result["skills_count"], 2)
         self.assertEqual(result["links_replaced"], 1)
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
-        self.assertIn("[link to b](skill:skill-b)", synced_a)
+        self.assertIn("[link to b](skill-b/SKILL.md)", synced_a)
+
+    def test_rewrites_cross_skill_link_with_repo_path_above_target_dir(self):
+        # EN: When repo_path is above target_dir, links include the target_dir
+        # prefix in repo-absolute form.
+        # RU: Когда repo_path выше target_dir, ссылки включают префикс target_dir
+        # в repo-absolute форме.
+        a = self._dir_skill("skill-a")
+        b = self._dir_skill("skill-b")
+        (a / "SKILL.md").write_text(
+            "---\nname: skill-a\n---\n# A\n[link to b](../skill-b/SKILL.md)\n"
+        )
+
+        target_dir = self.target_dir / "agents" / "skills"
+        result = run_sync(
+            [LocalSource(scan_path=self.source_dir)],
+            target_dir,
+            repo_path=self.target_dir,
+        )
+
+        self.assertEqual(result["skills_count"], 2)
+        self.assertEqual(result["links_replaced"], 1)
+        synced_a = (target_dir / "skill-a" / "SKILL.md").read_text()
+        self.assertIn("[link to b](agents/skills/skill-b/SKILL.md)", synced_a)
 
     def test_rewrites_internal_link(self):
         skill = self._dir_skill("skill")
@@ -54,7 +77,7 @@ class TestRunSync(unittest.TestCase):
 
         self.assertEqual(result["links_replaced"], 1)
         synced = (self.target_dir / "skill" / "SKILL.md").read_text()
-        self.assertIn("[template](./template.md)", synced)
+        self.assertIn("[template](skill/template.md)", synced)
 
     def test_rewrites_wiki_link(self):
         a = self._dir_skill("skill-a")
@@ -67,7 +90,7 @@ class TestRunSync(unittest.TestCase):
 
         self.assertEqual(result["links_replaced"], 1)
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
-        self.assertIn("[link to b](skill:skill-b)", synced_a)
+        self.assertIn("[link to b](skill-b/SKILL.md)", synced_a)
 
     def test_skips_external_url(self):
         skill = self._dir_skill("skill")
@@ -125,7 +148,7 @@ class TestRunSync(unittest.TestCase):
         run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
-        self.assertIn("[link](skill:skill-b#section)", synced_a)
+        self.assertIn("[link](skill-b/SKILL.md#section)", synced_a)
 
     def test_progress_callback_called(self):
         self._dir_skill("skill-a")

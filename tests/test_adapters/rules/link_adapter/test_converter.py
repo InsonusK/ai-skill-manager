@@ -67,7 +67,7 @@ class TestLinkConverter(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_skill_kind_self_link_to_skill_file(self):
-        """RU: Ссылка kind=skill на основной файл скилла превращается в ./SKILL.md."""
+        """RU: Ссылка kind=skill на основной файл скилла превращается в repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_file = self._skill_file(skill_a, "SKILL.md", "[self](./SKILL.md)\n")
@@ -75,10 +75,10 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a])
 
-        self.assertEqual(result, "./SKILL.md")
+        self.assertEqual(result, "skill-a/SKILL.md")
 
     def test_skill_kind_internal_link_to_nested_file(self):
-        """RU: Ссылка kind=skill на вложенный файл скилла сохраняет относительный путь."""
+        """RU: Ссылка kind=skill на вложенный файл скилла переписывается в repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a", {"docs/readme.md": "# Doc\n"})
         skill_file = self._skill_file(skill_a, "SKILL.md", "[doc](./docs/readme.md)\n")
@@ -86,10 +86,10 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a])
 
-        self.assertEqual(result, "./docs/readme.md")
+        self.assertEqual(result, "skill-a/docs/readme.md")
 
     def test_skill_kind_link_with_header(self):
-        """RU: Ссылка kind=skill с #header сохраняет заголовок."""
+        """RU: Ссылка kind=skill с #header сохраняет заголовок в repo-absolute пути."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_file = self._skill_file(skill_a, "SKILL.md", "[self](./SKILL.md#header)\n")
@@ -97,7 +97,7 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a])
 
-        self.assertEqual(result, "./SKILL.md#header")
+        self.assertEqual(result, "skill-a/SKILL.md#header")
 
     # ------------------------------------------------------------------
     # kind = external: keep external URL unchanged
@@ -130,7 +130,7 @@ class TestLinkConverter(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_source_link_to_other_skill_main_file(self):
-        """RU: Ссылка kind=source на основной файл другого скилла -> skill:<name>."""
+        """RU: Ссылка kind=source на основной файл другого скилла -> repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_b = self._make_agent_skill(target, "skill-b")
@@ -141,10 +141,10 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:skill-b")
+        self.assertEqual(result, "skill-b/SKILL.md")
 
     def test_source_link_to_other_skill_main_file_with_header(self):
-        """RU: Ссылка kind=source на основной файл другого скилла с #header."""
+        """RU: Ссылка kind=source на основной файл другого скилла с #header -> repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_b = self._make_agent_skill(target, "skill-b")
@@ -155,14 +155,14 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:skill-b#header")
+        self.assertEqual(result, "skill-b/SKILL.md#header")
 
     # ------------------------------------------------------------------
     # kind = source: link to a file nested inside another skill
     # ------------------------------------------------------------------
 
     def test_source_link_to_nested_file_in_dir_skill(self):
-        """RU: Ссылка kind=source на файл внутри директорийного скилла -> skill:name;file:./rel."""
+        """RU: Ссылка kind=source на файл внутри директорийного скилла -> repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_b = self._make_agent_skill(
@@ -175,10 +175,10 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:skill-b;file:./docs/extra.md")
+        self.assertEqual(result, "skill-b/docs/extra.md")
 
     def test_source_link_to_nested_file_in_dir_skill_with_header(self):
-        """RU: Ссылка kind=source на файл внутри скилла с #header."""
+        """RU: Ссылка kind=source на файл внутри скилла с #header -> repo-absolute путь."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_b = self._make_agent_skill(
@@ -191,18 +191,18 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:skill-b;file:./docs/extra.md#header")
+        self.assertEqual(result, "skill-b/docs/extra.md#header")
 
     # ------------------------------------------------------------------
     # HumanFlat / HumanDir -> Agent conversion cases
     # ------------------------------------------------------------------
 
     def test_source_link_to_flat_skill_main_file_after_conversion(self):
-        """RU: Ссылка на HumanFlat-скилл после копирования в Agent -> skill:name.
+        """RU: Ссылка на HumanFlat-скилл после копирования в Agent -> repo-absolute путь.
 
         HumanFlat skill: my-skill.skill.md -> Agent: my-skill/SKILL.md.
         Ссылка, разрешённая относительно target_dir, попадает на SKILL.md
-        скопированного скилла и должна превратиться в skill:my-skill.
+        скопированного скилла и должна превратиться в my-skill/SKILL.md.
         """
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
@@ -215,14 +215,14 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:my-skill")
+        self.assertEqual(result, "my-skill/SKILL.md")
 
     def test_source_link_to_dir_skill_nested_file_after_conversion(self):
-        """RU: Ссылка на файл внутри HumanDir-скилла после копирования в Agent.
+        """RU: Ссылка на файл внутри HumanDir-скилла после копирования в Agent -> repo-absolute путь.
 
         HumanDir skill: my-skill.skill/ + my-skill.skill/my-skill.skill.md
         -> Agent: my-skill/ + SKILL.md + docs/extra.md.
-        Относительный путь file должен считаться от папки скопированного скилла.
+        Результат должен быть repo-absolute путём от корня репозитория.
         """
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
@@ -237,7 +237,7 @@ class TestLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:my-skill;file:./docs/extra.md")
+        self.assertEqual(result, "my-skill/docs/extra.md")
 
     # ------------------------------------------------------------------
     # Error cases
@@ -315,7 +315,7 @@ class TestSkillLinkConverter(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_returns_formatted_path(self):
-        """RU: SkillLinkConverter возвращает absLink.path.formatted."""
+        """RU: SkillLinkConverter возвращает repo-absolute путь."""
         target = self.tmpdir / "target"
         target.mkdir()
         skill_file_path = target / "SKILL.md"
@@ -332,7 +332,7 @@ class TestSkillLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill])
 
-        self.assertEqual(result, "./SKILL.md")
+        self.assertEqual(result, "target/SKILL.md")
 
 
 class TestExternalLinkConverter(unittest.TestCase):
@@ -468,7 +468,7 @@ class TestSourceLinkConverter(unittest.TestCase):
         )
 
     def test_main_file_skill_name(self):
-        """RU: SourceLinkConverter выдаёт skill:name для основного файла скилла."""
+        """RU: SourceLinkConverter выдаёт repo-absolute путь для основного файла скилла."""
         target = self.tmpdir / "target"
         skill_a = self._make_agent_skill(target, "skill-a")
         skill_b = self._make_agent_skill(target, "skill-b")
@@ -480,7 +480,7 @@ class TestSourceLinkConverter(unittest.TestCase):
 
         result = self.converter.convert(link, [skill_a, skill_b])
 
-        self.assertEqual(result, "skill:skill-b")
+        self.assertEqual(result, "skill-b/SKILL.md")
 
 
 if __name__ == "__main__":
