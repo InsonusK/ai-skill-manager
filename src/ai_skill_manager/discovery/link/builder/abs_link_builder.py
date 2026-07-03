@@ -140,7 +140,9 @@ class absLinkBuilder(ABC):
             ``True`` when the path is a relative filesystem reference. /
             ``True``, когда путь является относительной файловой ссылкой.
         """
-        return path.startswith(("./", "../"))
+        # Accept both POSIX and Windows relative prefixes.
+        # Принимаем относительные префиксы как POSIX, так и Windows.
+        return path.replace("\\", "/").startswith(("./", "../"))
 
     def _is_os_absolute(self, path: str) -> bool:
         """Return ``True`` for OS-absolute paths starting with ``/``.
@@ -156,4 +158,4 @@ class absLinkBuilder(ABC):
             ``True`` when the path is absolute on the local filesystem. /
             ``True``, когда путь абсолютен в локальной файловой системе.
         """
-        return path.startswith("/")
+        return path.replace("\\", "/").startswith("/")

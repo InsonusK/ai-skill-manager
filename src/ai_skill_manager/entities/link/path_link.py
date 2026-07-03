@@ -124,10 +124,15 @@ def _classify_raw_path(path: str) -> PathKind:
     lower = path.lower()
     if lower.startswith(("http://", "https://", "mailto:", "ftp://", "file://")):
         raise ValueError(f"Web links are represented by WebLink: {path}")
-    if path.startswith(("./", "../")):
+    # Normalize Windows path separators so links authored on Windows (e.g.
+    # .\dir\file.md) are classified the same way as POSIX links.
+    # Нормализуем Windows-разделители, чтобы ссылки, созданные на Windows,
+    # классифицировались так же, как POSIX-ссылки.
+    normalized = path.replace("\\", "/")
+    if normalized.startswith(("./", "../")):
         logger.debug("Classified path %r as relative", path)
         return PathKind.relative
-    if path.startswith("/"):
+    if normalized.startswith("/"):
         logger.debug("Classified path %r as os_absolute", path)
         return PathKind.os_absolute
     logger.debug("Classified path %r as repo_absolute", path)
@@ -212,10 +217,13 @@ def _resolve_path(
             is_inside_repo=True,
         )
 
+    # Normalize path separators so the same link works on Linux and Windows.
+    # Нормализуем разделители, чтобы одна и та же ссылка работала на Linux и Windows.
+    normalized_raw_path = raw_path.replace("\\", "/")
     if raw_kind == PathKind.relative:
-        candidate = (file_path.parent / raw_path).resolve()
+        candidate = (file_path.parent / normalized_raw_path).resolve()
     elif raw_kind == PathKind.repo_absolute:
-        candidate = (repo_path / raw_path).resolve()
+        candidate = (repo_path / normalized_raw_path).resolve()
     elif raw_kind == PathKind.os_absolute:
         # Resolve as a real OS path, not relative to the repository root.
         # Разрешаем как реальный путь ОС, а не относительно корня репозитория.

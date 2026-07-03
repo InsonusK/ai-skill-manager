@@ -90,6 +90,29 @@ class TestWikilinkBuilder(unittest.TestCase):
         self.assertEqual(links[0].path.kind, LinkKind.skill)
         self.assertEqual(links[0].text, "integration.solution.skill")
 
+    def test_finds_wiki_link_with_windows_separators(self):
+        # EN: Wiki links authored on Windows with backslashes must resolve
+        # exactly like POSIX links.
+        # RU: Wiki-ссылки, созданные на Windows с обратными слешами, должны
+        # разрешаться точно так же, как POSIX-ссылки.
+        builder = WikilinkBuilder()
+        skill_dir = self.workdir
+        md = skill_dir / "SKILL.md"
+        md.write_text("# Skill\n")
+        target = skill_dir / "sub" / "file.md"
+        target.parent.mkdir()
+        target.write_text("# File\n")
+        skill_file = self._skill_file(md, skill_dir)
+        raw_wiki = r"[[.\sub\file.md|text]]"
+        links = builder.search(raw_wiki, skill_file)
+        self.assertEqual(len(links), 1)
+        self.assertIsInstance(links[0], PathLink)
+        self.assertEqual(links[0].path_raw.path, r".\sub\file.md")
+        self.assertEqual(links[0].path_raw.kind, PathKind.relative)
+        self.assertEqual(links[0].path.kind, LinkKind.skill)
+        self.assertEqual(links[0].path.formatted, "./sub/file.md")
+        self.assertTrue(links[0].path.exists)
+
 
 if __name__ == "__main__":
     unittest.main()
