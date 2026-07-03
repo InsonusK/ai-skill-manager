@@ -3,11 +3,15 @@
 Паттерн навыка HumanFlat.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
 from .SkillPattern import absSkillTemplate
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class HumanFlatPattern(absSkillTemplate):
@@ -48,6 +52,7 @@ class HumanFlatPattern(absSkillTemplate):
             Плоский :class:`Skill` при совпадении, иначе ``None``.
         """
         if path.is_file() and path.name.endswith(".skill.md"):
+            logger.debug("HumanFlat pattern matched: %s", path)
             # Flat skills have no associated folder.
             # У плоских навыков нет связанной директории.
             return Skill(
@@ -57,4 +62,5 @@ class HumanFlatPattern(absSkillTemplate):
                 source=self._source,
                 source_path=self._source_path
             )
+        logger.debug("HumanFlat pattern did not match: %s", path)
         return None

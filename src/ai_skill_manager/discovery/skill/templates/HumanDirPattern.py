@@ -3,11 +3,15 @@
 Паттерн навыка HumanDir.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
 from .SkillPattern import absSkillTemplate
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class HumanDirPattern(absSkillTemplate):
@@ -63,15 +67,18 @@ class HumanDirPattern(absSkillTemplate):
         if not path.is_dir():
             # This pattern only applies to directories.
             # Этот паттерн применяется только к директориям.
+            logger.debug("HumanDir pattern skipped (not a directory): %s", path)
             return None
-        
+
         if not HumanDirPattern.__is_directory_name_correct(path):
+            logger.debug("HumanDir pattern skipped (directory name does not end with .skill): %s", path)
             return None
-        
+
         # Expected skill markdown file named after the directory.
         # Ожидаемый skill-файл, названный по имени директории.
         skill_md = path / f"{path.name}.md"
         if skill_md.is_file():
+            logger.debug("HumanDir pattern matched: %s -> %s", path, skill_md)
             return Skill(
                 file_path=skill_md,
                 folder_path=path,
@@ -79,4 +86,5 @@ class HumanDirPattern(absSkillTemplate):
                 source=self._source,
                 source_path=self._source_path
             )
+        logger.debug("HumanDir pattern did not match (missing %s): %s", skill_md, path)
         return None
