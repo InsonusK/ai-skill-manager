@@ -60,6 +60,17 @@ class absSkillTemplate(ABC):
         """
         ...
 
+    @property
+    @abstractmethod
+    def pattern_description(self) -> str:
+        """Short human-readable description of what this pattern looks for.
+
+        Returns:
+            A pattern example such as ``{name}.skill.md`` or
+            ``{name}/SKILL.md``.
+        """
+        ...
+
     @abstractmethod
     def match(
         self, path: Path
