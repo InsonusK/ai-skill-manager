@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,6 +15,9 @@ from ....entities import LinkKind, absLink
 
 if TYPE_CHECKING:
     from ....entities import Skill
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 def _append_header(target: str, header: Optional[str]) -> str:
@@ -50,6 +54,7 @@ def _repo_absolute_path(os_path: Path, repo_path: Path) -> str:
         Repository-relative POSIX path.
             Путь относительно корня репозитория в POSIX-формате.
     """
+    logger.debug("Computing repo-absolute path: os_path=%s repo_path=%s", os_path, repo_path)
     return Path(os.path.relpath(os_path, repo_path)).as_posix()
 
 
@@ -159,9 +164,11 @@ class ExternalFileConverter:
             Relative target string such as ``./files/diagram.png``.
         """
         source_path = link.path.os_path
+        logger.debug("Converting external file link: %s", source_path)
         if source_path in self._copied_files:
             copied_path = self._copied_files[source_path]
             rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
+            logger.debug("Reusing previously copied external file: %s -> %s", source_path, copied_path)
             return _append_header(rel, link.header)
 
         files_dir = target_skill_folder / "files"
@@ -177,6 +184,7 @@ class ExternalFileConverter:
             counter += 1
 
         import shutil
+        logger.debug("Copying external file: %s -> %s", source_path, target_path)
         shutil.copy2(source_path, target_path)
         self._copied_files[source_path] = target_path
 

@@ -3,11 +3,15 @@
 Локальный файловый источник навыков.
 """
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .source import ScanLocation, Source
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -77,4 +81,10 @@ class LocalSource(Source):
         scan_path = self.scan_path.resolve()
         source_path = scan_path.parent if scan_path.is_file() else scan_path
         repo_path = self.repo_path.resolve() if self.repo_path else source_path
+        logger.debug(
+            "LocalSource resolved: scan_path=%s source_path=%s repo_path=%s",
+            scan_path,
+            source_path,
+            repo_path,
+        )
         return ScanLocation(repo_path=repo_path, source_path=source_path)

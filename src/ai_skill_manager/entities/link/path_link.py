@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field, InitVar
 from pathlib import Path
@@ -20,6 +21,9 @@ from .abs_link import absLink
 if TYPE_CHECKING:
     from ..skill import Skill
     from ..skill_file import SkillFile
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -121,9 +125,12 @@ def _classify_raw_path(path: str) -> PathKind:
     if lower.startswith(("http://", "https://", "mailto:", "ftp://", "file://")):
         raise ValueError(f"Web links are represented by WebLink: {path}")
     if path.startswith(("./", "../")):
+        logger.debug("Classified path %r as relative", path)
         return PathKind.relative
     if path.startswith("/"):
+        logger.debug("Classified path %r as os_absolute", path)
         return PathKind.os_absolute
+    logger.debug("Classified path %r as repo_absolute", path)
     return PathKind.repo_absolute
 
 
@@ -216,11 +223,24 @@ def _resolve_path(
     else:
         raise ValueError(f"Unknown raw path kind: {raw_kind}")
 
+    logger.debug(
+        "Resolving link: raw_kind=%s repo_path=%s candidate=%s",
+        raw_kind,
+        repo_path,
+        candidate,
+    )
+
     target = _existing_file(candidate)
     resolved = target if target is not None else candidate
     exists = target is not None
 
     is_inside_repo = resolved.is_relative_to(repo_path)
+    logger.debug(
+        "Link resolved: resolved=%s exists=%s is_inside_repo=%s",
+        resolved,
+        exists,
+        is_inside_repo,
+    )
 
     if not is_inside_repo:
         # Relative paths must stay inside the repository; OS-absolute paths may
@@ -249,6 +269,7 @@ def _resolve_path(
     is_inside_skill_folder = folder is not None and resolved.is_relative_to(folder)
 
     repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
+    logger.debug("Repo-relative link path: %s", repo_relative)
 
     if is_self_link or is_inside_skill_folder:
         kind = LinkKind.skill
@@ -260,6 +281,7 @@ def _resolve_path(
         kind = LinkKind.source
         formatted = repo_relative
 
+    logger.debug("Final link: kind=%s formatted=%s", kind, formatted)
     return LinkPath(
         kind=kind,
         formatted=formatted,
