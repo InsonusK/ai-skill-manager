@@ -37,6 +37,11 @@ class AgentTemplate(absSkillTemplate):
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.Agent
 
+    @property
+    def pattern_description(self) -> str:
+        """Return the pattern example for an agent skill directory."""
+        return "{name}/SKILL.md"
+
     def match(
         self, path: Path
     ) -> Optional[Skill]:

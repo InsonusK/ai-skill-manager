@@ -66,11 +66,17 @@ class AutoDiscovery(absDiscoveryStrategy):
         self._dir_patterns: List[absSkillTemplate] = [pattern(source, source_path)
                                                       for pattern in self._DIR_PATTERNS]
 
+        flat_descs = "\n".join(f"- {p.pattern_description}" for p in self._flat_patterns)
+        dir_descs = "\n".join(f"- {p.pattern_description}" for p in self._dir_patterns)
         logger.debug(
-            "AutoDiscovery initialized for %s with %d flat and %d directory pattern(s)",
+            "AutoDiscovery initialized for %s with %d flat and %d directory pattern(s)\n"
+            "flat:\n%s\n"
+            "directory:\n%s",
             self.source_path,
             len(self._flat_patterns),
             len(self._dir_patterns),
+            flat_descs,
+            dir_descs,
         )
 
     def discover(self) -> List[Skill]:

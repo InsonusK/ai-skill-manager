@@ -37,6 +37,11 @@ class HumanFlatPattern(absSkillTemplate):
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanFlat
 
+    @property
+    def pattern_description(self) -> str:
+        """Return the pattern example for a flat skill file."""
+        return "{name}.skill.md"
+
     def match(self, path: Path) -> Optional[Skill]:
         """Match a file ending with ``.skill.md``.
 

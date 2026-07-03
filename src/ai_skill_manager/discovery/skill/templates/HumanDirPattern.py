@@ -39,7 +39,12 @@ class HumanDirPattern(absSkillTemplate):
 
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.HumanDir
-    
+
+    @property
+    def pattern_description(self) -> str:
+        """Return the pattern example for a human directory skill."""
+        return "{name}.skill/{name}.skill.md"
+
     @staticmethod
     def __is_directory_name_correct(path:Path)->bool:
         """
