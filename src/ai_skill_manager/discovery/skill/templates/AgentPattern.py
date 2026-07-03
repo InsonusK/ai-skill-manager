@@ -3,11 +3,15 @@
 Паттерн навыка Agent.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 from ....entities import Skill, SkillFormat
 from .SkillPattern import absSkillTemplate
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class AgentTemplate(absSkillTemplate):
@@ -33,6 +37,11 @@ class AgentTemplate(absSkillTemplate):
     # Format produced by this pattern. / Формат, производимый этим паттерном.
     skill_format = SkillFormat.Agent
 
+    @property
+    def pattern_description(self) -> str:
+        """Return the pattern example for an agent skill directory."""
+        return "{name}/SKILL.md"
+
     def match(
         self, path: Path
     ) -> Optional[Skill]:
@@ -52,12 +61,14 @@ class AgentTemplate(absSkillTemplate):
         if not path.is_dir():
             # This pattern only applies to directories.
             # Этот паттерн применяется только к директориям.
+            logger.debug("Agent pattern skipped (not a directory): %s", path)
             return None
 
         # Agent skills use a fixed SKILL.md marker.
         # Навыки агента используют фиксированный маркер SKILL.md.
         skill_md = path / "SKILL.md"
         if skill_md.is_file():
+            logger.debug("Agent pattern matched: %s -> %s", path, skill_md)
             return Skill(
                 file_path=skill_md,
                 folder_path=path,
@@ -65,4 +76,5 @@ class AgentTemplate(absSkillTemplate):
                 source=self._source,
                 source_path=self._source_path
             )
+        logger.debug("Agent pattern did not match (missing %s): %s", skill_md, path)
         return None

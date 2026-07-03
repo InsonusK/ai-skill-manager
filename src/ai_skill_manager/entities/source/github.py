@@ -48,7 +48,9 @@ def _parse_github_url(url: str) -> tuple:
     for pattern in _GITHUB_URL_PATTERNS:
         match = pattern.match(url)
         if match:
-            return match.group(1), match.group(2)
+            owner, repo = match.group(1), match.group(2)
+            logger.debug("Parsed GitHub URL: owner=%s repo=%s", owner, repo)
+            return owner, repo
     raise ValueError(f"Invalid GitHub repository URL: {url}")
 
 
@@ -66,11 +68,13 @@ def _download_archive(owner: str, repo: str, tree: str) -> Path:
         Path to the downloaded archive. / Путь к скачанному архиву.
     """
     archive_url = f"https://github.com/{owner}/{repo}/archive/{tree}.tar.gz"
+    logger.debug("Downloading GitHub archive: %s", archive_url)
     fd, tmp_path = tempfile.mkstemp(suffix=".tar.gz")
     try:
         with urllib.request.urlopen(archive_url, timeout=60) as response:
             with open(fd, "wb") as f:
                 shutil.copyfileobj(response, f)
+        logger.debug("Downloaded archive to %s", tmp_path)
     except Exception:
         # Clean up the temp file on error to avoid leaving garbage behind.
         # Удаляем временный файл при ошибке, чтобы не оставлять мусор.
@@ -80,6 +84,7 @@ def _download_archive(owner: str, repo: str, tree: str) -> Path:
 
 
 def _extract_archive(archive_path: Path, extract_to: Path) -> None:
+    logger.debug("Extracting archive %s to %s", archive_path, extract_to)
     """Extract a tar.gz archive.
 
     Распаковать архив tar.gz.
@@ -113,10 +118,12 @@ def _find_extracted_root(extract_to: Path) -> Path:
         RuntimeError: Если архив не содержит ровно одной директории верхнего уровня.
     """
     entries = [e for e in extract_to.iterdir() if e.is_dir()]
+    logger.debug("Extracted archive root entries: %d", len(entries))
     if len(entries) != 1:
         raise RuntimeError(
             f"Expected exactly one top-level directory in extracted archive, found {len(entries)}"
         )
+    logger.debug("Archive root: %s", entries[0])
     return entries[0]
 
 
@@ -195,8 +202,10 @@ class GitHubSource(Source):
         :meth:`cleanup`.
         """
         if self.__context.scan_cache is not None:
+            logger.debug("Using cached GitHub scan location for %s", self.repo_url)
             return self.__context.scan_cache
 
+        logger.debug("Resolving GitHub source: %s tree=%s subpath=%s", self.repo_url, self.tree, self.subpath)
         owner, repo = _parse_github_url(self.repo_url)
         archive_path = _download_archive(owner, repo, self.tree)
         try:
@@ -206,6 +215,7 @@ class GitHubSource(Source):
 
             repo_root = _find_extracted_root(extracted_dir)
             source_path = repo_root / self.subpath if self.subpath else repo_root
+            logger.debug("GitHub scan location: repo_root=%s source_path=%s", repo_root, source_path)
             if not source_path.exists():
                 logger.error("subpath not found: %s", source_path)
                 # Return a location that AutoDiscovery will treat as missing.
@@ -224,8 +234,10 @@ class GitHubSource(Source):
 
         Удалить распакованные временные директории и очистить кеш сканирования.
         """
+        logger.debug("Cleaning up GitHub source temporary directories")
         self.__context.scan_cache = None
         for extracted_dir in self.__context.extracted_dirs:
             if extracted_dir.exists():
+                logger.debug("Removing extracted directory: %s", extracted_dir)
                 shutil.rmtree(extracted_dir)
         self.__context.extracted_dirs = []

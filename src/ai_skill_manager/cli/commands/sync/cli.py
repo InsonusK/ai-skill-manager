@@ -77,7 +77,8 @@ def add_parser(subparsers):
     return parser
 
 
-logger = logging.Logger("sync cli")
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 def run(args):
@@ -91,7 +92,12 @@ def run(args):
     if args.verbose:
         # Enable debug logging across the synchronization pipeline.
         # Включаем подробное логирование во всём конвейере синхронизации.
-        logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="[%(levelname)s] %(message)s",
+            force=True,
+        )
+        logger.debug("Verbose logging enabled for sync")
 
     # Resolve conflicting orphan flags into a single boolean.
     # Преобразуем конфликтующие флаги orphan в одно булево значение.

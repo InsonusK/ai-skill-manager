@@ -17,6 +17,7 @@ Directory patterns (detected on directories):
 - HumanDir: directory contains ``{dir_name}.skill.md``
 """
 
+import logging
 from pathlib import Path
 from typing import List, Optional
 
@@ -24,6 +25,9 @@ from ...entities import Skill, Source
 from ...entities.source import LocalSource
 from .templates import AgentTemplate, HumanDirPattern, HumanFlatPattern, absSkillTemplate
 from .abs_discovery_strategy import absDiscoveryStrategy
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class AutoDiscovery(absDiscoveryStrategy):
@@ -57,11 +61,23 @@ class AutoDiscovery(absDiscoveryStrategy):
         self._source = source if source is not None else LocalSource(
             self.source_path)
         
-        self._flat_patterns:List[absSkillTemplate] = [pattern(source, source_path)
-                               for pattern in self._FLAT_PATTERNS]
-        self._dir_patterns:List[absSkillTemplate] = [pattern(source, source_path)
-                              for pattern in self._DIR_PATTERNS]
-        
+        self._flat_patterns: List[absSkillTemplate] = [pattern(source, source_path)
+                                                       for pattern in self._FLAT_PATTERNS]
+        self._dir_patterns: List[absSkillTemplate] = [pattern(source, source_path)
+                                                      for pattern in self._DIR_PATTERNS]
+
+        flat_descs = "\n".join(f"- {p.pattern_description}" for p in self._flat_patterns)
+        dir_descs = "\n".join(f"- {p.pattern_description}" for p in self._dir_patterns)
+        logger.debug(
+            "AutoDiscovery initialized for %s with %d flat and %d directory pattern(s)\n"
+            "flat:\n%s\n"
+            "directory:\n%s",
+            self.source_path,
+            len(self._flat_patterns),
+            len(self._dir_patterns),
+            flat_descs,
+            dir_descs,
+        )
 
     def discover(self) -> List[Skill]:
         """Recursively discover all skills at the source path.
@@ -71,18 +87,22 @@ class AutoDiscovery(absDiscoveryStrategy):
         Returns:
             List of discovered skills. / Список обнаруженных навыков.
         """
+        logger.debug("Starting discovery at %s", self.source_path)
         if not self.source_path.exists():
             # Missing source produces an empty result; the base class logs the error.
             # Отсутствующий источник даёт пустой результат; базовый класс логирует ошибку.
+            logger.debug("Source path does not exist: %s", self.source_path)
             return []
 
         if self.source_path.is_file():
             # A file can only match flat patterns.
             # Файл может соответствовать только плоским паттернам.
+            logger.debug("Source path is a file, matching flat patterns only")
             return self._handle_file(self.source_path)
 
         # Directories are scanned recursively for both flat and directory patterns.
         # Директории сканируются рекурсивно на предмет плоских и директориальных паттернов.
+        logger.debug("Source path is a directory, scanning recursively")
         return self._scan_directory(self.source_path)
 
     def _match_flat_patterns(self, path: Path) -> List[Skill]:
@@ -120,6 +140,7 @@ class AutoDiscovery(absDiscoveryStrategy):
         ]
 
     def _handle_file(self, filepath: Path) -> List[Skill]:
+        logger.debug("Checking file for flat patterns: %s", filepath)
         """Handle a single file path.
 
         Обработать один путь к файлу.
@@ -136,6 +157,7 @@ class AutoDiscovery(absDiscoveryStrategy):
             ValueError: Если файл соответствует более чем одному плоскому паттерну.
         """
         matches = self._match_flat_patterns(filepath)
+        logger.debug("Flat pattern matches for %s: %d", filepath, len(matches))
 
         if not matches:
             return []
@@ -150,6 +172,7 @@ class AutoDiscovery(absDiscoveryStrategy):
         )
 
     def _scan_directory(self, directory: Path) -> List[Skill]:
+        logger.debug("Scanning directory: %s", directory)
         """Recursively scan a directory for skills.
 
         Рекурсивно просканировать директорию на наличие навыков.
@@ -174,11 +197,18 @@ class AutoDiscovery(absDiscoveryStrategy):
         # Check whether the directory itself matches a directory skill pattern.
         # Проверяем, соответствует ли сама директория паттерну директориального навыка.
         dir_matches = self._match_directory_patterns(directory)
+        logger.debug(
+            "Directory %s: %d flat match(es), %d directory pattern match(es)",
+            directory,
+            len(flat_matches),
+            len(dir_matches),
+        )
 
         # No directory skill here: collect flat files and recurse into subdirs.
         # Здесь нет директориального навыка: собираем плоские файлы и рекурсия в поддиректории.
         if not dir_matches:
             results = list(flat_matches)
+            logger.debug("No directory skill in %s, recursing into subdirectories", directory)
             results.extend(self._recurse_subdirectories(directory))
             return results
 
@@ -193,6 +223,7 @@ class AutoDiscovery(absDiscoveryStrategy):
         # Exactly one directory pattern matched.
         # Совпал ровно один директориальный паттерн.
         dir_skill = dir_matches[0]
+        logger.debug("Directory skill matched at %s: %s", directory, dir_skill.file_path)
 
         if not flat_matches:
             # Directory skill with no flat files: ensure it has no nested skills.
@@ -234,12 +265,14 @@ class AutoDiscovery(absDiscoveryStrategy):
             Skills discovered in subdirectories. / Навыки, обнаруженные в поддиректориях.
         """
         results: List[Skill] = []
-        for subdir in sorted(directory.iterdir()):
-            if subdir.is_dir():
-                results.extend(self._scan_directory(subdir))
+        subdirs = [subdir for subdir in sorted(directory.iterdir()) if subdir.is_dir()]
+        logger.debug("Recursing into %d subdirectory(ies) of %s", len(subdirs), directory)
+        for subdir in subdirs:
+            results.extend(self._scan_directory(subdir))
         return results
 
     def _ensure_no_nested_skills(self, directory: Path, main_file: Path) -> None:
+        logger.debug("Checking for nested skills inside %s", directory)
         """Ensure a directory skill does not contain nested skills.
 
         Убедиться, что директориальный навык не содержит вложенных навыков.

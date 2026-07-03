@@ -8,12 +8,16 @@ and returns the combined list of skills.
 в его локацию сканирования и возвращает объединённый список навыков.
 """
 
+import logging
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
 from ..discovery.skill import AutoDiscovery
 from ..entities import GitHubSource, LocalSource, Skill, Source
 from ..progress import ProgressCallback
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
@@ -66,6 +70,8 @@ def discover(
     all_skills: List[Skill] = []
     normalized_sources = list(_normalize_github_sources(sources))
 
+    logger.debug("Discovering skills from %d source(s)", len(normalized_sources))
+
     if progress is not None:
         progress("discover", 0, len(normalized_sources))
 
@@ -79,11 +85,30 @@ def discover(
             )
 
         scan_location = src.get_scan_location()
+        logger.debug(
+            "Source %d/%d: %s (type=%s)",
+            index,
+            len(normalized_sources),
+            src,
+            src.source_type,
+        )
+        logger.debug(
+            "Resolved scan location: repo_path=%s source_path=%s",
+            scan_location.repo_path,
+            scan_location.source_path,
+        )
         strategy = AutoDiscovery(
             source_path=scan_location.source_path,
             source=src,
         )
-        all_skills.extend(strategy.discover())
+        source_skills = strategy.discover()
+        logger.debug(
+            "Source %d/%d discovered %d skill(s)",
+            index,
+            len(normalized_sources),
+            len(source_skills),
+        )
+        all_skills.extend(source_skills)
         if progress is not None:
             progress("discover", index, len(normalized_sources))
 

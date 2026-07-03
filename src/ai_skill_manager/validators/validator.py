@@ -9,11 +9,15 @@ producing a ``ValidationReport``.
 формируя ``ValidationReport``.
 """
 
+import logging
 from typing import Optional, Tuple
 
 from ..progress import ProgressCallback
 from .models.validation_report import Skill, ValidationReport, Dict, ValidationResult
 from .rules import absValidationRule, DEFAULT_RULES, List
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class Validator:
@@ -82,12 +86,14 @@ class Validator:
         # Сопоставляем каждому навыку отображение имя_правила -> ValidationResult.
         report_dict: Dict[Skill, Dict[absValidationRule, ValidationResult]] = {}
 
+        logger.debug("Validating %d skill(s) with %d rule(s)", len(skills), len(self.__rules))
         if progress is not None:
             progress("validate", 0, len(self.__rules))
 
         for index, rule in enumerate(self.__rules, start=1):
             # Run the current rule against all skills.
             # Запускаем текущее правило для всех навыков.
+            logger.debug("Running validation rule %d/%d: %s", index, len(self.__rules), rule.name)
             rule_report = rule.validate(skills)
             for skill, result in rule_report.items():
                 # Get or create the per-skill result map.
@@ -105,4 +111,7 @@ class Validator:
             if progress is not None:
                 progress("validate", index, len(self.__rules))
 
-        return ValidationReport(report_dict)
+        report = ValidationReport(report_dict)
+        error_count = sum(len(rules) for rules in report.errors.values())
+        logger.debug("Validation complete: %d error(s)", error_count)
+        return report

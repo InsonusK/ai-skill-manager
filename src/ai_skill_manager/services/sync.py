@@ -3,7 +3,7 @@
 Сервис синхронизации.
 """
 
-from logging import Logger
+import logging
 import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Type
@@ -18,7 +18,8 @@ from ..progress import ProgressCallback
 from ..validators import ValidationFailedError, Validator
 from .discover import discover
 
-logger = Logger("run_sync")
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 def run_sync(
@@ -59,7 +60,9 @@ def run_sync(
         Summary dict with counts and the target directory.
         Сводный словарь с количеством и целевой директорией.
     """
+    logger.debug("Starting sync: sources=%d target_dir=%s dry_run=%s force=%s", len(sources), target_dir, dry_run, force)
     skills: List[Skill] = discover(sources, progress=progress)
+    logger.debug("Discovered %d skill(s)", len(skills))
 
     try:
         # Validate all discovered skills before copying anything.
@@ -67,11 +70,14 @@ def run_sync(
         validator = Validator()
         validation_report = validator.validate(skills, progress=progress)
         if validation_report.has_errors:
+            logger.debug("Validation failed with errors")
             raise ValidationFailedError(validation_report)
+        logger.debug("Validation passed")
 
         target_dir = Path(target_dir).resolve()
         if repo_path is None:
             repo_path = target_dir
+        logger.debug("Resolved target_dir=%s repo_path=%s", target_dir, repo_path)
 
         # In dry-run mode return a summary without touching the filesystem.
         # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
@@ -100,6 +106,7 @@ def run_sync(
         ]
 
         adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
+        logger.debug("Adapters: %s", [a.__name__ for a in adapter_list])
 
         # Capture adapter versions before copying so we can skip skills that
         # have not changed since the last sync.
@@ -117,6 +124,7 @@ def run_sync(
             progress("copy", 0, len(skills))
         for index, skill in enumerate(skills, start=1):
             name = skill.properties.name
+            logger.debug("Processing skill %d/%d: name=%s file=%s format=%s", index, len(skills), name, skill.file_path, skill.format.value)
             if name is None:
                 raise ValueError(
                     f"Skill {skill.file_path} has no 'name' in frontmatter")
@@ -125,9 +133,11 @@ def run_sync(
             source_hash = compute_skill_hash(skill)
             if not force and _is_skill_up_to_date(
                     skill, skill_target_dir, adapters_version):
+                logger.debug("Skill '%s' is up to date, skipping copy", name)
                 new_skill = _build_target_skill(
                     skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
             else:
+                logger.debug("Skill '%s' needs copy (force=%s)", name, force)
                 if skill.is_flat():
                     new_skill = _copy_flat_skill(skill, skill_target_dir, repo_path=repo_path)
                 else:
@@ -150,9 +160,11 @@ def run_sync(
             target_dir=target_dir,
             copied_files=copied_files,
         )
+        logger.debug("Adapting %d copied skill(s)", len(skills_to_adapt))
         if progress is not None:
             progress("adapt", 0, len(skills_to_adapt))
         for index, (old_skill, new_skill) in enumerate(skills_to_adapt, start=1):
+            logger.debug("Adapting skill: %s -> %s", old_skill.file_path, new_skill.file_path)
             adapter_msg = adapter.adapt(old_skill, new_skill)
             link_msg = adapter_msg.get(LinkAdapter.name())
             if link_msg is not None:
@@ -166,6 +178,7 @@ def run_sync(
         # Сохраняем управляемое состояние для каждого скопированного навыка.
         # Хранимый хеш относится к *исходному* скиллу, чтобы при следующем
         # запуске обнаружить неизменённые источники.
+        logger.debug("Writing managed state for %d skill(s)", len(copied_skills))
         if progress is not None:
             progress("write_managed_state", 0, len(copied_skills))
         for index, new_skill in enumerate(copied_skills, start=1):
@@ -174,6 +187,7 @@ def run_sync(
                 "validators": validator_versions,
                 "adapters": adapters_version
             }
+            logger.debug("Managed state for %s: %s", new_skill.folder_path, state)
             _write_managed_state_if_changed(new_skill.folder_path, state)
             if progress is not None:
                 progress("write_managed_state", index, len(copied_skills))
@@ -181,8 +195,10 @@ def run_sync(
         # Remove previously copied skills that are no longer present.
         # Удаляем ранее скопированные навыки, которых больше нет в источниках.
         if cleanup_orphans:
+            logger.debug("Removing orphan skills from %s", target_dir)
             remove_orphans(target_dir, copied_skills, progress=progress)
 
+        logger.debug("Sync finished: %d skill(s), %d link(s) replaced", len(skills), links_replaced)
         return {
             "skills_count": len(skills),
             "target_dir": str(target_dir),
@@ -232,14 +248,17 @@ def remove_orphans(
     # Перебираем записи целевой директории и удаляем управляемые директории,
     # отсутствующие среди скопированных навыков.
     target_entries = list(target_dir.iterdir())
+    logger.debug("Checking %d target entries for orphans", len(target_entries))
     if progress is not None:
         progress("remove_orphans", 0, len(target_entries))
     for index, entry in enumerate(target_entries, start=1):
         if entry.is_dir() and is_managed(entry) and entry not in copied_dirs:
+            logger.debug("Removing orphan skill directory: %s", entry)
             shutil.rmtree(entry)
             removed.append(entry)
         if progress is not None:
             progress("remove_orphans", index, len(target_entries))
+    logger.debug("Removed %d orphan skill(s)", len(removed))
     return removed
 
 
@@ -270,23 +289,38 @@ def _is_skill_up_to_date(
         ``True``, если копирование и адаптацию можно пропустить.
     """
     if not skill_target_dir.is_dir():
+        logger.debug("Target dir missing: %s", skill_target_dir)
         return False
 
     target_skill_file = skill_target_dir / "SKILL.md"
     if not target_skill_file.is_file():
+        logger.debug("Target SKILL.md missing: %s", target_skill_file)
         return False
 
     if not is_managed(skill_target_dir):
+        logger.debug("Target dir is not managed: %s", skill_target_dir)
         return False
 
     state = read_managed_state(skill_target_dir)
     if state is None:
+        logger.debug("No managed state for: %s", skill_target_dir)
         return False
 
-    return (
-        state.get("hash") == compute_skill_hash(skill)
+    current_hash = compute_skill_hash(skill)
+    up_to_date = (
+        state.get("hash") == current_hash
         and state.get("adapters") == adapters_version
     )
+    logger.debug(
+        "Up-to-date check for %s: stored_hash=%s current_hash=%s stored_adapters=%s current_adapters=%s result=%s",
+        skill_target_dir,
+        state.get("hash"),
+        current_hash,
+        state.get("adapters"),
+        adapters_version,
+        up_to_date,
+    )
+    return up_to_date
 
 
 def _write_managed_state_if_changed(skill_dir: Path, state: dict) -> None:
@@ -300,7 +334,9 @@ def _write_managed_state_if_changed(skill_dir: Path, state: dict) -> None:
     """
     existing = read_managed_state(skill_dir)
     if existing == state:
+        logger.debug("Managed state unchanged for %s, skipping write", skill_dir)
         return
+    logger.debug("Writing managed state to %s", skill_dir)
     write_managed_state(skill_dir, state)
 
 
@@ -322,6 +358,7 @@ def _copy_flat_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> S
     """
     skill_target_dir.mkdir(parents=True, exist_ok=True)
     target_path = skill_target_dir / "SKILL.md"
+    logger.debug("Copying flat skill %s -> %s", skill.file_path, target_path)
     shutil.copy2(skill.file_path, target_path)
     return _build_target_skill(target_path, skill_target_dir, repo_path=repo_path)
 
@@ -346,6 +383,7 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Sk
 
     source_root = skill.folder_path
     skill_target_dir.mkdir(parents=True, exist_ok=True)
+    logger.debug("Copying directory skill %s -> %s", source_root, skill_target_dir)
 
     # Recursively copy every file, renaming the main skill file to SKILL.md.
     # Рекурсивно копируем каждый файл, переименовывая основной файл навыка в SKILL.md.
@@ -358,6 +396,7 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Sk
         else:
             dst = skill_target_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
+        logger.debug("Copying skill file %s -> %s", src_file, dst)
         shutil.copy2(src_file, dst)
 
     return _build_target_skill(skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
