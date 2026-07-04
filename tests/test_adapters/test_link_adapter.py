@@ -178,6 +178,50 @@ class TestLinkAdapter(unittest.TestCase):
         self.assertIn("![diagram](./files/diagram.png)", content)
         self.assertTrue((skill_dir / "files" / "diagram.png").exists())
 
+    def test_rewrites_windows_separator_internal_link(self):
+        # EN: A link authored with Windows backslashes inside a directory skill
+        # must be rewritten the same way as a POSIX link.
+        # RU: Ссылка с обратными слешами Windows внутри директорийного скилла
+        # должна переписываться так же, как POSIX-ссылка.
+        root = self.tmpdir / "windows_sep"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n[details](.\\details.md)\n"
+        )
+        (skill_dir / "details.md").write_text("# Details\n")
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        adapter.adapt(skill, skill)
+
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[details](skill/details.md)", content)
+
+    def test_rewrites_windows_separator_source_link(self):
+        # EN: A link authored with Windows backslashes to a file outside any
+        # skill must be copied into files/ and rewritten as a relative link.
+        # RU: Ссылка с обратными слешами Windows на файл вне скилла должна
+        # копироваться в files/ и переписываться относительной ссылкой.
+        root = self.tmpdir / "windows_sep_source"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (root / "extra.md").write_text("# Extra\n")
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n[extra](.\\..\\extra.md)\n"
+        )
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        msg = adapter.adapt(skill, skill)["LinkAdapter"]
+
+        self.assertEqual(msg.params["count"], 1)
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[extra](./files/extra.md)", content)
+        self.assertTrue((skill_dir / "files" / "extra.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

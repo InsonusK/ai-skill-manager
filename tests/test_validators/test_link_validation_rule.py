@@ -170,6 +170,42 @@ class TestLinkValidationRule(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+    def test_windows_separator_internal_link_is_valid(self):
+        # EN: A link written with Windows backslashes to a file inside the same
+        # skill must be valid, just like a POSIX-style link.
+        # RU: Ссылка с обратными слешами Windows на файл внутри того же скилла
+        # должна считаться корректной, как и POSIX-ссылка.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n[template](.\\template.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
+    def test_windows_separator_cross_skill_link_is_valid(self):
+        # EN: A link written with Windows backslashes to a file inside another
+        # skill in the sync set must be valid.
+        # RU: Ссылка с обратными слешами Windows на файл внутри другого скилла,
+        # входящего в копирование, должна считаться корректной.
+        root = self._copy_mock("cross_skill_non_md")
+        a = self._dir_skill(root, "skill-a")
+        b = self._dir_skill(root, "skill-b")
+        skill_file = a.folder_path / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill-a\n---\n# A\n[impl](.\\..\\skill-b\\Implementation\\App.Host.csproj.extend.md)\n"
+        )
+
+        rule = LinkValidationRule()
+        result = rule.validate([a, b])
+
+        self.assertEqual(result, {})
+
 
 if __name__ == "__main__":
     unittest.main()

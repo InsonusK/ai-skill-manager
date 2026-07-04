@@ -8,16 +8,59 @@ metadata:
     - readme
     - quickstart
     - bilingual
+    - install
+    - setup
   responsibilities:
     - introduce the project
-    - provide quick start examples
-    - link to detailed documentation
+    - provide installation and setup instructions
+    - link to detailed documentation and example skills
 ---
 
 # AI Skills Manager / Менеджер навыков ИИ
 
 Sync AI agent skills into `.agents/skills/` from local directories or GitHub repositories.
 Синхронизирует навыки AI-агентов в `.agents/skills/` из локальных директорий или репозиториев GitHub.
+
+## Installation / Установка
+
+### From GitHub (latest master) / Из GitHub (последний master)
+
+Install the latest version directly from the repository:
+Установите последнюю версию напрямую из репозитория:
+
+```bash
+pip install git+https://github.com/InsonusK/ai-skill-manager.git
+```
+
+To install a specific branch or tag:
+Чтобы установить конкретную ветку или тег:
+
+```bash
+pip install git+https://github.com/InsonusK/ai-skill-manager.git@v1.1.0
+```
+
+### From source / Из исходников
+
+```bash
+git clone https://github.com/InsonusK/ai-skill-manager
+cd ai-skill-manager
+python3 -m venv .venv
+# Linux / macOS
+source .venv/bin/activate
+# Windows
+# .venv\Scripts\activate
+pip install -e .
+```
+
+### Verify installation / Проверка установки
+
+```bash
+ai-skill-manager --help
+aism --help
+```
+
+For detailed installation steps see [docs/install.md](docs/install.md).
+Подробные шаги установки см. в [docs/install.md](docs/install.md).
 
 ## Quick start / Быстрый старт
 
@@ -43,6 +86,98 @@ ai-skill-manager sync
 # or use the short alias / или используйте короткий псевдоним
 aism sync
 ```
+
+## Basic setup examples / Примеры базовой настройки
+
+### Linux / macOS
+
+```bash
+# 1. Create a project folder and a virtual environment
+mkdir my-agent-project && cd my-agent-project
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. Install the tool from GitHub
+pip install git+https://github.com/InsonusK/ai-skill-manager.git
+
+# 3. Create a config
+mkdir -p my-skills
+cat > ai-skills.yaml << 'EOF'
+sources:
+  - path: ./my-skills
+    type: auto
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+EOF
+
+# 4. Add a skill and sync
+ai-skill-manager new git-workflow ./my-skills/git-workflow
+ai-skill-manager sync --dry-run
+ai-skill-manager sync
+```
+
+### Windows (PowerShell)
+
+```powershell
+# 1. Create a project folder and a virtual environment
+mkdir my-agent-project; cd my-agent-project
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# 2. Install the tool from GitHub
+pip install git+https://github.com/InsonusK/ai-skill-manager.git
+
+# 3. Create a config
+mkdir my-skills
+@'
+sources:
+  - path: ./my-skills
+    type: auto
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+'@ | Out-File -Encoding utf8 ai-skills.yaml
+
+# 4. Add a skill and sync
+ai-skill-manager new git-workflow .\my-skills\git-workflow
+ai-skill-manager sync --dry-run
+ai-skill-manager sync
+```
+
+### Use skills from a GitHub repository / Использовать навыки из репозитория GitHub
+
+You can sync skills directly from a GitHub repository without cloning it manually.
+Можно синхронизировать навыки напрямую из репозитория GitHub, не клонируя его вручную.
+
+```yaml
+sources:
+  - path: https://github.com/InsonusK/ai-skills.git
+    type: github
+    tree: master
+    subpath: skills
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+```
+
+Run:
+Запустите:
+
+```bash
+ai-skill-manager sync
+```
+
+A public collection of ready-to-use skills is maintained at
+<https://github.com/InsonusK/ai-skills.git>.
+Там же поддерживается публичная коллекция готовых к использованию навыков:
+<https://github.com/InsonusK/ai-skills.git>.
 
 ## Documentation / Документация
 
