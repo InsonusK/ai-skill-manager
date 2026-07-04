@@ -9,7 +9,7 @@ metadata:
     - commands
     - bilingual
   responsibilities:
-    - document sync, discover, and new commands
+    - document sync, check, and new commands
     - list options and examples for each command
 ---
 
@@ -75,49 +75,46 @@ ai-skill-manager sync -f
 
 ---
 
-## `discover`
+## `check`
 
-Discover skills and print their mappings without copying anything.
-Обнаруживает навыки и выводит их сопоставления без копирования.
+Discover skills, validate them, and print the result without copying anything.
+Обнаруживает навыки, проверяет их и выводит результат без копирования.
 
 ### Usage / Использование
 
 ```bash
-ai-skill-manager discover [options]
+ai-skill-manager check [options]
 ```
 
 ### Options / Опции
 
 | Option / Опция | Description / Описание |
 |----------------|------------------------|
-| `-c, --config <path>` | Discover from config file. / Обнаружить из файла конфигурации. |
-| `-t, --type <auto\|directory\|flat\|github>` | Discovery strategy for a single source. / Стратегия обнаружения для одного источника. |
-| `-p, --path <path>` | Source path or GitHub URL. / Путь к источнику или URL GitHub. |
-| `--target <dir>` | Override target directory. / Переопределить целевую директорию. |
-| `--tree <branch>` | Git tree/branch when `type=github` (default: `master`). / Ветка Git при `type=github` (по умолчанию: `master`). |
-| `--subpath <path>` | GitHub subpath (can be repeated). / Подпуть в GitHub (можно повторять). |
+| `-c, --config <path>` | Check from config file. / Проверить из файла конфигурации. |
+| `-t, --type <auto\|github>` | Source type for a single source. / Тип источника для одного источника. |
+| `-p, --path <path>` | Source path or GitHub URL (with optional branch: `url branch`). / Путь к источнику или URL GitHub (с опциональной веткой: `url branch`). |
+| `--subpath <path>` | GitHub subpath (can be repeated; default: `skills`). / Подпуть в GitHub (можно повторять; по умолчанию: `skills`). |
 | `-v, --verbose` | Enable debug logging. / Включить подробное логирование. |
 
 ### Examples / Примеры
 
 ```bash
-# Discover from default config
-# Обнаружить из конфига по умолчанию
-ai-skill-manager discover
+# Check from default config
+# Проверить из конфига по умолчанию
+ai-skill-manager check
 
-# Discover from a single local source
-# Обнаружить из одного локального источника
-ai-skill-manager discover -t auto -p ./my-skills
+# Check a single local source
+# Проверить один локальный источник
+ai-skill-manager check -t auto -p ./my-skills
 
-# Discover from GitHub
-# Обнаружить из GitHub
-ai-skill-manager discover -t github -p https://github.com/owner/skills-repo.git
+# Check from GitHub
+# Проверить из GitHub
+ai-skill-manager check -t github -p https://github.com/owner/skills-repo.git
 
-# Discover a specific subpath in a GitHub repo
-# Обнаружить конкретный подпуть в репозитории GitHub
-ai-skill-manager discover -t github \
-  -p https://github.com/owner/skills-repo.git \
-  --tree main \
+# Check a specific subpath and branch in a GitHub repo
+# Проверить конкретный подпуть и ветку в репозитории GitHub
+ai-skill-manager check -t github \
+  -p "https://github.com/owner/skills-repo.git main" \
   --subpath skills \
   --subpath docs/guides.skill.md
 ```
@@ -180,9 +177,9 @@ Profiling can also be enabled without the flag by setting the environment variab
 # Профилировать запуск синхронизации
 ai-skill-manager --profile sync
 
-# Profile discovery and save raw stats for external tools
-# Профилировать обнаружение и сохранить сырые данные для внешних инструментов
-ai-skill-manager --profile --profile-output discover.prof discover
+# Profile check and save raw stats for external tools
+# Профилировать проверку и сохранить сырые данные для внешних инструментов
+ai-skill-manager --profile --profile-output check.prof check
 
 # Enable profiling via environment variable
 # Включить профилирование через переменную окружения

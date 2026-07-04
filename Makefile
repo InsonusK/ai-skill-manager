@@ -17,5 +17,8 @@ run-ai-skill-manager:
 profile-sync:
 	.venv/bin/python -m ai_skill_manager.cli --profile sync
 
-profile-discover:
-	.venv/bin/python -m ai_skill_manager.cli --profile discover
+profile-check:
+	.venv/bin/python -m ai_skill_manager.cli --profile check
+
+build:
+	python -m build

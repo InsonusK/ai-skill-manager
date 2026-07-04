@@ -8,10 +8,12 @@ metadata:
     - config
     - yaml
     - bilingual
+    - setup
   responsibilities:
     - document ai-skills.yaml structure
     - describe sources, settings, and conflict resolution
-    - provide config examples
+    - provide config examples for local and GitHub sources
+    - link to the public skills repository
 ---
 
 # Configuration / Конфигурация
@@ -40,6 +42,44 @@ settings:
   on_conflict: error
   dry_run: false
 ```
+
+## Basic setup examples / Примеры базовой настройки
+
+### Local skills / Локальные навыки
+
+```yaml
+sources:
+  - path: ./my-skills
+    type: auto
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+```
+
+### Skills from GitHub / Навыки из GitHub
+
+```yaml
+sources:
+  - path: https://github.com/InsonusK/ai-skills.git
+    type: github
+    tree: master
+    subpath: skills
+
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+```
+
+Run `ai-skill-manager sync` to download the configured skills.
+Запустите `ai-skill-manager sync`, чтобы скачать настроенные навыки.
+
+A public collection of example skills is maintained at
+<https://github.com/InsonusK/ai-skills.git>.
+Публичная коллекция примеров навыков поддерживается по адресу
+<https://github.com/InsonusK/ai-skills.git>.
 
 ## `sources` / Источники
 
@@ -127,9 +167,9 @@ Example with a single subpath / Пример с одним подпутём:
 
 ```yaml
 sources:
-  - path: https://github.com/owner/skills-repo.git
+  - path: https://github.com/InsonusK/ai-skills.git
     type: github
-    tree: main
+    tree: master
     subpath: skills
 ```
 
@@ -137,9 +177,9 @@ Example with multiple subpaths / Пример с несколькими подп
 
 ```yaml
 sources:
-  - path: https://github.com/owner/skills-repo.git
+  - path: https://github.com/InsonusK/ai-skills.git
     type: github
-    tree: main
+    tree: master
     subpath:
       - skills
       - docs/guides.skill.md
@@ -151,9 +191,9 @@ sources:
 sources:
   - path: ./my-skills
     type: auto
-  - path: https://github.com/owner/shared-skills.git
+  - path: https://github.com/InsonusK/ai-skills.git
     type: github
-    tree: main
+    tree: master
     subpath:
       - skills
       - playbooks
