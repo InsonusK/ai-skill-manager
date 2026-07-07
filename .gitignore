@@ -11,3 +11,4 @@ htmlcov/
 .ai-worktree/
 profiling/**.prof
 profiling/skills
+profiling/ai-skills
