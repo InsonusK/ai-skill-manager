@@ -340,7 +340,7 @@ def remove_orphans(
         if entry.is_dir() and is_managed(entry) and entry.resolve() not in copied_dirs:
             logger.debug("Removing orphan skill directory: %s", entry)
             shutil.rmtree(entry)
-            removed.append(entry.resolve())
+            removed.append(entry)
         if progress is not None:
             progress("remove_orphans", index, len(target_entries))
     logger.debug("Removed %d orphan skill(s)", len(removed))

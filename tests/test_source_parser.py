@@ -58,7 +58,7 @@ class TestBuildSourcesFromArgs(unittest.TestCase):
 
         self.assertEqual(len(sources), 1)
         self.assertIsInstance(sources[0], LocalSource)
-        self.assertEqual(sources[0].scan_path, src)
+        self.assertEqual(sources[0].scan_path, src.resolve())
         self.assertIsNone(config_path)
 
     def test_github_source_default_tree(self):

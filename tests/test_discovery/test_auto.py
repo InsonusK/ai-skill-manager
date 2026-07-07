@@ -74,7 +74,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(result[0].name, "web")
         self.assertFalse(result[0].is_flat())
         self.assertEqual(result[0].format, SkillFormat.HumanDir)
-        self.assertEqual(result[0].folder_path, skill_dir)
+        self.assertEqual(result[0].folder_path, skill_dir.resolve())
 
     def test_agent_skill(self):
         skill_dir = self._copy_mock("agent_skill") / "agent"
