@@ -211,10 +211,47 @@ Global settings that apply to the synchronization.
 
 | Setting / Настройка | Type / Тип | Default / По умолчанию | Description / Описание |
 |---------------------|------------|------------------------|------------------------|
-| `target` | string / строка | `.agents/skills` | Target directory relative to the config file. / Целевая директория относительно файла конфигурации. |
+| `target` | string or mapping / строка или отображение | `.agents/skills` | Target directory, or a mapping of multiple named targets. See [Multi-target sync](#multi-target-sync--мульти-target-синхронизация) below. / Целевая директория, либо отображение с несколькими именованными target'ами. См. [Мульти-target синхронизация](#multi-target-sync--мульти-target-синхронизация) ниже. |
 | `remove_orphans` | boolean / булево | `true` | Remove skills in the target that are no longer defined in the config. / Удалить навыки в целевой директории, которые больше не определены в конфиге. |
 | `on_conflict` | string / строка | `error` | How to handle duplicate skill names: `error` or `last_wins`. / Как обрабатывать дублирующиеся имена навыков: `error` или `last_wins`. |
 | `dry_run` | boolean / булево | `false` | When `true`, preview changes without writing anything. / При значении `true` показывать изменения без записи. |
+
+## Multi-target sync / Мульти-target синхронизация
+
+`settings.target` can be a mapping of several named targets instead of a single string. Each target copies **the same discovered skills**, independently, into its own directory with its own adapter list.
+`settings.target` может быть отображением из нескольких именованных target'ов вместо одной строки. Каждый target независимо копирует **одни и те же обнаруженные скиллы** в свою директорию со своим списком адаптеров.
+
+```yaml
+settings:
+  target:
+    for_each:
+      adapters:
+        - link-adapter
+    default:
+      path: .agents/skills
+    claude:
+      path: .claude/skills
+      adapters:
+        - claude-property-adapter
+```
+
+- `for_each` — a reserved key, not a target name. Its `adapters` list is merged (added, deduplicated, order-preserving) into every real target's own `adapters` list.
+  `for_each` — служебный ключ, не является именем target'а. Его список `adapters` объединяется (с дедупликацией, с сохранением порядка) со списком `adapters` каждого реального target'а.
+- Any other top-level key under `target` is a target name with two optional fields: `path` and `adapters` (a list of adapter names, see the table below).
+  Любой другой ключ верхнего уровня внутри `target` — это имя target'а с двумя опциональными полями: `path` и `adapters` (список имён адаптеров, см. таблицу ниже).
+- `default` and `claude` are **reserved names** with built-in default paths (`.agents/skills` and `.claude/skills` respectively), so `path` can be omitted for them. Any other target name requires an explicit `path` — omitting it is a configuration error, raised when the config is loaded.
+  `default` и `claude` — **зарезервированные имена** со встроенными путями по умолчанию (`.agents/skills` и `.claude/skills` соответственно), поэтому для них `path` можно не указывать. Для любого другого имени `path` обязателен — его отсутствие является ошибкой конфигурации, которая выдаётся при загрузке конфига.
+- If a target's final adapter list (its own `adapters` plus `for_each.adapters`) ends up empty, it falls back to `link-adapter`, matching the flat-string default.
+  Если итоговый список адаптеров target'а (его собственные `adapters` плюс `for_each.adapters`) оказывается пустым, используется `link-adapter`, как и при строковом формате.
+- The flat string format (`target: .agents/skills`) still works unchanged — it is equivalent to `target: {default: {path: .agents/skills, adapters: [link-adapter]}}`.
+  Строковый формат (`target: .agents/skills`) по-прежнему работает без изменений — он эквивалентен `target: {default: {path: .agents/skills, adapters: [link-adapter]}}`.
+
+### Available adapters / Доступные адаптеры
+
+| Config name / Имя в конфиге | Description / Описание |
+|------------------------------|-------------------------|
+| `link-adapter` | Rewrites internal links between skills into repo-absolute `skill-link` targets. Used by default. / Переписывает внутренние ссылки между скиллами в repo-absolute `skill-link` цели. Используется по умолчанию. |
+| `claude-property-adapter` | Reshapes frontmatter into the fields Claude Code natively understands (`name`, `description`, `when_to_use`, `allowed-tools`, `model`, etc.). Any other frontmatter field is moved into a visible `## Metadata` block in the file body instead of being silently dropped. / Приводит frontmatter к полям, нативно понимаемым Claude Code (`name`, `description`, `when_to_use`, `allowed-tools`, `model` и т.д.). Любое другое поле frontmatter переносится в видимый блок `## Metadata` в теле файла вместо того, чтобы быть молча отброшенным. |
 
 ### Conflict resolution / Разрешение конфликтов
 

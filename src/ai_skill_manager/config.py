@@ -4,10 +4,23 @@
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
+from .adapters.rules import absAdapter, resolve_adapters
 from .entities import GitHubSource, LocalSource, Source
+
+#: Default target directory for the reserved "default" target name.
+#: Целевая директория по умолчанию для зарезервированного имени "default".
+DEFAULT_TARGET_PATH = ".agents/skills"
+
+#: Default paths for reserved target names that omit ``path``.
+#: Пути по умолчанию для зарезервированных имён target'ов без ``path``.
+RESERVED_TARGET_DEFAULTS: Dict[str, str] = {
+    "default": DEFAULT_TARGET_PATH,
+    "claude": ".claude/skills",
+}
 
 
 def load_config(config_path: Path) -> dict:
@@ -108,3 +121,126 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
             raise ValueError(f"Unkonwn {src_type}")
 
     return sources
+
+
+@dataclass(frozen=True)
+class TargetSpec:
+    """A single sync destination: name, path and resolved adapter classes.
+
+    Одна цель синхронизации: имя, путь и разрешённые классы адаптеров.
+    """
+
+    name: str
+    path: Path
+    adapters: List[Type[absAdapter]]
+
+
+def _dedup_adapter_names(*name_lists: List[str]) -> List[str]:
+    """Merge adapter name lists, keeping the first occurrence of each name.
+
+    Объединяет списки имён адаптеров, сохраняя первое вхождение каждого имени.
+    """
+    seen: set[str] = set()
+    merged: List[str] = []
+    for names in name_lists:
+        for name in names or []:
+            if name not in seen:
+                seen.add(name)
+                merged.append(name)
+    return merged
+
+
+def parse_target_settings(target_value: Any) -> List[TargetSpec]:
+    """Parse ``settings.target`` into a list of :class:`TargetSpec`.
+
+    Разбирает ``settings.target`` в список :class:`TargetSpec`.
+
+    Supports the legacy flat-string format (a single target using the
+    default adapter) and the new multi-target mapping format with a
+    reserved ``for_each`` key whose ``adapters`` are merged into every
+    target's own adapter list.
+
+    Поддерживает устаревший строковый формат (один target с адаптером по
+    умолчанию) и новый формат с несколькими target'ами, где служебный ключ
+    ``for_each`` задаёт адаптеры, добавляемые к адаптерам каждого target'а.
+
+    Raises:
+        ValueError: If the shape of ``target_value`` is invalid, a
+            non-reserved target name is missing ``path``, or an adapter
+            name is unknown.
+            / Если форма ``target_value`` некорректна, нерезервированное
+            имя target'а не имеет ``path``, либо имя адаптера неизвестно.
+    """
+    if target_value is None:
+        target_value = DEFAULT_TARGET_PATH
+
+    if isinstance(target_value, str):
+        return [
+            TargetSpec(
+                name="default",
+                path=Path(target_value),
+                adapters=resolve_adapters(["link-adapter"]),
+            )
+        ]
+
+    if not isinstance(target_value, dict):
+        raise ValueError(
+            "settings.target must be a string or a mapping, got "
+            f"{type(target_value).__name__}"
+        )
+
+    raw = dict(target_value)
+    for_each = raw.pop("for_each", None) or {}
+    if not isinstance(for_each, dict):
+        raise ValueError(
+            "settings.target.for_each must be a mapping, got "
+            f"{type(for_each).__name__}"
+        )
+    for_each_adapters = list(for_each.get("adapters") or [])
+
+    if not raw:
+        # Only for_each (or nothing) was given: fall back to a single
+        # legacy-shaped default target.
+        merged = for_each_adapters or ["link-adapter"]
+        return [
+            TargetSpec(
+                name="default",
+                path=Path(DEFAULT_TARGET_PATH),
+                adapters=resolve_adapters(merged),
+            )
+        ]
+
+    specs: List[TargetSpec] = []
+    for name, entry in raw.items():
+        entry = entry or {}
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"settings.target.{name} must be a mapping, got "
+                f"{type(entry).__name__}"
+            )
+
+        path_value = entry.get("path")
+        if path_value is None:
+            default_path = RESERVED_TARGET_DEFAULTS.get(name)
+            if default_path is None:
+                raise ValueError(
+                    f"settings.target.{name} is missing required 'path' "
+                    "(only reserved names "
+                    f"{sorted(RESERVED_TARGET_DEFAULTS)} have a default path)"
+                )
+            path_value = default_path
+
+        own_adapters = list(entry.get("adapters") or [])
+        merged = _dedup_adapter_names(for_each_adapters, own_adapters)
+        if not merged:
+            merged = ["link-adapter"]
+
+        specs.append(
+            TargetSpec(
+                name=name,
+                path=Path(path_value),
+                adapters=resolve_adapters(merged),
+            )
+        )
+
+    return specs
