@@ -304,12 +304,14 @@ class TestPathLink(unittest.TestCase):
         # becomes an OS link and records that it is outside the repository.
         # RU: Абсолютный путь ОС, разрешающийся за пределами корня репозитория,
         # становится OS-ссылкой и фиксирует, что он вне репозитория.
-        link = self._path_link(self._dir_skill_file(), "/tmp/outside-repo.md")
+        outside = self.tmpdir / "outside-repo.md"
+        outside.write_text("# Outside\n")
+        link = self._path_link(self._dir_skill_file(), str(outside))
         self.assertEqual(link.path_raw.kind, PathKind.os_absolute)
         self.assertEqual(link.path.kind, LinkKind.os)
         self.assertFalse(link.path.is_inside_repo)
         self.assertEqual(link.path.repo_path, None)
-        self.assertEqual(link.path.formatted, "/tmp/outside-repo.md")
+        self.assertEqual(link.path.formatted, outside.resolve().as_posix())
 
     # ==================================================================
     # Additional cases

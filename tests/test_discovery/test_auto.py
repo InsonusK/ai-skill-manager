@@ -54,7 +54,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(result[0].name, "guide")
         self.assertTrue(result[0].is_flat())
         self.assertEqual(result[0].format, SkillFormat.HumanFlat)
-        self.assertEqual(result[0].file_path, md)
+        self.assertEqual(result[0].file_path, md.resolve())
 
     def test_non_skill_file_ignored(self):
         txt = self._copy_mock("non_skill_file_ignored") / "readme.txt"
@@ -86,7 +86,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self.assertEqual(result[0].name, "agent")
         self.assertFalse(result[0].is_flat())
         self.assertEqual(result[0].format, SkillFormat.Agent)
-        self.assertEqual(result[0].file_path, skill_dir / "SKILL.md")
+        self.assertEqual(result[0].file_path, (skill_dir / "SKILL.md").resolve())
 
     def test_conflicting_skill_markers_raises(self):
         skill_dir = self._copy_mock("conflicting_skill_markers_raises") / "conflict"
