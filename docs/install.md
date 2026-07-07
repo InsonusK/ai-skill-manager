@@ -60,6 +60,29 @@ To upgrade to the latest master:
 pip install --force-reinstall git+https://github.com/InsonusK/ai-skill-manager.git
 ```
 
+### Add to `requirements.txt` / Добавить в `requirements.txt`
+
+You can also add the package to your project dependencies:
+Вы также можете добавить пакет в зависимости проекта:
+
+```text
+ai-skill-manager @ git+https://github.com/InsonusK/ai-skill-manager.git
+```
+
+To pin a specific version, append a tag or branch:
+Чтобы зафиксировать конкретную версию, добавьте тег или ветку:
+
+```text
+ai-skill-manager @ git+https://github.com/InsonusK/ai-skill-manager.git@v1.1.0
+```
+
+Then install as usual:
+Затем установите обычным способом:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Install from source (development) / Установка из исходников (для разработки)
 
 Clone the repository and install in editable mode:

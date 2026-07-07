@@ -6,7 +6,7 @@
 from pathlib import Path
 from typing import Any, Optional
 
-import yaml
+from . import frontmatter
 
 
 class SkillProperty:
@@ -62,26 +62,5 @@ class SkillProperty:
         except (FileNotFoundError, IsADirectoryError, PermissionError):
             return None
 
-        if not content.startswith("---"):
-            return None
-
-        # EN: Find the closing --- after the opening one.
-        # RU: Найти закрывающий --- после открывающего.
-        rest = content[3:]
-        end_idx = rest.find("---")
-        if end_idx == -1:
-            return None
-
-        frontmatter_text = rest[:end_idx].strip()
-        if not frontmatter_text:
-            return None
-
-        try:
-            parsed = yaml.safe_load(frontmatter_text)
-        except yaml.YAMLError:
-            return None
-
-        if not isinstance(parsed, dict):
-            return None
-
+        parsed, _ = frontmatter.split(content)
         return parsed

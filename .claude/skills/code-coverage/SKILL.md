@@ -1,7 +1,7 @@
 ---
 name: code-coverage
 description: How many codes must be codered by unittest
-whenToUse: write code or write test
+when_to_use: write code or write test
 ---
 
 # How to use it
