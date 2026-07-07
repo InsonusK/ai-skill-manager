@@ -63,7 +63,7 @@ class TestSkillSourceLink(unittest.TestCase):
 
         self.assertEqual(len(skills), 1)
         self.assertIsInstance(skills[0].source, LocalSourceCls)
-        self.assertEqual(skills[0].source.scan_path, root.resolve())
+        self.assertEqual(skills[0].source.scan_path, root)
 
 if __name__ == "__main__":
     unittest.main()

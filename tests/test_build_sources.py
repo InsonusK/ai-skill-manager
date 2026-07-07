@@ -31,7 +31,7 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
         sources = build_sources_from_config(config)
 
         self.assertIsInstance(sources[0], LocalSource)
-        self.assertEqual(sources[0].scan_path, (root / "skills").resolve())
+        self.assertEqual(sources[0].scan_path, root / "skills")
 
     def test_build_github_source(self):
         root = self._copy_mock("default")

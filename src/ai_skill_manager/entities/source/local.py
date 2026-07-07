@@ -41,15 +41,6 @@ class LocalSource(Source):
     #: Optional repository root used for repo_absolute link resolution.
     #: Опциональный корень репозитория для разрешения ссылок repo_absolute.
 
-    def __post_init__(self):
-        # EN: Resolve paths once so all downstream comparisons use the same
-        # canonical representation (long names on Windows, no redundant segments).
-        # RU: Разрешаем пути один раз, чтобы все последующие сравнения использовали
-        # одно каноническое представление (длинные имена на Windows, без лишних сегментов).
-        object.__setattr__(self, "scan_path", self.scan_path.resolve())
-        if self.repo_path is not None:
-            object.__setattr__(self, "repo_path", self.repo_path.resolve())
-
     def __str__(self) -> str:
         return str(self.scan_path)
 
