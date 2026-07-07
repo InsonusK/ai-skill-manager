@@ -4,9 +4,10 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ...entities.skill import Skill
+from ...progress import ProgressCallback
 from ..models.validation_result import ValidationResult
 
 
@@ -39,7 +40,11 @@ class absValidationRule(ABC):
         return self.__class__.__name__
 
     @abstractmethod
-    def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
+    def validate(
+        self,
+        skills: List[Skill],
+        progress: Optional[ProgressCallback] = None,
+    ) -> Dict[Skill, ValidationResult]:
         """Validate a list of skills and return per-skill results.
 
         Проверяет список навыков и возвращает результаты по каждому навыку.
@@ -47,6 +52,8 @@ class absValidationRule(ABC):
         Args:
             skills: Skills to validate.
                 / Навыки для валидации.
+            progress: Optional ``(stage, current, total)`` callback for progress
+                reporting. / Опциональный callback для отчёта о прогрессе.
 
         Returns:
             Mapping from skill to its validation result.
