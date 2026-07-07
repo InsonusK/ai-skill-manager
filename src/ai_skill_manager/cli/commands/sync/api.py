@@ -99,7 +99,7 @@ def run_sync(
     Example:
         >>> from pathlib import Path
         >>> run_sync(config_path=Path("ai-skills.yaml"), dry_run=True)
-        {'skills_count': 0, 'skipped_count': 0, 'links_replaced': 0, 'targets': {}, 'dry_run': True, 'synced_count': 0}
+        {'skills_count': 0, 'skipped_count': 0, 'links_replaced': 0, 'targets': {}, 'dry_run': True, 'synced_count': 0, 'skills': []}
     """
     if config_path is None and sources is None:
         raise ValueError("Either config_path or sources must be provided")
@@ -172,6 +172,7 @@ def run_sync(
         "skipped_count": sum(t.get("skipped_count", 0) for t in per_target.values()),
         "links_replaced": sum(t.get("links_replaced", 0) for t in per_target.values()),
         "targets": per_target,
+        "skills": skills,
     }
 
     # Preserve legacy fields for formatters and callers.

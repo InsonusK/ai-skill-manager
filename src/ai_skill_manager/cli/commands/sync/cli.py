@@ -16,6 +16,8 @@ from ...tools.validation_report_printer import print_validation_report
 from ....progress import progress_context
 from ....validators import ValidationFailedError
 
+from ..check.formatter import print_skills
+
 from .api import DEFAULT_CONFIG, run_sync
 from .formatter import format_sync_result
 
@@ -131,6 +133,7 @@ def run(args):
                     force=args.force,
                     progress=progress,
                 )
+        print_skills(result["skills"])
         print(format_sync_result(result))
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
@@ -139,6 +142,9 @@ def run(args):
         print(f"❌ {e}", file=sys.stderr)
         sys.exit(1)
     except ValidationFailedError as e:
+        if e.skills:
+            print_skills(e.skills)
+            print()
         print_validation_report(e.report)
         print(f"❌ Validation Errors: {e}", file=sys.stderr)
         sys.exit(1)

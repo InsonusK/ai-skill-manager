@@ -59,7 +59,7 @@ def discover_and_validate(
     validation_report = validator.validate(skills, progress=progress)
     if validation_report.has_errors:
         logger.debug("Validation failed with errors")
-        raise ValidationFailedError(validation_report)
+        raise ValidationFailedError(validation_report, skills=skills)
     logger.debug("Validation passed")
 
     return skills
