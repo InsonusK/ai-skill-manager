@@ -93,10 +93,12 @@ jobs:
             python-version: '3.11'
 
     steps:
+      - name: Enable Git long paths
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
+
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          git-config: core.longpaths=true
 
       - name: Set up Python
         uses: actions/setup-python@v5
