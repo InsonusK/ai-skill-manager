@@ -8,18 +8,39 @@ No console output is produced here.
 """
 
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
-from ....config import build_sources_from_config, load_config
+from ....adapters.rules import resolve_adapters
+from ....config import (
+    TargetSpec,
+    build_sources_from_config,
+    load_config,
+    parse_target_settings,
+)
 from ....entities import Source
 from ....progress import ProgressCallback
-from ....services.sync import run_sync as run_sync_service
+from ....services.sync import discover_and_validate, sync_to_target
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
 
 DEFAULT_TARGET = ".agents/skills"
 #: Default target directory. / Целевая директория по умолчанию.
+
+
+def _single_target(target_dir: Optional[Path]) -> List[TargetSpec]:
+    """Build a single default-shaped target, matching pre-multi-target behavior.
+
+    Строит один target в форме по умолчанию, соответствующей поведению до
+    появления мульти-target.
+    """
+    return [
+        TargetSpec(
+            name="default",
+            path=target_dir if target_dir is not None else Path(DEFAULT_TARGET),
+            adapters=resolve_adapters(["link-adapter"]),
+        )
+    ]
 
 
 def run_sync(
@@ -38,16 +59,20 @@ def run_sync(
     Args:
         config_path: Path to the configuration file. When ``sources`` is not
             provided, the config is loaded and used to resolve sources,
-            target directory and orphan settings.
+            target(s) and orphan settings.
             / Путь к файлу конфигурации. Если ``sources`` не переданы,
-            конфиг загружается и используется для источников, целевой
-            директории и настроек осиротевших навыков.
+            конфиг загружается и используется для источников, целевых
+            директорий и настроек осиротевших навыков.
         sources: Optional explicit sources. If provided, ``config_path`` is
             only used to resolve relative target paths when it is also given.
             / Опциональные явные источники. Если переданы, ``config_path``
             используется только для разрешения относительных целевых путей.
-        target_dir: Optional override for the target directory. /
-            Опциональное переопределение целевой директории.
+        target_dir: Optional override for the target directory. When given,
+            it replaces ``settings.target`` entirely with a single target
+            using the default adapter list. / Опциональное переопределение
+            целевой директории. Если передано, полностью заменяет
+            ``settings.target`` одним target'ом со списком адаптеров по
+            умолчанию.
         remove_orphans: Whether to remove orphan skills. Defaults to ``True``. /
             Удалять ли осиротевшие навыки. По умолчанию ``True``.
         dry_run: If ``True``, do not write any changes. /
@@ -58,24 +83,30 @@ def run_sync(
             reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
-        Result dictionary from the sync service. / Словарь результата от сервиса синхронизации.
+        Result dictionary aggregated across all configured targets, plus a
+        ``targets`` key with each target's individual result keyed by name.
+        / Словарь результата, агрегированный по всем настроенным target'ам,
+        плюс ключ ``targets`` с результатом каждого target'а по имени.
 
     Raises:
         FileNotFoundError: If the configuration file does not exist.
             / Если файл конфигурации не существует.
-        ValueError: If neither ``config_path`` nor ``sources`` is provided.
-            / Если не указан ни ``config_path``, ни ``sources``.
+        ValueError: If neither ``config_path`` nor ``sources`` is provided,
+            or if ``settings.target`` is malformed.
+            / Если не указан ни ``config_path``, ни ``sources``, либо
+            ``settings.target`` некорректен.
 
     Example:
         >>> from pathlib import Path
         >>> run_sync(config_path=Path("ai-skills.yaml"), dry_run=True)
-        {'skills_count': 0, 'target_dir': '...', 'links_replaced': 0, 'dry_run': True}
+        {'skills_count': 0, 'skipped_count': 0, 'links_replaced': 0, 'targets': {}, 'dry_run': True, 'synced_count': 0}
     """
     if config_path is None and sources is None:
         raise ValueError("Either config_path or sources must be provided")
 
     resolved_sources: Sequence[Source]
     config_base: Optional[Path] = None
+    targets: List[TargetSpec]
 
     if config_path is not None:
         config_path = config_path.resolve()
@@ -87,12 +118,12 @@ def run_sync(
             config = load_config(config_path)
             settings = config.get("settings", {})
 
-            # Resolve target directory: CLI override > config > default.
-            # Определяем целевую директорию: CLI > конфиг > умолчание.
-            if target_dir is None:
-                target_dir = Path(settings.get("target", DEFAULT_TARGET))
-            if not target_dir.is_absolute():
-                target_dir = config_base / target_dir
+            # Resolve target(s): CLI override > config > default.
+            # Определяем target(ы): CLI > конфиг > умолчание.
+            if target_dir is not None:
+                targets = _single_target(target_dir)
+            else:
+                targets = parse_target_settings(settings.get("target"))
 
             # Resolve orphan removal: CLI override > config > default.
             # Определяем удаление осиротевших навыков: CLI > конфиг > умолчание.
@@ -102,33 +133,50 @@ def run_sync(
             resolved_sources = build_sources_from_config(config_path)
         else:
             resolved_sources = sources
+            targets = _single_target(target_dir)
     else:
         resolved_sources = sources  # type: ignore[assignment]
-
-    if target_dir is None:
-        target_dir = Path(DEFAULT_TARGET)
-    if not target_dir.is_absolute():
-        base = config_base if config_base is not None else Path.cwd()
-        target_dir = base / target_dir
-    target_dir = target_dir.resolve()
+        targets = _single_target(target_dir)
 
     if remove_orphans is None:
         remove_orphans = True
 
-    result = run_sync_service(
-        sources=resolved_sources,
-        target_dir=target_dir,
-        dry_run=dry_run,
-        cleanup_orphans=remove_orphans,
-        force=force,
-        progress=progress,
-        repo_path=config_base if config_base is not None else Path.cwd(),
-    )
+    base = config_base if config_base is not None else Path.cwd()
+    resolved_targets = []
+    for spec in targets:
+        path = spec.path
+        if not path.is_absolute():
+            path = base / path
+        resolved_targets.append((spec.name, path.resolve(), spec.adapters))
+
+    try:
+        skills = discover_and_validate(resolved_sources, progress=progress)
+        per_target: Dict[str, dict] = {}
+        for name, path, adapter_classes in resolved_targets:
+            per_target[name] = sync_to_target(
+                skills,
+                path,
+                adapters=adapter_classes,
+                dry_run=dry_run,
+                cleanup_orphans=remove_orphans,
+                force=force,
+                progress=progress,
+                repo_path=base,
+            )
+    finally:
+        for src in resolved_sources:
+            src.cleanup()
+
+    result: dict = {
+        "skills_count": len(skills),
+        "skipped_count": sum(t.get("skipped_count", 0) for t in per_target.values()),
+        "links_replaced": sum(t.get("links_replaced", 0) for t in per_target.values()),
+        "targets": per_target,
+    }
 
     # Preserve legacy fields for formatters and callers.
     # Сохраняем устаревшие поля для форматёров и вызывающих сторон.
-    result.setdefault("dry_run", dry_run)
-    result.setdefault("skipped_count", 0)
+    result["dry_run"] = dry_run
     result.setdefault("synced_count", result.get("skills_count", 0))
 
     return result
