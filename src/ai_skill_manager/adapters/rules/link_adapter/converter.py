@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
@@ -135,10 +136,10 @@ class ExternalLinkConverter(absLinkConverter):
 
 
 class ExternalFileConverter:
-    """Copies a non-skill file into ``files/`` and returns the relative link.
+    """Copies a non-skill file or directory into ``files/`` and returns the relative link.
 
-    Копирует файл, не принадлежащий скиллу, в ``files/`` и возвращает
-    относительную ссылку.
+    Копирует файл или директорию, не принадлежащие скиллу, в ``files/`` и
+    возвращает относительную ссылку.
     """
 
     def __init__(self, copied_files: Dict[Path, Path]):
@@ -155,20 +156,21 @@ class ExternalFileConverter:
         link: absLink,
         target_skill_folder: Path,
     ) -> str:
-        """Return ``./files/<name>`` for the linked file, copying if needed.
+        """Return ``./files/<name>`` for the linked file or directory, copying if needed.
 
-        If the same source file has already been copied, reuse the existing
+        If the same source path has already been copied, reuse the existing
         target name to avoid duplicates.
 
         Returns:
-            Relative target string such as ``./files/diagram.png``.
+            Relative target string such as ``./files/diagram.png`` or
+            ``./files/assets``.
         """
         source_path = link.path.os_path
         logger.debug("Converting external file link: %s", source_path)
         if source_path in self._copied_files:
             copied_path = self._copied_files[source_path]
             rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
-            logger.debug("Reusing previously copied external file: %s -> %s", source_path, copied_path)
+            logger.debug("Reusing previously copied external path: %s -> %s", source_path, copied_path)
             return _append_header(rel, link.header)
 
         files_dir = target_skill_folder / "files"
@@ -183,9 +185,12 @@ class ExternalFileConverter:
             target_path = files_dir / f"{stem}_{counter}{suffix}"
             counter += 1
 
-        import shutil
-        logger.debug("Copying external file: %s -> %s", source_path, target_path)
-        shutil.copy2(source_path, target_path)
+        if source_path.is_dir():
+            logger.debug("Copying external directory: %s -> %s", source_path, target_path)
+            shutil.copytree(source_path, target_path)
+        else:
+            logger.debug("Copying external file: %s -> %s", source_path, target_path)
+            shutil.copy2(source_path, target_path)
         self._copied_files[source_path] = target_path
 
         rel = "./" + target_path.relative_to(target_skill_folder).as_posix()
