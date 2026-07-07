@@ -80,7 +80,7 @@ class TestWikilinkBuilder(unittest.TestCase):
         md = skill_dir / "SKILL.md"
         md.write_text("# Skill\n")
         skill_file = self._skill_file(md, skill_dir)
-        content = (self.workdir / "relative_link_tc.md").read_text()
+        content = (self.workdir / "relative_link_tc.md").read_text(encoding="utf-8")
         links = builder.search(content, skill_file)
         self.assertEqual(len(links), 1)
         self.assertIsInstance(links[0], PathLink)

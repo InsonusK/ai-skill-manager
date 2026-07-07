@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from ....entities import LinkKind, absLink
+from ....entities.link.path_utils import same_path
 
 if TYPE_CHECKING:
     from ....entities import Skill
@@ -428,7 +429,7 @@ class SourceLinkConverter(absLinkConverter):
 
             # EN: Determine the absolute target path inside the resolved skill.
             # RU: Определяем абсолютный путь цели внутри разрешённого скилла.
-            if is_main_file or target_path == skill.file_path:
+            if is_main_file or same_path(target_path, skill.file_path):
                 final_path = skill.file_path
             else:
                 folder = skill.folder_path

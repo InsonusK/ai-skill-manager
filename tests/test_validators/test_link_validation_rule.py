@@ -206,6 +206,76 @@ class TestLinkValidationRule(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+    def test_link_in_plain_text_is_validated(self):
+        # EN: A link in regular markdown text must be validated.
+        # RU: Ссылка в обычном markdown-тексте должна проверяться.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n[missing](./missing.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertIn(skill, result)
+        self.assertTrue(result[skill].has_errors)
+
+    def test_link_in_inline_code_is_skipped(self):
+        # EN: A link wrapped in single backticks must not be validated.
+        # RU: Ссылка внутри одиночных обратных кавычек не должна проверяться.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n`[missing](./missing.md)`\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
+    def test_link_in_plain_fenced_block_is_validated(self):
+        # EN: A link inside a plain fenced code block (no language label) must
+        # still be validated.
+        # RU: Ссылка внутри обычного fenced code block (без метки языка) должна
+        # всё ещё проверяться.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n```\n[missing](./missing.md)\n```\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertIn(skill, result)
+        self.assertTrue(result[skill].has_errors)
+
+    def test_link_in_example_fenced_block_is_skipped(self):
+        # EN: A link inside an ```example block must not be validated because
+        # such blocks are masked during link discovery.
+        # RU: Ссылка внутри блока ```example не должна проверяться, так как
+        # такие блоки маскируются при поиске ссылок.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: skill\n---\n# Skill\n```example\n[missing](./missing.md)\n```\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
 
 if __name__ == "__main__":
     unittest.main()

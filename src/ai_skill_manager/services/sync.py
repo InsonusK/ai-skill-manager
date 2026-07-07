@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
+from ..entities.link.path_utils import same_path
 from ..utils import compute_skill_hash, is_managed, read_managed_state, write_managed_state
 
 from ..adapters import Adapter
@@ -336,7 +337,7 @@ def remove_orphans(
     if progress is not None:
         progress("remove_orphans", 0, len(target_entries))
     for index, entry in enumerate(target_entries, start=1):
-        if entry.is_dir() and is_managed(entry) and entry not in copied_dirs:
+        if entry.is_dir() and is_managed(entry) and entry.resolve() not in copied_dirs:
             logger.debug("Removing orphan skill directory: %s", entry)
             shutil.rmtree(entry)
             removed.append(entry)
@@ -475,7 +476,7 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Sk
         if not src_file.is_file():
             continue
         rel = src_file.relative_to(source_root)
-        if src_file.resolve() == skill.file_path.resolve():
+        if same_path(src_file, skill.file_path):
             dst = skill_target_dir / "SKILL.md"
         else:
             dst = skill_target_dir / rel

@@ -37,6 +37,15 @@ class Skill:
 
         Инициализирует производные атрибуты и проверяет пути.
         """
+        # EN: Resolve paths to their canonical form so comparisons are not
+        # affected by Windows short names (RUNNER~1) or by redundant segments.
+        # RU: Приводим пути к каноническому виду, чтобы сравнения не зависели
+        # от Windows-коротких имён (RUNNER~1) или лишних сегментов.
+        object.__setattr__(self, "file_path", self.file_path.resolve())
+        if self.folder_path is not None:
+            object.__setattr__(self, "folder_path", self.folder_path.resolve())
+        object.__setattr__(self, "source_path", self.source_path.resolve())
+
         # EN: Validate that all stored paths have the expected shape.
         # RU: Проверяем, что все сохранённые пути имеют ожидаемый вид.
         assert self.file_path.is_absolute(

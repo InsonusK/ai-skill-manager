@@ -43,10 +43,13 @@ class TestLinkFactory(unittest.TestCase):
         tmp_dir.mkdir()
         (tmp_dir / "file.md").write_text("# Absolute\n")
         (root / "wiki link.md").write_text("# Wiki\n")
+        absolute_target = self.tmpdir / "absolute.md"
+        absolute_target.write_text("# Absolute\n")
+        self._absolute_target = absolute_target
         content = (
             "# Mixed\n"
             "[relative](./file.md)\n"
-            "[absolute](/tmp/file.md)\n"
+            f"[absolute]({absolute_target.as_posix()})\n"
             "[web](https://example.com)\n"
             "![image](./img.png)\n"
             "[[wiki link|text]]\n"
@@ -85,8 +88,8 @@ class TestLinkFactory(unittest.TestCase):
                 "cls": PathLink,
                 "formatted": "file.md",
             },
-            "[absolute](/tmp/file.md)": {
-                "path_raw": "/tmp/file.md",
+            f"[absolute]({self._absolute_target.as_posix()})": {
+                "path_raw": self._absolute_target.as_posix(),
                 "raw_kind": PathKind.os_absolute,
                 "kind": LinkKind.os,
                 "text": "absolute",
@@ -94,7 +97,7 @@ class TestLinkFactory(unittest.TestCase):
                 "header": None,
                 "is_image": False,
                 "cls": PathLink,
-                "formatted": "/tmp/file.md",
+                "formatted": self._absolute_target.resolve().as_posix(),
             },
             "[web](https://example.com)": {
                 "url": "https://example.com",

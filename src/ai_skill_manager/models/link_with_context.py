@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ..entities import PathLink, Skill, SkillFile, WebLink, absLink
+from ..entities.link.path_utils import is_relative_to_resolved, same_path
 from .link_location import LinkLocation
 
 _UNSET = object()
@@ -124,12 +125,12 @@ class LinkWithContext:
         # EN: Flat skills only accept links to their single markdown file.
         # RU: Плоские навыки принимают только ссылки на свой единственный markdown-файл.
         if skill.format.is_flat:
-            return target == skill.file_path
+            return same_path(target, skill.file_path)
 
         # EN: Directory skills accept links to any existing file under the skill folder.
         # RU: Директорийные навыки принимают ссылки на любой существующий файл внутри папки навыка.
         assert skill.folder_path is not None, "None folder path in dir skill"
-        return target.is_relative_to(skill.folder_path) and target.exists()
+        return is_relative_to_resolved(target, skill.folder_path) and target.exists()
 
     def is_link_to_another_skill_file(self, other_skills: List[Skill]) -> Optional[Tuple[Skill, SkillFile]]:
         """Return the other skill and SkillFile this link targets, if any.
@@ -139,7 +140,7 @@ class LinkWithContext:
         candidates = []
         for skill in other_skills:
             for file in skill.files:
-                if self.os_absolute_path == file.path:
+                if same_path(self.os_absolute_path, file.path):
                     candidates.append((skill, file))
         if len(candidates) == 0:
             return None
@@ -160,8 +161,8 @@ class LinkWithContext:
         # repo-absolute ссылки, записанные без суффикса ``.md``.
         skill_candidates = [
             skill for skill in other_skills
-            if self.os_absolute_path == skill.file_path
-            or (skill.folder_path is not None and self.os_absolute_path == skill.folder_path)
+            if same_path(self.os_absolute_path, skill.file_path)
+            or (skill.folder_path is not None and same_path(self.os_absolute_path, skill.folder_path))
         ]
         if len(skill_candidates) == 0:
             return None
@@ -185,9 +186,9 @@ class LinkWithContext:
             return None
         candidates = []
         for skill in skills:
-            if skill.folder_path is not None and target.is_relative_to(skill.folder_path):
+            if skill.folder_path is not None and is_relative_to_resolved(target, skill.folder_path):
                 candidates.append(skill)
-            elif target == skill.file_path:
+            elif same_path(target, skill.file_path):
                 candidates.append(skill)
         if len(candidates) == 0:
             return None

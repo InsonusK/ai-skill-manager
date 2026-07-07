@@ -47,6 +47,11 @@ class SkillFile:
 
         Проверяет, что сохранённый путь является абсолютным путём к файлу.
         """
+        # EN: Resolve the path so it matches the canonical form used by Skill
+        # (long names on Windows, no redundant segments).
+        # RU: Приводим путь к каноническому виду, используемому Skill
+        # (длинные имена на Windows, без лишних сегментов).
+        object.__setattr__(self, "path", self.path.resolve())
         assert self.path.is_absolute(), f"Skill file path must be absolute. Current value: {self.path}"
         assert self.path.is_file(), f"Skill file path must lead to file. Now it leads to {self.path}"
 

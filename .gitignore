@@ -8,3 +8,4 @@ build/
 venv/
 htmlcov/
 .coverage
+.ai-worktree/
