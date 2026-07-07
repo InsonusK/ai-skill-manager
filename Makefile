@@ -11,6 +11,9 @@ test:
 test-codecover:
 	.venv/bin/pytest -v --cov=./src --cov-report html
 
+run-check:
+	.venv/bin/python -m ai_skill_manager.cli check
+
 run-sync:
 	.venv/bin/python -m ai_skill_manager.cli sync
 
