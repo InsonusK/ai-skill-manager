@@ -8,6 +8,7 @@ Registers subcommands from the ``commands`` package.
 """
 
 import argparse
+import sys
 
 from ..profiling import profile_command
 
@@ -21,6 +22,15 @@ def main():
 
     Запускает основную точку входа CLI.
     """
+    # Ensure stdout/stderr use UTF-8 so emoji and non-ASCII characters in
+    # formatter output do not crash on Windows with legacy code pages.
+    # Убеждаемся, что stdout/stderr используют UTF-8, чтобы эмодзи и
+    # не-ASCII символы в выводе форматтера не приводили к ошибкам в Windows.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
     # EN: Create the top-level argument parser.
     # RU: Создаём корневой парсер аргументов.
     parser = argparse.ArgumentParser(
