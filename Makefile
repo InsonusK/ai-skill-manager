@@ -18,10 +18,10 @@ run-sync:
 	.venv/bin/python -m ai_skill_manager.cli sync
 
 profile-sync:
-	.venv/bin/python -m ai_skill_manager.cli --profile sync
+	cd profiling &&	../.venv/bin/python -m ai_skill_manager.cli --profile sync
 
 profile-check:
-	.venv/bin/python -m ai_skill_manager.cli --profile check
+	cd profiling &&	../.venv/bin/python -m ai_skill_manager.cli --profile check
 
 build:
 	python -m build

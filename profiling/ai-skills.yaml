@@ -1,10 +1,10 @@
 sources:
   - path: https://github.com/InsonusK/ai-skills.git
     type: github
-    tree: develop
+    tree: master
     subpath:
       - skills
-      
+
 settings:
   target: 
     for_each:
