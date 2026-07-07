@@ -3,6 +3,7 @@
 Правило валидации ссылок внутри скиллов.
 """
 
+import re
 from typing import Dict, List, Optional
 
 from ...entities import PathLink, Skill, WebLink
@@ -90,6 +91,13 @@ class LinkValidationRule(absValidationRule):
             A validation error if the link is invalid, otherwise ``None``.
                 / Ошибка валидации, если ссылка некорректна, иначе ``None``.
         """
+        # Links inside inline code spans (`...`) are not validated.
+        # This keeps examples like `[text](path)` from being treated as real links.
+        # Ссылки внутри инлайн-кода (`...`) не валидируются, чтобы примеры вида
+        # `[text](path)` не считались настоящими ссылками.
+        if _is_inside_inline_code(link.context.file.content, link.base.start, link.base.end):
+            return None
+
         # External web links are always allowed.
         # Внешние веб-ссылки всегда разрешены.
         if isinstance(link.base, WebLink):
@@ -140,3 +148,64 @@ class LinkValidationRule(absValidationRule):
         # Anything else (source or OS file) is allowed as long as the file exists.
         # Всё остальное (source- или OS-файл) разрешено, пока файл существует.
         return None
+
+
+# Matches fenced code blocks (3+ backticks, optional language label). Used to
+# exclude such blocks when looking for inline code spans so that links inside
+# plain ``` blocks are still validated.
+# Совпадает с fenced code blocks (3+ обратных кавычки, необязательная метка
+# языка). Используется для исключения таких блоков при поиске инлайн-кода,
+# чтобы ссылки внутри обычных ``` блоков всё ещё проверялись.
+_FENCED_BLOCK_RE = re.compile(
+    r"^[ ]{0,3}(`{3,})[^\n]*$\n?.*?^[ ]{0,3}\1\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _mask_fenced_blocks_for_inline_code(content: str) -> str:
+    """Replace fenced code blocks with spaces.
+
+    The returned string has the same length as ``content`` so that link offsets
+    stay valid for the original document.
+
+    Возвращает строку той же длины, что и ``content``, чтобы смещения ссылок
+    оставались корректными для оригинального документа.
+    """
+
+    def _replace_with_spaces(match: re.Match) -> str:
+        return " " * len(match.group(0))
+
+    return _FENCED_BLOCK_RE.sub(_replace_with_spaces, content)
+
+
+def _is_inside_inline_code(content: str, start: int, end: int) -> bool:
+    """Return ``True`` if the span ``[start, end]`` lies inside inline code.
+
+    Only single backtick inline code spans (`` `...` ``) are considered.
+    Fenced code blocks are ignored during detection, so links inside plain
+    `` ``` `` blocks are not treated as inline code.
+
+    Возвращает ``True``, если диапазон ``[start, end]`` находится внутри
+    инлайн-кода. Учитываются только пары из одной обратной кавычки.
+    Fenced code blocks игнорируются при определении, поэтому ссылки внутри
+    обычных `` ``` `` блоков не считаются инлайн-кодом.
+    """
+    masked = _mask_fenced_blocks_for_inline_code(content)
+    backtick_re = re.compile(r"`+")
+    pos = 0
+    while True:
+        match = backtick_re.search(masked, pos)
+        if not match:
+            break
+        open_start = match.start()
+        open_len = len(match.group(0))
+        closing_re = re.compile(rf"`{{{open_len}}}(?!`)")
+        closing_match = closing_re.search(masked, match.end())
+        if not closing_match:
+            break
+        close_start = closing_match.start()
+        close_end = closing_match.end()
+        if start < close_end and end > open_start:
+            return True
+        pos = close_end
+    return False

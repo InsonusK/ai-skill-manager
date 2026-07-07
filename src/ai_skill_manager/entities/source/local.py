@@ -59,10 +59,10 @@ class LocalSource(Source):
         """
         result: Dict[str, Any] = {
             "type": self.source_type,
-            "path": str(self.scan_path),
+            "path": self.scan_path.as_posix(),
         }
         if self.repo_path is not None:
-            result["repo_path"] = str(self.repo_path)
+            result["repo_path"] = self.repo_path.as_posix()
         return result
 
     def get_scan_location(self) -> ScanLocation:

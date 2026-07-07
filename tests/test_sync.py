@@ -336,7 +336,7 @@ class TestRemoveOrphans(unittest.TestCase):
 
         self.assertFalse(orphan.exists())
         self.assertTrue(kept.folder_path.exists())
-        self.assertEqual(removed, [orphan])
+        self.assertEqual(removed, [orphan.resolve()])
 
     def test_keeps_unmanaged_directories(self):
         unmanaged = self.target_dir / "unmanaged"

@@ -6,6 +6,7 @@
 from typing import List, Optional, Tuple
 
 from ....entities import Skill, SkillFile, WebLink, absLink
+from ....validators.rules.link_validation_rule import _is_inside_inline_code
 from ...models.adapter_message import AdapterMessage
 from ..abs_adapter import absAdapter
 from .converter import LinkConverter
@@ -144,6 +145,12 @@ class LinkAdapter(absAdapter):
         last_start = len(content)
 
         for link in sorted_links:
+            # Skip links inside inline code spans (`...`), just like validation.
+            # Examples like `[text](path)` in anti-patterns should not be treated
+            # as real links and must not trigger file copies.
+            if _is_inside_inline_code(content, link.start, link.end):
+                continue
+
             new_target = self._compute_new_target(link, skill_file, skill, other_skills)
             if new_target is None:
                 # Nothing to do for this link.

@@ -41,7 +41,7 @@ class TestSkillFile(unittest.TestCase):
         md = self._copy_mock("skill_with_link") / "guide.skill.md"
         skill = self._skill(md)
         sf = SkillFile(path=md, skill=skill)
-        self.assertEqual(sf.path, md)
+        self.assertEqual(sf.path, md.resolve())
 
     def test_links_are_cached(self):
         md = self._copy_mock("skill_with_link") / "guide.skill.md"

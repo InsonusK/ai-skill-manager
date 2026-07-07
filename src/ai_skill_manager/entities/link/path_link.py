@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .link_path import LinkPath
+from .path_utils import is_relative_to_resolved, same_path
 
 from ..path_kind import PathKind
 
@@ -133,6 +134,11 @@ def _classify_raw_path(path: str) -> PathKind:
         logger.debug("Classified path %r as relative", path)
         return PathKind.relative
     if normalized.startswith("/"):
+        logger.debug("Classified path %r as os_absolute", path)
+        return PathKind.os_absolute
+    # Windows drive-letter paths (C:/foo/bar) are OS-absolute as well.
+    # Пути с буквой диска Windows (C:/foo/bar) тоже являются абсолютными путями ОС.
+    if len(normalized) >= 2 and normalized[1] == ":":
         logger.debug("Classified path %r as os_absolute", path)
         return PathKind.os_absolute
     logger.debug("Classified path %r as repo_absolute", path)
@@ -273,8 +279,8 @@ def _resolve_path(
         )
 
     folder = skill.folder_path
-    is_self_link = resolved == skill.file_path
-    is_inside_skill_folder = folder is not None and resolved.is_relative_to(folder)
+    is_self_link = same_path(resolved, skill.file_path)
+    is_inside_skill_folder = folder is not None and is_relative_to_resolved(resolved, folder)
 
     repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
     logger.debug("Repo-relative link path: %s", repo_relative)

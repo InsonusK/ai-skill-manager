@@ -91,10 +91,15 @@ class TestLinkWithContext(unittest.TestCase):
         # реальный путь ОС и классифицируется как LinkKind.os.
         root = self._copy_mock("os_abs")
         md = root / "guide.skill.md"
+        absolute_target = self.tmpdir / "absolute.md"
+        absolute_target.write_text("# Absolute\n")
+        md.write_text(
+            f"---\nname: guide\n---\n# Guide\n[absolute]({absolute_target.as_posix()})\n"
+        )
         skill = self._skill(md)
         ctx = self._context(skill, md)
 
-        self.assertEqual(ctx.os_absolute_path, Path("/tmp/absolute.md"))
+        self.assertEqual(ctx.os_absolute_path, absolute_target.resolve())
         self.assertEqual(ctx.base.path.kind, LinkKind.os)
         self.assertFalse(ctx.base.path.is_inside_repo)
 

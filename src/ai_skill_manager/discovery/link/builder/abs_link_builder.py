@@ -158,4 +158,9 @@ class absLinkBuilder(ABC):
             ``True`` when the path is absolute on the local filesystem. /
             ``True``, когда путь абсолютен в локальной файловой системе.
         """
-        return path.replace("\\", "/").startswith("/")
+        normalized = path.replace("\\", "/")
+        if normalized.startswith("/"):
+            return True
+        # Windows drive-letter paths such as C:/foo/bar are OS-absolute too.
+        # Пути с буквой диска Windows, например C:/foo/bar, тоже являются абсолютными.
+        return len(normalized) >= 2 and normalized[1] == ":"
