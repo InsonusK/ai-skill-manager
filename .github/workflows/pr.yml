@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - master
+      - develop
 
 jobs:
   changes:
@@ -29,7 +30,7 @@ jobs:
 
   version-check:
     needs: changes
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.workflow == 'true'
+    if: github.base_ref == 'master' && (needs.changes.outputs.src == 'true' || needs.changes.outputs.workflow == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
