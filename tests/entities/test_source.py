@@ -34,7 +34,7 @@ class TestSource(unittest.TestCase):
             skill_file.write_text("# Guide")
             source = LocalSource(scan_path=skill_file)
             loc = source.get_scan_location()
-            self.assertEqual(loc.source_path, tmpdir.resolve())
+            self.assertEqual(loc.source_path, skill_file.resolve())
             self.assertEqual(loc.repo_path, tmpdir.resolve())
         finally:
             shutil.rmtree(tmpdir)
