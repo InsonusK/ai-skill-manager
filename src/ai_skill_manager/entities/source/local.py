@@ -41,6 +41,14 @@ class LocalSource(Source):
     #: Optional repository root used for repo_absolute link resolution.
     #: Опциональный корень репозитория для разрешения ссылок repo_absolute.
 
+    original_repo_path: Optional[Path] = None
+    #: Optional original repository root from the source skill, used when a
+    #: copied skill is scanned from a different root (e.g. a target directory)
+    #: so that repo-absolute links authored in the source still resolve.
+    #: Опциональный исходный корень репозитория из исходного скилла,
+    #: используется при сканировании скопированного скилла из другого корня,
+    #: чтобы repo-absolute ссылки, созданные в источнике, продолжали разрешаться.
+
     def __str__(self) -> str:
         return str(self.scan_path)
 
@@ -63,6 +71,8 @@ class LocalSource(Source):
         }
         if self.repo_path is not None:
             result["repo_path"] = self.repo_path.as_posix()
+        if self.original_repo_path is not None:
+            result["original_repo_path"] = self.original_repo_path.as_posix()
         return result
 
     def get_scan_location(self) -> ScanLocation:

@@ -12,7 +12,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 
-from ....entities import LinkKind, absLink
+from ....entities import LinkKind, PathKind, absLink
+from ....entities.link.path_link import _existing_file
 from ....entities.link.path_utils import same_path
 
 if TYPE_CHECKING:
@@ -168,6 +169,34 @@ class ExternalFileConverter:
         """
         source_path = link.path.os_path
         logger.debug("Converting external file link: %s", source_path)
+
+        # EN: When a copied skill is scanned from a different root, repo-absolute
+        # links may resolve to a non-existent path under the target root while
+        # the original source file still exists. Fall back to the original repo
+        # root so the file can be copied.
+        # RU: Когда скопированный скилл сканируется из другого корня, repo-absolute
+        # ссылки могут разрешаться в несуществующий путь под целевым корнем,
+        # хотя исходный файл всё ещё существует. Возвращаемся к исходному корню
+        # репозитория, чтобы файл можно было скопировать.
+        if not source_path.exists():
+            raw_path = getattr(link, "path_raw", None)
+            original_repo_path = getattr(
+                link.skill_file.skill.source, "original_repo_path", None
+            )
+            if (
+                raw_path is not None
+                and original_repo_path is not None
+                and raw_path.kind == PathKind.repo_absolute
+            ):
+                original_candidate = _existing_file(
+                    (original_repo_path / raw_path.path.replace("\\", "/")).resolve()
+                )
+                if original_candidate is not None:
+                    logger.debug(
+                        "Falling back to original repo path: %s", original_candidate
+                    )
+                    source_path = original_candidate
+
         if source_path in self._copied_files:
             copied_path = self._copied_files[source_path]
             rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
@@ -327,6 +356,15 @@ class SourceLinkConverter(absLinkConverter):
             result = idx["old_file_to_new"].get(norm_target)
             if result is not None:
                 return result
+
+            # EN: Exact match against original source skill folders (repo-absolute
+            # links that point to the folder itself, e.g. without ``.md``).
+            # RU: Точное совпадение с исходными папками скиллов (repo-absolute
+            # ссылки, указывающие на саму папку, например без ``.md``).
+            result = idx["old_folder_full"].get(norm_target)
+            if result is not None:
+                new_skill, _ = result
+                return new_skill, True, None
 
             # EN: Target is inside an original source skill folder.
             for parent in norm_target.parents:
