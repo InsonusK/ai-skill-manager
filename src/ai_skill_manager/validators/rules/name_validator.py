@@ -14,6 +14,7 @@ import re
 from typing import Dict, Optional
 from .abs_validation_rule import Skill, absValidationRule, ValidationResult, List
 from ...entities import SkillFormat
+from ...progress import ProgressCallback
 from ..models import ValidationSeverity, ValidationError
 
 
@@ -24,7 +25,11 @@ class NameValidationRule(absValidationRule):
         """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"
 
-    def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
+    def validate(
+        self,
+        skills: List[Skill],
+        progress: Optional[ProgressCallback] = None,
+    ) -> Dict[Skill, ValidationResult]:
         """Validate each skill's name depending on its format.
 
         Проверяет имя каждого навыка в зависимости от его формата.
@@ -32,6 +37,8 @@ class NameValidationRule(absValidationRule):
         Args:
             skills: Skills to validate.
                 / Навыки для валидации.
+            progress: Optional ``(stage, current, total)`` callback for progress
+                reporting. / Опциональный callback для отчёта о прогрессе.
 
         Returns:
             Per-skill validation results.

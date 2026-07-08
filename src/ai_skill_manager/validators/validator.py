@@ -9,6 +9,7 @@ producing a ``ValidationReport``.
 формируя ``ValidationReport``.
 """
 
+import inspect
 import logging
 from typing import Optional, Tuple
 
@@ -94,7 +95,14 @@ class Validator:
             # Run the current rule against all skills.
             # Запускаем текущее правило для всех навыков.
             logger.debug("Running validation rule %d/%d: %s", index, len(self.__rules), rule.name)
-            rule_report = rule.validate(skills)
+            # Some custom rules may not accept the progress callback yet, so
+            # fall back to the old signature when needed.
+            # Некоторые пользовательские правила могут ещё не принимать callback
+            # прогресса, поэтому при необходимости используем старую сигнатуру.
+            if "progress" in inspect.signature(rule.validate).parameters:
+                rule_report = rule.validate(skills, progress=progress)
+            else:
+                rule_report = rule.validate(skills)
             for skill, result in rule_report.items():
                 # Get or create the per-skill result map.
                 # Получаем или создаём карту результатов для навыка.

@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from pathlib import Path
 
 
+@lru_cache(maxsize=None)
 def normalize_path(path: Path) -> Path:
     """Return a canonical, comparable form of ``path``.
 

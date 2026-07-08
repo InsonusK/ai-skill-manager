@@ -4,10 +4,11 @@
 """
 
 import re
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from ...entities import PathLink, Skill, WebLink
 from ...models import LinkWithContext
+from ...progress import ProgressCallback
 from ..models import ValidationError, ValidationResult, ValidationSeverity
 from .abs_validation_rule import absValidationRule
 
@@ -25,7 +26,11 @@ class LinkValidationRule(absValidationRule):
         """Return the rule version. / Возвращает версию правила."""
         return "1.1.0"
 
-    def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
+    def validate(
+        self,
+        skills: List[Skill],
+        progress: Optional[ProgressCallback] = None,
+    ) -> Dict[Skill, ValidationResult]:
         """Validate links for all provided skills.
 
         Валидирует ссылки для всех переданных скиллов.
@@ -33,21 +38,54 @@ class LinkValidationRule(absValidationRule):
         Args:
             skills: Skills to validate.
                 / Навыки для валидации.
+            progress: Optional ``(stage, current, total)`` callback for progress
+                reporting. / Опциональный callback для отчёта о прогрессе.
 
         Returns:
             Per-skill validation results.
                 / Результаты валидации по каждому навыку.
         """
         results: Dict[Skill, ValidationResult] = {}
+
+        # Count the total number of links so the progress bar has a meaningful
+        # upper bound.
+        # Считаем общее количество ссылок, чтобы у прогресс-бара было
+        # осмысленное максимальное значение.
+        total_links = sum(
+            len(skill_file.links)
+            for skill in skills
+            for skill_file in skill.files
+        )
+        if progress is not None:
+            progress("link_validation", 0, total_links)
+
+        processed_links = 0
+
+        def _report_one() -> None:
+            """Report that one more link has been processed."""
+            nonlocal processed_links
+            processed_links += 1
+            if progress is not None:
+                progress("link_validation", processed_links, total_links)
+
         for skill in skills:
             # Collect all link errors for the current skill.
             # Собираем все ошибки ссылок для текущего навыка.
-            errors = self._validate_skill(skill, skills)
+            errors = self._validate_skill(skill, skills, _report_one)
             if errors:
                 results[skill] = ValidationResult(errors)
+
+        if progress is not None:
+            progress("link_validation", processed_links, total_links)
+
         return results
 
-    def _validate_skill(self, skill: Skill, skills: List[Skill]) -> List[ValidationError]:
+    def _validate_skill(
+        self,
+        skill: Skill,
+        skills: List[Skill],
+        report_one: Callable[[], None],
+    ) -> List[ValidationError]:
         """Validate all links inside ``skill``.
 
         Валидирует все ссылки внутри ``skill``.
@@ -57,6 +95,8 @@ class LinkValidationRule(absValidationRule):
                 / Навык, ссылки которого проверяются.
             skills: All known skills, used to resolve inter-skill links.
                 / Все известные навыки, используемые для разрешения межнавыковых ссылок.
+            report_one: Callback invoked after each processed link.
+                / Callback, вызываемый после обработки каждой ссылки.
 
         Returns:
             List of validation errors found in the skill.
@@ -74,6 +114,8 @@ class LinkValidationRule(absValidationRule):
 
                 if (error := self.__validate_link(link_context, skills)) is not None:
                     errors.append(error)
+
+                report_one()
         return errors
 
     def __validate_link(self, link: LinkWithContext, skills: List[Skill]) -> Optional[ValidationError]:
