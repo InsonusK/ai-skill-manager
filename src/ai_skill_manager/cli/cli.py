@@ -13,7 +13,6 @@ import sys
 from ..profiling import profile_command
 
 from .commands.check.cli import add_parser as check_add_parser
-from .commands.new.cli import add_parser as new_add_parser
 from .commands.sync.cli import add_parser as sync_add_parser
 
 
@@ -59,7 +58,6 @@ def main():
     # Register subcommand parsers.
     # Регистрируем парсеры подкоманд.
     sync_add_parser(subparsers)
-    new_add_parser(subparsers)
     check_add_parser(subparsers)
 
     # EN: Parse CLI arguments and dispatch to the selected subcommand.

@@ -1,90 +1,9 @@
 """Tests for CLI and commands."""
 
 import unittest
-import tempfile
-import shutil
-from pathlib import Path
 from unittest.mock import patch
-import io
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.cli.commands.new.api import SKILL_TEMPLATE
-from ai_skill_manager.cli.commands.new.cli import run as new_run
-
-
-class TestNewCommand(unittest.TestCase):
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-
-    def tearDown(self):
-        shutil.rmtree(self.tmp)
-
-    def test_create_dir_skill(self):
-        args = type('Args', (), {
-            'skill_name': 'test-skill',
-            'path': str(self.tmp / 'test-skill'),
-            'type': 'dir',
-        })()
-        new_run(args)
-
-        skill_dir = self.tmp / 'test-skill'
-        self.assertTrue(skill_dir.exists())
-        self.assertTrue(skill_dir.is_dir())
-
-        skill_file = skill_dir / 'SKILL.md'
-        self.assertTrue(skill_file.exists())
-        content = skill_file.read_text(encoding='utf-8')
-        self.assertIn('name: test-skill', content)
-        self.assertIn('# When use skill', content)
-
-    def test_create_flat_skill(self):
-        args = type('Args', (), {
-            'skill_name': 'test-skill',
-            'path': str(self.tmp / 'test-skill.md'),
-            'type': 'flat',
-        })()
-        new_run(args)
-
-        skill_file = self.tmp / 'test-skill.md'
-        self.assertTrue(skill_file.exists())
-        content = skill_file.read_text(encoding='utf-8')
-        self.assertIn('name: test-skill', content)
-        self.assertIn('# When use skill', content)
-
-    def test_create_flat_skill_in_directory(self):
-        args = type('Args', (), {
-            'skill_name': 'test-skill',
-            'path': str(self.tmp),
-            'type': 'flat',
-        })()
-        new_run(args)
-
-        skill_file = self.tmp / 'test-skill.md'
-        self.assertTrue(skill_file.exists())
-
-    def test_dir_skill_already_exists(self):
-        (self.tmp / 'test-skill').mkdir()
-        args = type('Args', (), {
-            'skill_name': 'test-skill',
-            'path': str(self.tmp / 'test-skill'),
-            'type': 'dir',
-        })()
-
-        with self.assertRaises(SystemExit) as cm:
-            new_run(args)
-        self.assertEqual(cm.exception.code, 1)
-
-    def test_flat_skill_already_exists(self):
-        (self.tmp / 'test-skill.md').write_text('existing')
-        args = type('Args', (), {
-            'skill_name': 'test-skill',
-            'path': str(self.tmp / 'test-skill.md'),
-            'type': 'flat',
-        })()
-
-        with self.assertRaises(SystemExit) as cm:
-            new_run(args)
-        self.assertEqual(cm.exception.code, 1)
 
 
 class TestCLIEntrypoint(unittest.TestCase):
@@ -100,8 +19,8 @@ class TestCLIEntrypoint(unittest.TestCase):
                 main()
             self.assertEqual(cm.exception.code, 0)
 
-    def test_new_help(self):
-        with patch('sys.argv', ['ai-skill-manager', 'new', '--help']):
+    def test_check_help(self):
+        with patch('sys.argv', ['ai-skill-manager', 'check', '--help']):
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, 0)

@@ -9,7 +9,7 @@ metadata:
     - commands
     - bilingual
   responsibilities:
-    - document sync, check, and new commands
+    - document sync and check commands
     - list options and examples for each command
 ---
 
@@ -117,44 +117,6 @@ ai-skill-manager check -t github \
   -p "https://github.com/owner/skills-repo.git main" \
   --subpath skills \
   --subpath docs/guides.skill.md
-```
-
----
-
-## `new`
-
-Create a new skill from a template.
-Создаёт новый навык из шаблона.
-
-### Usage / Использование
-
-```bash
-ai-skill-manager new <skill_name> <path> [options]
-```
-
-### Arguments / Аргументы
-
-| Argument / Аргумент | Description / Описание |
-|---------------------|------------------------|
-| `skill_name` | Name of the new skill. / Имя нового навыка. |
-| `path` | Target path. / Целевой путь. |
-
-### Options / Опции
-
-| Option / Опция | Description / Описание |
-|----------------|------------------------|
-| `--type <flat\|dir>` | Skill type: `flat` creates a single `.md` file, `dir` creates a folder with `SKILL.md` (default: `dir`). / Тип навыка: `flat` создаёт один `.md` файл, `dir` создаёт папку с `SKILL.md` (по умолчанию: `dir`). |
-
-### Examples / Примеры
-
-```bash
-# Create a directory skill
-# Создать навык в виде директории
-ai-skill-manager new my-skill ./my-skill
-
-# Create a flat skill
-# Создать плоский навык
-ai-skill-manager new my-skill ./my-skill.md --type flat
 ```
 
 ---
