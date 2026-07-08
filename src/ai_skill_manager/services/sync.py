@@ -166,7 +166,11 @@ def sync_to_target(
                 skill, skill_target_dir, adapters_version):
             logger.debug("Skill '%s' is up to date, skipping copy", name)
             new_skill = _build_target_skill(
-                skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
+                skill_target_dir / "SKILL.md",
+                skill_target_dir,
+                repo_path=repo_path,
+                old_skill=skill,
+            )
         else:
             logger.debug("Skill '%s' needs copy (force=%s)", name, force)
             if skill.is_flat():
@@ -445,7 +449,9 @@ def _copy_flat_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> S
     target_path = skill_target_dir / "SKILL.md"
     logger.debug("Copying flat skill %s -> %s", skill.file_path, target_path)
     shutil.copy2(skill.file_path, target_path)
-    return _build_target_skill(target_path, skill_target_dir, repo_path=repo_path)
+    return _build_target_skill(
+        target_path, skill_target_dir, repo_path=repo_path, old_skill=skill
+    )
 
 
 def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Skill:
@@ -484,10 +490,20 @@ def _copy_dir_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Sk
         logger.debug("Copying skill file %s -> %s", src_file, dst)
         shutil.copy2(src_file, dst)
 
-    return _build_target_skill(skill_target_dir / "SKILL.md", skill_target_dir, repo_path=repo_path)
+    return _build_target_skill(
+        skill_target_dir / "SKILL.md",
+        skill_target_dir,
+        repo_path=repo_path,
+        old_skill=skill,
+    )
 
 
-def _build_target_skill(file_path: Path, folder_path: Path, repo_path: Path) -> Skill:
+def _build_target_skill(
+    file_path: Path,
+    folder_path: Path,
+    repo_path: Path,
+    old_skill: Optional[Skill] = None,
+) -> Skill:
     """Build a Skill object for a copied Agent-format skill.
 
     Build a Skill object for a copied Agent-format skill.
@@ -501,13 +517,28 @@ def _build_target_skill(file_path: Path, folder_path: Path, repo_path: Path) -> 
             Путь к целевой директории навыка.
         repo_path: Repository root used for repo-absolute link formatting. /
             Корень репозитория для формирования repo-absolute ссылок.
+        old_skill: Optional original skill before copying. Its repository root
+            is preserved so that repo-absolute links authored in the source
+            can still be resolved after copying. /
+            Опциональный исходный скилл до копирования. Его корень репозитория
+            сохраняется, чтобы repo-absolute ссылки, созданные в источнике,
+            продолжали разрешаться после копирования.
 
     Returns:
         A new :class:`Skill` instance representing the copied skill. /
         Новый экземпляр :class:`Skill`, представляющий скопированный навык.
     """
+    original_repo_path = (
+        old_skill.source.get_scan_location().repo_path
+        if old_skill is not None
+        else None
+    )
     source_path = folder_path.parent
-    source = LocalSource(scan_path=source_path, repo_path=repo_path)
+    source = LocalSource(
+        scan_path=source_path,
+        repo_path=repo_path,
+        original_repo_path=original_repo_path,
+    )
     return Skill(
         file_path=file_path,
         folder_path=folder_path,
