@@ -1,25 +1,26 @@
-"""Sync command CLI.
+"""Sync command CLI wiring.
 
-Parses arguments, calls the sync API, and prints the formatted result.
-Разбирает аргументы, вызывает API синхронизации и печатает отформатированный результат.
+Parses arguments, calls the sync command, and prints the formatted result.
+No business logic lives here.
+
+Разбор аргументов, вызов команды синхронизации и вывод результата.
+Здесь нет бизнес-логики.
 """
 
 import argparse
 import logging
-import sys
 from pathlib import Path
 from typing import Optional
 
-from ...tools.source_parser import add_source_arguments, build_sources_from_args
-from ...tools.validation_report_printer import print_validation_report
+from ..command.sync import run_sync
+from ..progress import progress_context
+from ..validators import ValidationFailedError
 
-from ....progress import progress_context
-from ....validators import ValidationFailedError
+from .formatters import format_sync_result, print_skills, print_validation_report
+from .source_parser import add_source_arguments, build_sources_from_args
 
-from ..check.formatter import print_skills
-
-from .api import DEFAULT_CONFIG, run_sync
-from .formatter import format_sync_result
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 def add_parser(subparsers):
@@ -67,59 +68,42 @@ def add_parser(subparsers):
         help="Force copy all skills, skip hash and version checks / "
              "Принудительно скопировать все навыки, пропустив проверку хеша и версии",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable debug logging / Включить подробное логирование",
-    )
-    # Wire the default command function for this subparser.
-    # Связываем функцию команды по умолчанию для этого подпарсера.
     parser.set_defaults(func=run)
     return parser
 
 
-# Module logger / Логгер модуля.
-logger = logging.getLogger(__name__)
+def _resolve_remove_orphans(args) -> Optional[bool]:
+    """Resolve conflicting orphan flags into a single boolean or None."""
+    if args.remove_orphans:
+        return True
+    if args.keep_orphans:
+        return False
+    return None
 
 
-def run(args):
+def run(args) -> int:
     """Execute the ``sync`` command from parsed CLI arguments.
 
     Выполняет команду ``sync`` из разобранных аргументов CLI.
 
     Args:
         args: Parsed argparse namespace. / Разобранное пространство имён argparse.
-    """
-    if args.verbose:
-        # Enable debug logging across the synchronization pipeline.
-        # Включаем подробное логирование во всём конвейере синхронизации.
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="[%(levelname)s] %(message)s",
-            force=True,
-        )
-        logger.debug("Verbose logging enabled for sync")
 
-    # Resolve conflicting orphan flags into a single boolean.
-    # Преобразуем конфликтующие флаги orphan в одно булево значение.
-    remove: Optional[bool] = None
-    if args.remove_orphans:
-        remove = True
-    elif args.keep_orphans:
-        remove = False
+    Returns:
+        Exit code. / Код завершения.
+    """
+    remove = _resolve_remove_orphans(args)
 
     try:
-        # Resolve sources from --config, --type/--path or the default config.
-        # Разрешаем источники из --config, --type/--path или конфигурации по умолчанию.
         sources, config_path = build_sources_from_args(args)
+        target_dir = Path(args.target) if args.target else None
 
         with progress_context() as progress:
             if config_path is not None:
                 result = run_sync(
                     config_path=config_path,
-                    target_dir=Path(args.target) if args.target else None,
-                    remove_orphans=remove if remove is not None else True,
+                    target_dir=target_dir,
+                    remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
                     progress=progress,
@@ -127,27 +111,30 @@ def run(args):
             else:
                 result = run_sync(
                     sources=sources,
-                    target_dir=Path(args.target) if args.target else None,
-                    remove_orphans=remove if remove is not None else True,
+                    target_dir=target_dir,
+                    remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
                     progress=progress,
                 )
+
         print_skills(result["skills"])
         print(format_sync_result(result))
+        return 0
     except FileNotFoundError as e:
-        print(f"❌ {e}", file=sys.stderr)
-        sys.exit(1)
+        logger.error("%s", e)
+        return 1
     except ValueError as e:
-        print(f"❌ {e}", file=sys.stderr)
-        sys.exit(1)
+        logger.error("%s", e)
+        return 1
     except ValidationFailedError as e:
         if e.skills:
             print_skills(e.skills)
             print()
         print_validation_report(e.report)
-        print(f"❌ Validation Errors: {e}", file=sys.stderr)
-        sys.exit(1)
+        logger.error("Validation errors: %s", e)
+        return 1
     except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        logger.error("Error: %s", e)
+        return 1
+

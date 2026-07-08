@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities.source import LocalSource
-from ai_skill_manager.services.validate import run_validation
+from ai_skill_manager.service.validate import run_validation
 
 
 MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_validate"

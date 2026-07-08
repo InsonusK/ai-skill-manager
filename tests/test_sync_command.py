@@ -9,8 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.cli.commands.sync.api import DEFAULT_TARGET, run_sync
-from ai_skill_manager.cli.commands.sync.cli import run as sync_run
+from ai_skill_manager.command.sync import DEFAULT_TARGET, run_sync
+from ai_skill_manager.cli.sync import run as sync_run
 from ai_skill_manager.validators import ValidationFailedError
 
 
@@ -74,7 +74,7 @@ class TestSyncAPI(unittest.TestCase):
         target.mkdir(parents=True)
         orphan = target / "orphan"
         orphan.mkdir()
-        from ai_skill_manager.utils import tag_managed
+        from ai_skill_manager.functions.managed_state import tag_managed
         tag_managed(orphan)
 
         self._make_source_dir()
@@ -156,7 +156,6 @@ class TestSyncCLI(unittest.TestCase):
             "keep_orphans": False,
             "dry_run": False,
             "force": False,
-            "verbose": False,
         }
         defaults.update(overrides)
         return type("Args", (), defaults)()

@@ -7,7 +7,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_skill_manager.cli.commands.sync.cli import run as sync_run
+from ai_skill_manager.cli.sync import run as sync_run
 from . import MOCK_DIR
 
 
@@ -38,7 +38,6 @@ class TestSyncCLI(unittest.TestCase):
             "keep_orphans": False,
             "dry_run": False,
             "force": False,
-            "verbose": False,
         }
         defaults.update(overrides)
         return type("Args", (), defaults)()
@@ -49,9 +48,10 @@ class TestSyncCLI(unittest.TestCase):
 
         args = self._args(config=str(config))
         with patch("sys.stdout", new_callable=StringIO) as stdout:
-            sync_run(args)
+            exit_code = sync_run(args)
             output = stdout.getvalue()
 
+        self.assertEqual(exit_code, 0)
         self.assertIn("Synced: 1 skills", output)
         self.assertTrue((root / "target" / "guide" / "SKILL.md").exists())
 
@@ -61,9 +61,10 @@ class TestSyncCLI(unittest.TestCase):
 
         args = self._args(config=str(config), dry_run=True)
         with patch("sys.stdout", new_callable=StringIO) as stdout:
-            sync_run(args)
+            exit_code = sync_run(args)
             output = stdout.getvalue()
 
+        self.assertEqual(exit_code, 0)
         self.assertIn("Dry run - no changes", output)
         self.assertFalse((root / "target").exists())
 
@@ -73,21 +74,20 @@ class TestSyncCLI(unittest.TestCase):
         target.mkdir(parents=True)
         orphan = target / "orphan"
         orphan.mkdir()
-        from ai_skill_manager.utils import tag_managed
+        from ai_skill_manager.functions.managed_state import tag_managed
         tag_managed(orphan)
         config = root / "ai-skills.yaml"
 
         args = self._args(config=str(config), remove_orphans=False, keep_orphans=True)
-        sync_run(args)
+        exit_code = sync_run(args)
 
+        self.assertEqual(exit_code, 0)
         self.assertTrue(orphan.exists())
 
     def test_sync_command_missing_config(self):
         args = self._args(config=str(self.tmpdir / "missing.yaml"))
-        with patch("sys.stderr", new_callable=StringIO) as stderr:
-            with self.assertRaises(SystemExit):
-                sync_run(args)
-            self.assertIn("Config not found", stderr.getvalue())
+        exit_code = sync_run(args)
+        self.assertEqual(exit_code, 1)
 
 
 if __name__ == "__main__":

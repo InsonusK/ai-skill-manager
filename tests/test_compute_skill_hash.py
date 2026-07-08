@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
-from ai_skill_manager.utils import compute_skill_hash
+from ai_skill_manager.functions.hash import compute_skill_hash
 
 
 MOCK_DIR = Path(__file__).parent / "mock" / "test_compute_skill_hash"

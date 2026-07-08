@@ -8,11 +8,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.cli.commands.check.cli import _check
+from ai_skill_manager.cli.source_parser import build_sources_from_args
+from ai_skill_manager.command.check import run_check
 from . import MOCK_DIR
 
 
 TESTCASE_MOCK_DIR = MOCK_DIR / "test_check_cli"
+
+
+def _check(args):
+    """Resolve CLI arguments to a list of skills."""
+    sources, _ = build_sources_from_args(args)
+    skills, _ = run_check(sources)
+    return skills
 
 
 class TestCheckCLI(unittest.TestCase):
@@ -34,7 +42,6 @@ class TestCheckCLI(unittest.TestCase):
             "type": None,
             "path": None,
             "subpath": None,
-            "verbose": False,
         }
         defaults.update(overrides)
         return type("Args", (), defaults)()

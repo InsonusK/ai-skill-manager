@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities import LocalSource
-from ai_skill_manager.services.sync import run_sync
+from ai_skill_manager.service.sync import run_sync
 
 
 MOCKS_DIR = Path(__file__).parent / "mocks"

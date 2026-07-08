@@ -1,4 +1,4 @@
-"""Sync command API.
+"""Sync command business logic.
 
 Provides a pure function to run synchronization and return a result dictionary.
 No console output is produced here.
@@ -10,19 +10,16 @@ No console output is produced here.
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from ....adapters.rules import resolve_adapters
-from ....config import (
+from ..adapters.rules import resolve_adapters
+from ..config import (
     TargetSpec,
     build_sources_from_config,
     load_config,
     parse_target_settings,
 )
-from ....entities import Source
-from ....progress import ProgressCallback
-from ....services.sync import discover_and_validate, sync_to_target
-
-DEFAULT_CONFIG = "ai-skills.yaml"
-#: Default config file name. / Имя файла конфигурации по умолчанию.
+from ..entities import Source
+from ..progress import ProgressCallback
+from ..service.sync import discover_and_validate, sync_to_target
 
 DEFAULT_TARGET = ".agents/skills"
 #: Default target directory. / Целевая директория по умолчанию.

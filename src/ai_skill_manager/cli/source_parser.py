@@ -14,8 +14,8 @@ import argparse
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from ...config import build_sources_from_config
-from ...entities import GitHubSource, LocalSource, Source
+from ..config import build_sources_from_config
+from ..entities import GitHubSource, LocalSource, Source
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
 from ..entities.link.path_utils import same_path
-from ..utils import compute_skill_hash, is_managed, read_managed_state, write_managed_state
+from ..functions.hash import compute_hash, compute_skill_hash
+from ..functions.managed_state import is_managed, read_managed_state, write_managed_state
 
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter

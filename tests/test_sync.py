@@ -8,8 +8,9 @@ from pathlib import Path
 from ai_skill_manager.adapters.models.adapter_message import AdapterMessage
 from ai_skill_manager.adapters.rules.abs_adapter import absAdapter
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
-from ai_skill_manager.services.sync import remove_orphans, run_sync
-from ai_skill_manager.utils import compute_skill_hash, tag_managed
+from ai_skill_manager.service.sync import remove_orphans, run_sync
+from ai_skill_manager.functions.hash import compute_skill_hash
+from ai_skill_manager.functions.managed_state import tag_managed
 from ai_skill_manager.validators import ValidationFailedError
 
 
@@ -244,7 +245,7 @@ class TestRunSync(unittest.TestCase):
         skill = self._dir_skill("skill")
         run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
 
-        from ai_skill_manager.services.discover import discover
+        from ai_skill_manager.service.discover import discover
 
         discovered = discover([LocalSource(scan_path=self.source_dir)])
         source_skill = discovered[0]
