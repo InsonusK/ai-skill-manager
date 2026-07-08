@@ -276,6 +276,27 @@ class TestLinkValidationRule(unittest.TestCase):
 
         self.assertEqual(result, {})
 
+    def test_progress_callback_reports_each_link(self):
+        # EN: The rule must report progress for every processed link so the
+        # CLI can show a dedicated progress bar.
+        # RU: Правило должно сообщать прогресс для каждой обработанной ссылки,
+        # чтобы CLI мог показывать отдельный прогресс-бар.
+        root = self._copy_mock("internal_link")
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        events = []
+        rule.validate([skill], progress=lambda *args: events.append(args))
+
+        self.assertEqual(
+            events,
+            [
+                ("link_validation", 0, 1),
+                ("link_validation", 1, 1),
+                ("link_validation", 1, 1),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,6 +41,14 @@ class LocalSource(Source):
     #: Optional repository root used for repo_absolute link resolution.
     #: Опциональный корень репозитория для разрешения ссылок repo_absolute.
 
+    original_repo_path: Optional[Path] = None
+    #: Optional original repository root from the source skill, used when a
+    #: copied skill is scanned from a different root (e.g. a target directory)
+    #: so that repo-absolute links authored in the source still resolve.
+    #: Опциональный исходный корень репозитория из исходного скилла,
+    #: используется при сканировании скопированного скилла из другого корня,
+    #: чтобы repo-absolute ссылки, созданные в источнике, продолжали разрешаться.
+
     def __str__(self) -> str:
         return str(self.scan_path)
 
@@ -63,6 +71,8 @@ class LocalSource(Source):
         }
         if self.repo_path is not None:
             result["repo_path"] = self.repo_path.as_posix()
+        if self.original_repo_path is not None:
+            result["original_repo_path"] = self.original_repo_path.as_posix()
         return result
 
     def get_scan_location(self) -> ScanLocation:
@@ -70,17 +80,24 @@ class LocalSource(Source):
 
         Вернуть локальную файловую локацию для сканирования.
 
-        If ``path`` points to a file, the scan directory is its parent.
-        The repository root defaults to the scan directory unless an explicit
-        ``repo_path`` was provided.
+        The scan path is used exactly as given: a file is scanned as a single
+        file, and a directory is scanned recursively. The repository root
+        defaults to the scan directory, or to the parent directory when the
+        scan path is a file, unless an explicit ``repo_path`` was provided.
 
-        Если ``path`` указывает на файл, директорией сканирования становится
-        его родитель. Корень репозитория по умолчанию совпадает с директорией
-        сканирования, если не задан явный ``repo_path``.
+        Путь сканирования используется точно как указан: файл сканируется как
+        отдельный файл, директория — рекурсивно. Корень репозитория по
+        умолчанию совпадает с директорией сканирования, либо с родительской
+        директорией, если путь сканирования является файлом, если не задан
+        явный ``repo_path``.
         """
         scan_path = self.scan_path.resolve()
-        source_path = scan_path.parent if scan_path.is_file() else scan_path
-        repo_path = self.repo_path.resolve() if self.repo_path else source_path
+        source_path = scan_path
+        repo_path = (
+            self.repo_path.resolve()
+            if self.repo_path
+            else (scan_path.parent if scan_path.is_file() else scan_path)
+        )
         logger.debug(
             "LocalSource resolved: scan_path=%s source_path=%s repo_path=%s",
             scan_path,

@@ -9,3 +9,6 @@ venv/
 htmlcov/
 .coverage
 .ai-worktree/
+profiling/**.prof
+profiling/skills
+profiling/ai-skills

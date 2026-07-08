@@ -11,6 +11,7 @@ overwrite each other during synchronization.
 from typing import Dict, List, Optional
 
 from .abs_validation_rule import Skill, absValidationRule, List
+from ...progress import ProgressCallback
 from ..models import ValidationError, ValidationResult, ValidationSeverity
 
 
@@ -22,13 +23,19 @@ class ConflictValidationRule(absValidationRule):
         """Return the rule version. / Возвращает версию правила."""
         return "1.0.0"
 
-    def validate(self, skills: List[Skill]) -> Dict[Skill, ValidationResult]:
+    def validate(
+        self,
+        skills: List[Skill],
+        progress: Optional[ProgressCallback] = None,
+    ) -> Dict[Skill, ValidationResult]:
         """Find every skill name that is declared by more than one skill.
 
         Находит каждое имя навыка, которое объявлено более чем одним навыком.
 
         Args:
             skills: Skills to validate. / Навыки для валидации.
+            progress: Optional ``(stage, current, total)`` callback for progress
+                reporting. / Опциональный callback для отчёта о прогрессе.
 
         Returns:
             Mapping from each conflicting skill to its error result.

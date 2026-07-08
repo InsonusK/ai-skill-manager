@@ -122,6 +122,39 @@ class TestRunSync(unittest.TestCase):
         self.assertEqual(result["skills_count"], 1)
         self.assertTrue((self.target_dir / "guide" / "SKILL.md").exists())
 
+    def test_copies_repo_absolute_linked_file_from_flat_skill(self):
+        # EN: When source repo_path differs from target repo_path, repo-absolute
+        # links authored in the source must still resolve to the original file
+        # and be copied into files/ instead of raising a path-not-found error.
+        # RU: Когда repo_path источника отличается от целевого repo-absolute
+        # ссылки, созданные в источнике, должны разрешаться в исходный файл
+        # и копироваться в files/, а не вызывать ошибку "path not found".
+        skill_dir = self.source_dir / "skills" / "create-feature"
+        skill_dir.mkdir(parents=True)
+        templates_dir = skill_dir / "templates"
+        templates_dir.mkdir(parents=True)
+        (templates_dir / "Impementation plan.md").write_text("# Plan\n")
+        (skill_dir / "create-feature.skill.md").write_text(
+            "---\nname: create-feature\n---\n# Create feature\n"
+            "[[skills/create-feature/templates/Impementation plan.md|Impementation plan.md]]\n"
+        )
+
+        result = run_sync(
+            [LocalSource(scan_path=self.source_dir, repo_path=self.source_dir)],
+            self.target_dir,
+            repo_path=self.target_dir,
+        )
+
+        self.assertEqual(result["skills_count"], 1)
+        self.assertEqual(result["links_replaced"], 1)
+        synced = (self.target_dir / "create-feature" / "SKILL.md").read_text()
+        self.assertIn(
+            "[Impementation plan.md](./files/Impementation plan.md)", synced
+        )
+        self.assertTrue(
+            (self.target_dir / "create-feature" / "files" / "Impementation plan.md").exists()
+        )
+
     def test_copies_non_markdown_files(self):
         skill = self._dir_skill("skill")
         (skill / "template.md").write_text("# Template\n")
