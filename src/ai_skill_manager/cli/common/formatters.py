@@ -14,10 +14,10 @@ from rich.console import Console
 from rich.text import Text
 from rich.tree import Tree
 
-from ..entities.skill import Skill
-from ..entities.source import Source
-from ..validators.models import ValidationReport
-from ..validators.rules import absValidationRule
+from ...entities.skill import Skill
+from ...entities.source import Source
+from ...validators.models import ValidationReport
+from ...validators.rules import absValidationRule
 
 
 def format_sync_result(result: Dict[str, Any]) -> str:

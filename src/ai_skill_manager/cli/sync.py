@@ -16,8 +16,8 @@ from ..command.sync import run_sync
 from ..progress import progress_context
 from ..validators import ValidationFailedError
 
-from .formatters import format_sync_result, print_skills, print_validation_report
-from .source_parser import add_source_arguments, build_sources_from_args
+from .common.formatters import format_sync_result, print_skills, print_validation_report
+from .common.source_parser import add_source_arguments, build_sources_from_args
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
