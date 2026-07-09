@@ -60,7 +60,8 @@ class AutoDiscovery(absDiscoveryStrategy):
         super().__init__(source_path)
         self._source = source if source is not None else LocalSource(
             self.source_path)
-        
+        self._skip_folders: Tuple[str, ...] = getattr(source, "skip_folder", ("examples",))
+
         self._flat_patterns: List[absSkillTemplate] = [pattern(source, source_path)
                                                        for pattern in self._FLAT_PATTERNS]
         self._dir_patterns: List[absSkillTemplate] = [pattern(source, source_path)
@@ -271,6 +272,18 @@ class AutoDiscovery(absDiscoveryStrategy):
             results.extend(self._scan_directory(subdir))
         return results
 
+    def _is_under_skip_folder(self, directory: Path, path: Path) -> bool:
+        """Return ``True`` if ``path`` is inside a skipped subdirectory.
+
+        Возвращает ``True``, если ``path`` находится внутри пропускаемой
+        поддиректории.
+        """
+        try:
+            first_part = path.relative_to(directory).parts[0]
+        except (ValueError, IndexError):
+            return False
+        return first_part in self._skip_folders
+
     def _ensure_no_nested_skills(self, directory: Path, main_file: Path) -> None:
         logger.debug("Checking for nested skills inside %s", directory)
         """Ensure a directory skill does not contain nested skills.
@@ -289,6 +302,9 @@ class AutoDiscovery(absDiscoveryStrategy):
         main_file_resolved = main_file.resolve()
         for path in directory.rglob("*"):
             if path == directory:
+                continue
+
+            if self._is_under_skip_folder(directory, path):
                 continue
 
             if path.is_file():

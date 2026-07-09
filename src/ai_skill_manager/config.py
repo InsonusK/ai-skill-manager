@@ -90,6 +90,28 @@ def _normalize_subpaths(subpath: Any) -> List[str | None]:
     return [subpath]
 
 
+def _normalize_skip_folders(value: Any) -> Tuple[str, ...]:
+    """Convert a skip_folder config value into a tuple of folder names.
+
+    Преобразует значение skip_folder из конфигурации в кортеж имён директорий.
+
+    ``None`` falls back to the default ``("examples",)``. A single string
+    becomes a one-element tuple; a list is converted to a tuple of strings.
+    An empty list disables folder-based exclusions.
+
+    ``None`` заменяется умолчанием ``("examples",)``. Одиночная строка
+    становится кортежем из одного элемента; список преобразуется в кортеж
+    строк. Пустой список отключает исключения по директориям.
+    """
+    if value is None:
+        return ("examples",)
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, (list, tuple)):
+        return tuple(str(folder) for folder in value)
+    return (str(value),)
+
+
 def _normalize_tags(tags: Any) -> Tuple[str, ...]:
     """Convert a tag filter config value into a tuple of expressions.
 
@@ -136,6 +158,8 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
 
         # EN: GitHub sources are created from a repository URL and optional tree/subpath.
         # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
+        skip_folders = _normalize_skip_folders(src.get("skip_folder"))
+
         if src_type == "github":
             for sp in _normalize_subpaths(src.get("subpath")):
                 sources.append(
@@ -146,6 +170,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                         tree=src.get("tree", "master"),
                         subpath=sp,
                         tags=tags,
+                        skip_folder=skip_folders,
                     )
                 )
         elif src_type == "local":
@@ -165,6 +190,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                         scan_path=sp_path,
                         repo_path=repo_path,
                         tags=tags,
+                        skip_folder=skip_folders,
                     )
                 )
         else:

@@ -193,6 +193,62 @@ class TestAutoDiscovery(unittest.TestCase):
 
         self.assertEqual(len(result), 0)
 
+    def _build_dir_skill_with_nested(self, skill_dir: Path, nested_dir_name: str) -> None:
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text("---\nname: skill\n---\n# Skill\n")
+        nested = skill_dir / nested_dir_name
+        nested.mkdir()
+        (nested / "nested.skill.md").write_text("---\nname: nested\n---\n# Nested\n")
+
+    def test_default_skip_folder_ignores_nested_flat_skill(self):
+        skill_dir = self.tmpdir / "skill"
+        self._build_dir_skill_with_nested(skill_dir, "examples")
+
+        source = LocalSource(scan_path=skill_dir)
+        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "skill")
+
+    def test_custom_skip_folder_ignores_nested_flat_skill(self):
+        skill_dir = self.tmpdir / "skill"
+        self._build_dir_skill_with_nested(skill_dir, "abc")
+
+        source = LocalSource(scan_path=skill_dir, skip_folder=("abc",))
+        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "skill")
+
+    def test_empty_skip_folder_does_not_ignore_nested_skill(self):
+        skill_dir = self.tmpdir / "skill"
+        self._build_dir_skill_with_nested(skill_dir, "examples")
+
+        source = LocalSource(scan_path=skill_dir, skip_folder=())
+        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+
+        with self.assertRaises(ValueError):
+            strategy.discover()
+
+    def test_skip_folder_ignores_nested_directory_skill(self):
+        skill_dir = self.tmpdir / "skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\nname: skill\n---\n# Skill\n")
+        examples = skill_dir / "examples"
+        examples.mkdir()
+        nested = examples / "nested"
+        nested.mkdir()
+        (nested / "SKILL.md").write_text("---\nname: nested\n---\n# Nested\n")
+
+        source = LocalSource(scan_path=skill_dir)
+        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        result = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "skill")
+
 
 if __name__ == "__main__":
     unittest.main()

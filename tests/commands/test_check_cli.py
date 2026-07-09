@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.cli.source_parser import build_sources_from_args
+from ai_skill_manager.cli.common.source_parser import build_sources_from_args
 from ai_skill_manager.command.check import run_check
 from . import MOCK_DIR
 
