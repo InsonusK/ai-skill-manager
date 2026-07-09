@@ -3,7 +3,11 @@ sources:
     type: github
     tree: master
     subpath:
-      - skills
+      - skills/python
+      - skills/dotnet
+      - skills/devops
+      - skills/common-workflow
+      - skills/angular
 
 settings:
   target: 
@@ -11,9 +15,9 @@ settings:
       adapters:
         - link-adapter
     default:
-      path: .agents/skills
+      path: tmp/.agents/skills
     claude:
-      path: .claude/skills
+      path: tmp/.claude/skills
       adapters:
         - claude-property-adapter
   remove_orphans: true
