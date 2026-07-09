@@ -15,6 +15,7 @@ from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
 from .models.adapter_message import AdapterMessage
+from ..validation_settings import ValidationSettings
 from typing import Dict, Optional, Tuple
 
 
@@ -37,6 +38,7 @@ class Adapter:
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_dir: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
+        validation_settings: Optional[ValidationSettings] = None,
     ):
         """Initialize the adapter with the available skills and adapter classes.
 
@@ -77,6 +79,7 @@ class Adapter:
             skill_mapping=skill_mapping or {},
             target_dir=target_dir,
             copied_files=copied_files if copied_files is not None else {},
+            validation_settings=validation_settings,
         )
 
         # Instantiate each adapter with the shared context.

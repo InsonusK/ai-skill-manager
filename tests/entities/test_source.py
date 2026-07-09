@@ -97,6 +97,41 @@ class TestSource(unittest.TestCase):
         )
         self.assertEqual(str(source), "https://github.com/owner/repo main skills")
 
+    def test_local_source_to_dict_includes_tags(self):
+        tmpdir = Path(tempfile.mkdtemp())
+        try:
+            scan_path = tmpdir / "skills"
+            scan_path.mkdir()
+            source = LocalSource(scan_path=scan_path, tags=("python", "!web"))
+            self.assertEqual(
+                source.to_dict(),
+                {
+                    "type": "local",
+                    "path": scan_path.as_posix(),
+                    "tags": ["python", "!web"],
+                },
+            )
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_github_source_to_dict_includes_tags(self):
+        source = GitHubSource(
+            repo_url="https://github.com/owner/repo",
+            tree="main",
+            subpath="skills",
+            tags=("python | cli",),
+        )
+        self.assertEqual(
+            source.to_dict(),
+            {
+                "type": "github",
+                "repo_url": "https://github.com/owner/repo",
+                "tree": "main",
+                "subpath": "skills",
+                "tags": ["python | cli"],
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

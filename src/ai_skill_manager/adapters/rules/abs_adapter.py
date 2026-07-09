@@ -6,9 +6,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from ..models.adapter_message import AdapterMessage
+from ...validation_settings import ValidationSettings
 from ...entities import Skill
 
 
@@ -53,6 +55,12 @@ class absAdapter(ABC):
         Реестр внешних файлов, уже скопированных в целевые скиллы.
         Отображает исходный путь -> скопированный путь внутри ``files/``.
         Общий между экземплярами адаптеров, чтобы избежать дублирования и коллизий имён.
+        """
+
+        validation_settings: Optional[ValidationSettings] = None
+        """Validation settings used by link-related adapters.
+
+        Настройки валидации, используемые адаптерами, связанными со ссылками.
         """
 
     def __init__(self, adapter_context: absAdapter.Context):

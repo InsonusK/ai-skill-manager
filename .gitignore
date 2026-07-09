@@ -12,3 +12,5 @@ htmlcov/
 profiling/**.prof
 profiling/skills
 profiling/ai-skills
+.agents/skills
+.claude/skills

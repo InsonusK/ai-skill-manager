@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from ai_skill_manager.adapters.rules import ClaudePropertyAdapter, LinkAdapter
-from ai_skill_manager.config import load_config, parse_target_settings
+from ai_skill_manager.config import load_config, parse_target_settings, parse_validation_settings
 
 
 class TestLoadConfig(unittest.TestCase):
@@ -119,6 +119,72 @@ class TestParseTargetSettings(unittest.TestCase):
     def test_invalid_target_type_raises(self):
         with self.assertRaises(ValueError):
             parse_target_settings(123)
+
+
+class TestParseValidationSettings(unittest.TestCase):
+    def test_none_settings_returns_default_skip_folders(self):
+        settings = parse_validation_settings(None)
+
+        self.assertIsNone(settings.link_skip_folders)
+
+    def test_empty_settings_returns_default_skip_folders(self):
+        settings = parse_validation_settings({})
+
+        self.assertIsNone(settings.link_skip_folders)
+
+    def test_null_skip_folder_returns_none(self):
+        settings = parse_validation_settings({
+            "validation": {
+                "rules": {
+                    "link": {"skip_folder": None},
+                },
+            },
+        })
+
+        self.assertIsNone(settings.link_skip_folders)
+
+    def test_empty_skip_folder_list_returns_empty_list(self):
+        settings = parse_validation_settings({
+            "validation": {
+                "rules": {
+                    "link": {"skip_folder": []},
+                },
+            },
+        })
+
+        self.assertEqual(settings.link_skip_folders, [])
+
+    def test_custom_skip_folder_list(self):
+        settings = parse_validation_settings({
+            "validation": {
+                "rules": {
+                    "link": {"skip_folder": ["another_folder"]},
+                },
+            },
+        })
+
+        self.assertEqual(settings.link_skip_folders, ["another_folder"])
+
+    def test_single_string_skip_folder(self):
+        settings = parse_validation_settings({
+            "validation": {
+                "rules": {
+                    "link": {"skip_folder": "another_folder"},
+                },
+            },
+        })
+
+        self.assertEqual(settings.link_skip_folders, ["another_folder"])
+
+    def test_invalid_skip_folder_type_raises(self):
+        with self.assertRaises(ValueError):
+            parse_validation_settings({
+                "validation": {
+                    "rules": {
+                        "link": {"skip_folder": 123},
+                    },
+                },
+            })
 
 
 if __name__ == '__main__':

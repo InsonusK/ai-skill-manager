@@ -12,7 +12,7 @@ from ai_skill_manager.entities import GitHubSource, LocalSource, Skill, SkillFor
 from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 from ai_skill_manager.models.link_with_context import LinkWithContext
-from ai_skill_manager.services.discover import discover
+from ai_skill_manager.service.discover import discover
 
 
 MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_link_with_context"

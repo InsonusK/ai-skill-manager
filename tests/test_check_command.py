@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli import main
-from ai_skill_manager.cli.commands.check.cli import run as check_run
+from ai_skill_manager.cli.check import run as check_run
 
 
 class TestCheckCommand(unittest.TestCase):
@@ -29,6 +29,16 @@ class TestCheckCommand(unittest.TestCase):
         (web / "web.skill.md").write_text("---\nname: web\n---\n# Web")
         return src
 
+    def _args(self, **overrides):
+        defaults = {
+            "config": None,
+            "type": None,
+            "path": None,
+            "subpath": None,
+        }
+        defaults.update(overrides)
+        return type("Args", (), defaults)()
+
     def test_help_shows_check(self):
         with patch("sys.argv", ["ai-skill-manager", "check", "--help"]):
             with self.assertRaises(SystemExit) as cm:
@@ -38,23 +48,16 @@ class TestCheckCommand(unittest.TestCase):
     def test_check_single_source_auto(self):
         src = self._make_source_dir()
 
-        args = type("Args", (), {
-            "config": None,
-            "type": "auto",
-            "path": str(src),
-            "subpath": None,
-            "verbose": False,
-        })()
+        args = self._args(type="auto", path=str(src))
 
         with patch("sys.stdout", new_callable=StringIO) as stdout:
-            check_run(args)
+            exit_code = check_run(args)
             output = stdout.getvalue()
 
+        self.assertEqual(exit_code, 0)
         self.assertIn("guide", output)
         self.assertIn("web", output)
         self.assertIn("Discovered skills", output)
-        self.assertIn("guide", output)
-        self.assertIn("web", output)
         self.assertIn("guide.skill.md", output)
         self.assertIn("web.skill.md", output)
         self.assertIn("Total: 2 skill(s)", output)
@@ -68,18 +71,13 @@ class TestCheckCommand(unittest.TestCase):
             "settings": {"target": ".agents/skills"}
         }))
 
-        args = type("Args", (), {
-            "config": str(config),
-            "type": None,
-            "path": None,
-            "subpath": None,
-            "verbose": False,
-        })()
+        args = self._args(config=str(config))
 
         with patch("sys.stdout", new_callable=StringIO) as stdout:
-            check_run(args)
+            exit_code = check_run(args)
             output = stdout.getvalue()
 
+        self.assertEqual(exit_code, 0)
         self.assertIn("Discovered skills", output)
         self.assertIn("guide", output)
         self.assertIn("web", output)
@@ -89,34 +87,22 @@ class TestCheckCommand(unittest.TestCase):
         self.assertIn("Validation passed", output)
 
     def test_check_missing_config_exits(self):
-        args = type("Args", (), {
-            "config": str(self.tmp / "missing.yaml"),
-            "type": None,
-            "path": None,
-            "subpath": None,
-            "verbose": False,
-        })()
+        args = self._args(config=str(self.tmp / "missing.yaml"))
 
-        with self.assertRaises(SystemExit) as cm:
-            check_run(args)
-        self.assertEqual(cm.exception.code, 1)
+        exit_code = check_run(args)
+        self.assertEqual(exit_code, 1)
 
     def test_check_empty_source(self):
         empty = self.tmp / "empty"
         empty.mkdir()
 
-        args = type("Args", (), {
-            "config": None,
-            "type": "auto",
-            "path": str(empty),
-            "subpath": None,
-            "verbose": False,
-        })()
+        args = self._args(type="auto", path=str(empty))
 
         with patch("sys.stdout", new_callable=StringIO) as stdout:
-            check_run(args)
+            exit_code = check_run(args)
             output = stdout.getvalue()
 
+        self.assertEqual(exit_code, 0)
         self.assertIn("No skills discovered.", output)
         self.assertIn("Validation passed", output)
 
@@ -125,19 +111,10 @@ class TestCheckCommand(unittest.TestCase):
         src.mkdir()
         (src / "guide.skill.md").write_text("---\nname: wrong\n---\n# Guide")
 
-        args = type("Args", (), {
-            "config": None,
-            "type": "auto",
-            "path": str(src),
-            "subpath": None,
-            "verbose": False,
-        })()
+        args = self._args(type="auto", path=str(src))
 
-        with patch("sys.stderr", new_callable=StringIO) as stderr:
-            with self.assertRaises(SystemExit) as cm:
-                check_run(args)
-            self.assertEqual(cm.exception.code, 1)
-            self.assertIn("Validation", stderr.getvalue())
+        exit_code = check_run(args)
+        self.assertEqual(exit_code, 1)
 
 
 if __name__ == "__main__":

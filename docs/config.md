@@ -91,6 +91,58 @@ List of source locations to scan for skills. Each source is a dictionary with th
 | `path` | Yes / Да | — | Directory path relative to the config file (or GitHub repo URL when `type: github`). / Путь к директории относительно файла конфигурации (или URL репозитория GitHub при `type: github`). |
 | `type` | No / Нет | `auto` | Source type: `auto` (local filesystem) or `github`. Values `flat` and `directory` are accepted for backward compatibility and treated as `auto`. / Тип источника: `auto` (локальная файловая система) или `github`. Значения `flat` и `directory` принимаются для обратной совместимости и обрабатываются как `auto`. |
 | `name` | No / Нет | — | Explicit skill name override. / Явное переопределение имени навыка. |
+| `tags` | No / Нет | — | List of tag filter expressions. Skills must match every expression to be included. / Список выражений-фильтров тегов. Навык включается, только если соответствует каждому выражению. |
+
+#### `tags` syntax / Синтаксис `tags`
+
+Each item in `tags` is a string expression that can use the following operators:
+Каждый элемент `tags` — строковое выражение, в котором можно использовать следующие операторы:
+
+| Operator / Оператор | Meaning / Значение |
+|---------------------|--------------------|
+| `&` | AND — skill must have both tags. / И — навык должен иметь оба тега. |
+| `\|` | OR — skill must have at least one of the tags. / ИЛИ — навык должен иметь хотя бы один из тегов. |
+| `!` | NOT — skill must not have the tag. / НЕ — навык не должен иметь тега. |
+| `(`/`)` | Grouping. / Группировка. |
+| `/` | Hierarchical tag separator. / Разделитель иерархических тегов. |
+
+Examples / Примеры:
+
+```yaml
+sources:
+  - path: ./my-skills
+    type: auto
+    tags:
+      - python & cli
+      - "!deprecated"
+  - path: https://github.com/InsonusK/ai-skills.git
+    type: github
+    tree: master
+    subpath: skills
+    tags:
+      - (python & cli) | web
+      - a/b/c
+```
+
+- `python & cli` — skills tagged with both `python` and `cli`.
+  `python & cli` — навыки с тегами `python` и `cli` одновременно.
+- `python | cli` — skills tagged with `python` or `cli`.
+  `python | cli` — навыки с тегом `python` или `cli`.
+- `(python & cli) | web` — skills with both `python` and `cli`, or skills with `web`.
+  `(python & cli) | web` — навыки с `python` и `cli`, либо с `web`.
+- `!deprecated` — skills without the `deprecated` tag.
+  `!deprecated` — навыки без тега `deprecated`.
+- `a/b/c` — matches any consecutive segment (`a`, `b`, `c`, `a/b`, `b/c`, `a/b/c`).
+  `a/b/c` — совпадает с любым последовательным сегментом (`a`, `b`, `c`, `a/b`, `b/c`, `a/b/c`).
+
+Expressions starting with `!` should be quoted in YAML so they are not parsed as YAML tags:
+Выражения, начинающиеся с `!`, следует заключать в кавычки в YAML, чтобы они не воспринимались как YAML-теги:
+
+```yaml
+tags:
+  - "!deprecated"
+```
+
 
 ### Discovery types / Типы обнаружения
 
@@ -215,6 +267,38 @@ Global settings that apply to the synchronization.
 | `remove_orphans` | boolean / булево | `true` | Remove skills in the target that are no longer defined in the config. / Удалить навыки в целевой директории, которые больше не определены в конфиге. |
 | `on_conflict` | string / строка | `error` | How to handle duplicate skill names: `error` or `last_wins`. / Как обрабатывать дублирующиеся имена навыков: `error` или `last_wins`. |
 | `dry_run` | boolean / булево | `false` | When `true`, preview changes without writing anything. / При значении `true` показывать изменения без записи. |
+
+### Validation settings / Настройки валидации
+
+`settings.validation.rules.link.skip_folder` controls which directories are excluded from link validation and link rewriting.
+`settings.validation.rules.link.skip_folder` управляет тем, какие директории исключаются из валидации ссылок и их перезаписи.
+
+| Setting / Настройка | Type / Тип | Default / По умолчанию | Description / Описание |
+|---------------------|------------|------------------------|------------------------|
+| `skip_folder` | list of strings / список строк | `["examples"]` | Folder names whose files are skipped during link validation and adaptation. Use an empty list or `null` to disable folder-based exclusions. / Имена директорий, файлы которых пропускаются при валидации и адаптации ссылок. Используйте пустой список или `null`, чтобы отключить исключения по директориям. |
+
+Example / Пример:
+
+```yaml
+settings:
+  validation:
+    rules:
+      link:
+        skip_folder:
+          - examples
+          - another_folder
+```
+
+To disable the default `examples` exclusion, use an empty list:
+Чтобы отключить встроенное исключение `examples`, используйте пустой список:
+
+```yaml
+settings:
+  validation:
+    rules:
+      link:
+        skip_folder: []
+```
 
 ## Multi-target sync / Мульти-target синхронизация
 

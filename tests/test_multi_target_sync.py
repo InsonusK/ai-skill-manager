@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.cli.commands.sync.api import run_sync
+from ai_skill_manager.command.sync import run_sync
 
 
 class TestMultiTargetSync(unittest.TestCase):

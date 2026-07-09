@@ -6,11 +6,14 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from .adapters.rules import absAdapter, resolve_adapters
 from .entities import GitHubSource, LocalSource, Source
+from .validation_settings import ValidationSettings
 
+#: Default target directory for the reserved "default" target name.
+#: Целевая директория по умолчанию для зарезервированного имени "default".
 #: Default target directory for the reserved "default" target name.
 #: Целевая директория по умолчанию для зарезервированного имени "default".
 DEFAULT_TARGET_PATH = ".agents/skills"
@@ -37,10 +40,34 @@ def load_config(config_path: Path) -> dict:
     if config_path.suffix in ('.yaml', '.yml'):
         try:
             import yaml
-            return yaml.safe_load(content)
         except ImportError:
             raise ImportError(
                 "PyYAML required for .yaml files. Install: pip install pyyaml")
+
+        from yaml import ScalarNode
+        from yaml.constructor import ConstructorError
+
+        class _ConfigYamlLoader(yaml.SafeLoader):
+            """Loader that preserves unknown scalar tags as literal strings.
+
+            Needed so tag expressions such as ``!web`` are not treated as
+            YAML custom tags. / Загрузчик, который сохраняет неизвестные
+            скалярные теги как строки, чтобы выражения вроде ``!web`` не
+            воспринимались как пользовательские YAML-теги.
+            """
+
+        def _construct_unknown_scalar(loader, node):
+            if not isinstance(node, ScalarNode):
+                raise ConstructorError(
+                    None,
+                    None,
+                    f"cannot construct non-scalar tag {node.tag!r}",
+                    node.start_mark,
+                )
+            return f"{node.tag}{node.value}"
+
+        _ConfigYamlLoader.add_constructor(None, _construct_unknown_scalar)
+        return yaml.load(content, Loader=_ConfigYamlLoader)
 
     return json.loads(content)
 
@@ -61,6 +88,26 @@ def _normalize_subpaths(subpath: Any) -> List[str | None]:
     if isinstance(subpath, list):
         return subpath
     return [subpath]
+
+
+def _normalize_tags(tags: Any) -> Tuple[str, ...]:
+    """Convert a tag filter config value into a tuple of expressions.
+
+    Преобразует значение фильтра тегов из конфигурации в кортеж выражений.
+
+    ``None`` becomes an empty tuple; a single string becomes a one-element
+    tuple; a list is converted to a tuple of strings.
+
+    ``None`` становится пустым кортежем; одиночная строка — кортежем из
+    одного элемента; список преобразуется в кортеж строк.
+    """
+    if tags is None:
+        return ()
+    if isinstance(tags, str):
+        return (tags,)
+    if isinstance(tags, (list, tuple)):
+        return tuple(str(tag) for tag in tags)
+    return (str(tags),)
 
 
 def build_sources_from_config(config_path: Path) -> List[Source]:
@@ -85,6 +132,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
     for src in config.get("sources", []):
         src_type = src.get("type", "auto")
         src_path = src.get("path", "")
+        tags = _normalize_tags(src.get("tags"))
 
         # EN: GitHub sources are created from a repository URL and optional tree/subpath.
         # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
@@ -97,6 +145,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                         repo_url=src_path,
                         tree=src.get("tree", "master"),
                         subpath=sp,
+                        tags=tags,
                     )
                 )
         elif src_type == "local":
@@ -114,7 +163,8 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                 sources.append(
                     LocalSource(
                         scan_path=sp_path,
-                        repo_path=repo_path
+                        repo_path=repo_path,
+                        tags=tags,
                     )
                 )
         else:
@@ -244,3 +294,58 @@ def parse_target_settings(target_value: Any) -> List[TargetSpec]:
         )
 
     return specs
+
+
+def parse_validation_settings(settings: Any) -> ValidationSettings:
+    """Parse ``settings.validation`` into :class:`ValidationSettings`.
+
+    Разбирает ``settings.validation`` в :class:`ValidationSettings`.
+
+    Args:
+        settings: The ``settings`` section of the loaded config, or ``None``.
+            / Секция ``settings`` загруженной конфигурации или ``None``.
+
+    Returns:
+        Parsed validation settings.
+            / Разобранные настройки валидации.
+    """
+    if not isinstance(settings, dict):
+        return ValidationSettings()
+
+    validation = settings.get("validation") or {}
+    if not isinstance(validation, dict):
+        raise ValueError(
+            "settings.validation must be a mapping, got "
+            f"{type(validation).__name__}"
+        )
+
+    rules = validation.get("rules") or {}
+    if not isinstance(rules, dict):
+        raise ValueError(
+            "settings.validation.rules must be a mapping, got "
+            f"{type(rules).__name__}"
+        )
+
+    link_rules = rules.get("link") or {}
+    if not isinstance(link_rules, dict):
+        raise ValueError(
+            "settings.validation.rules.link must be a mapping, got "
+            f"{type(link_rules).__name__}"
+        )
+
+    skip_folder = link_rules.get("skip_folder")
+    # YAML ``skip_folder:`` without a value loads as ``None``; treat it as an
+    # explicit "no exclusions" together with an empty list.
+    # YAML ``skip_folder:`` без значения загружается как ``None``; считаем это
+    # явным отключением исключений вместе с пустым списком.
+    if skip_folder is None:
+        return ValidationSettings(link_skip_folders=None)
+    if isinstance(skip_folder, list):
+        return ValidationSettings(link_skip_folders=list(skip_folder))
+    if isinstance(skip_folder, str):
+        return ValidationSettings(link_skip_folders=[skip_folder])
+
+    raise ValueError(
+        "settings.validation.rules.link.skip_folder must be a list, string or null, "
+        f"got {type(skip_folder).__name__}"
+    )

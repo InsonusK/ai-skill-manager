@@ -4,7 +4,7 @@
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 from . import frontmatter
 
@@ -48,6 +48,24 @@ class SkillProperty:
         if not isinstance(value, str):
             return None
         return value
+
+    @property
+    def tags(self) -> Tuple[str, ...]:
+        """Return the skill tags from frontmatter as a tuple of strings.
+
+        Возвращает теги навыка из frontmatter в виде кортежа строк.
+        """
+        properties = self.all
+        if properties is None:
+            return ()
+        value = properties.get("tags", None)
+        if value is None:
+            return ()
+        if isinstance(value, str):
+            return (value.strip(),)
+        if isinstance(value, (list, tuple)):
+            return tuple(str(tag).strip() for tag in value if str(tag).strip())
+        return ()
 
     @staticmethod
     def _parse_frontmatter(file_path: Path) -> dict[str, Any] | None:

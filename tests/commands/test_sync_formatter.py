@@ -2,7 +2,7 @@
 
 import unittest
 
-from ai_skill_manager.cli.commands.sync.formatter import format_sync_result
+from ai_skill_manager.cli.formatters import format_sync_result
 
 
 class TestSyncFormatter(unittest.TestCase):

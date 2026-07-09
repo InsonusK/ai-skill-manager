@@ -6,7 +6,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .source import ScanLocation, Source
 
@@ -49,6 +49,10 @@ class LocalSource(Source):
     #: используется при сканировании скопированного скилла из другого корня,
     #: чтобы repo-absolute ссылки, созданные в источнике, продолжали разрешаться.
 
+    tags: Tuple[str, ...] = ()
+    #: Tag filter expressions applied to skills from this source.
+    #: Выражения-фильтры тегов, применяемые к навыкам из этого источника.
+
     def __str__(self) -> str:
         return str(self.scan_path)
 
@@ -73,6 +77,8 @@ class LocalSource(Source):
             result["repo_path"] = self.repo_path.as_posix()
         if self.original_repo_path is not None:
             result["original_repo_path"] = self.original_repo_path.as_posix()
+        if self.tags:
+            result["tags"] = list(self.tags)
         return result
 
     def get_scan_location(self) -> ScanLocation:
