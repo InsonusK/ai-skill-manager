@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.cli.source_parser import (
+from ai_skill_manager.cli.common.source_parser import (
     DEFAULT_CONFIG,
     build_sources_from_args,
 )
