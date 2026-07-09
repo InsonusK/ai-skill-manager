@@ -5,8 +5,9 @@
 
 from typing import List, Optional, Tuple
 
-from ....entities import Skill, SkillFile, WebLink, absLink
-from ....validators.rules.link_validation_rule import _is_inside_inline_code
+from ....entities import Skill, SkillFile, absLink
+from ....models import LinkWithContext
+from ....validators.rules.link.exclude_rule import build_link_exclude_rules
 from ...models.adapter_message import AdapterMessage
 from ..abs_adapter import absAdapter
 from .converter import LinkConverter
@@ -27,6 +28,9 @@ class LinkAdapter(absAdapter):
         # Счётчик заменённых ссылок во время последней адаптации.
         self.links_replaced = 0
         self._link_converter = LinkConverter()
+        self._exclude_rules = build_link_exclude_rules(
+            self._adapter_context.validation_settings
+        )
 
     @classmethod
     def version(cls) -> str:
@@ -34,7 +38,7 @@ class LinkAdapter(absAdapter):
 
         Версия адаптера для обнаружения изменений.
         """
-        return "1.2.0"
+        return "1.3.0"
 
     def adapt(self, old_skill: Skill, new_skill: Skill) -> AdapterMessage:
         """Rewrite links in ``new_skill`` files to the repo-absolute format.
@@ -64,11 +68,14 @@ class LinkAdapter(absAdapter):
                 # В этом файле нечего переписывать.
                 continue
 
-            # Skip files where every link is an external URL; they are never
-            # rewritten, so reading the file would be wasted work.
-            # Пропускаем файлы, где все ссылки — внешние URL; они никогда не
-            # переписываются, поэтому чтение файла было бы лишней работой.
-            if all(isinstance(link, WebLink) for link in links):
+            # Skip files where every link is excluded by an exclude rule; they
+            # are never rewritten, so reading the file would be wasted work.
+            # Пропускаем файлы, где все ссылки исключены правилами исключения;
+            # они никогда не переписываются, поэтому чтение файла было бы лишней работой.
+            if all(
+                self._should_exclude(link, new_skill, skill_file, other_skills)
+                for link in links
+            ):
                 continue
 
             # Read the full file content once.
@@ -89,6 +96,28 @@ class LinkAdapter(absAdapter):
         return AdapterMessage(
             message="Replaced {count} links",
             params={"count": self.links_replaced},
+        )
+
+    def _should_exclude(
+        self,
+        link: absLink,
+        skill: Skill,
+        skill_file: SkillFile,
+        other_skills: List[Skill],
+    ) -> bool:
+        """Return ``True`` if the link must not be rewritten.
+
+        Mirrors the exclusions used by link validation so that the adapter
+        never rewrites inline-code, web or skip-folder links.
+
+        Возвращает ``True``, если ссылку не нужно переписывать. Повторяет
+        исключения из валидации ссылок, чтобы адаптер не трогал ссылки в
+        инлайн-коде, веб-ссылки и ссылки из пропускаемых директорий.
+        """
+        link_context = LinkWithContext.build(skill, skill_file, link)
+        return any(
+            rule.should_exclude(link_context, other_skills)
+            for rule in self._exclude_rules
         )
 
     def _replace_links(
@@ -145,10 +174,11 @@ class LinkAdapter(absAdapter):
         last_start = len(content)
 
         for link in sorted_links:
-            # Skip links inside inline code spans (`...`), just like validation.
-            # Examples like `[text](path)` in anti-patterns should not be treated
-            # as real links and must not trigger file copies.
-            if _is_inside_inline_code(content, link.start, link.end):
+            # Skip links excluded by validation rules (inline code, web links,
+            # files inside skip folders).
+            # Пропускаем ссылки, исключённые правилами валидации (инлайн-код,
+            # веб-ссылки, файлы внутри пропускаемых директорий).
+            if self._should_exclude(link, skill, skill_file, other_skills):
                 continue
 
             new_target = self._compute_new_target(link, skill_file, skill, other_skills)
@@ -211,11 +241,6 @@ class LinkAdapter(absAdapter):
             Новая цель ссылки или ``None``, если ссылку следует оставить без
             изменений (например, внешние URL).
         """
-        # External links are never rewritten.
-        # Внешние ссылки никогда не переписываются.
-        if isinstance(link, WebLink):
-            return None
-
         # Resolve the repo-absolute target via the dedicated converter.
         # Pass the source-to-target skill mapping so source links that still
         # point to the original source paths can be resolved correctly.

@@ -6,11 +6,14 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from .adapters.rules import absAdapter, resolve_adapters
 from .entities import GitHubSource, LocalSource, Source
+from .validation_settings import ValidationSettings
 
+#: Default target directory for the reserved "default" target name.
+#: Целевая директория по умолчанию для зарезервированного имени "default".
 #: Default target directory for the reserved "default" target name.
 #: Целевая директория по умолчанию для зарезервированного имени "default".
 DEFAULT_TARGET_PATH = ".agents/skills"
@@ -291,3 +294,58 @@ def parse_target_settings(target_value: Any) -> List[TargetSpec]:
         )
 
     return specs
+
+
+def parse_validation_settings(settings: Any) -> ValidationSettings:
+    """Parse ``settings.validation`` into :class:`ValidationSettings`.
+
+    Разбирает ``settings.validation`` в :class:`ValidationSettings`.
+
+    Args:
+        settings: The ``settings`` section of the loaded config, or ``None``.
+            / Секция ``settings`` загруженной конфигурации или ``None``.
+
+    Returns:
+        Parsed validation settings.
+            / Разобранные настройки валидации.
+    """
+    if not isinstance(settings, dict):
+        return ValidationSettings()
+
+    validation = settings.get("validation") or {}
+    if not isinstance(validation, dict):
+        raise ValueError(
+            "settings.validation must be a mapping, got "
+            f"{type(validation).__name__}"
+        )
+
+    rules = validation.get("rules") or {}
+    if not isinstance(rules, dict):
+        raise ValueError(
+            "settings.validation.rules must be a mapping, got "
+            f"{type(rules).__name__}"
+        )
+
+    link_rules = rules.get("link") or {}
+    if not isinstance(link_rules, dict):
+        raise ValueError(
+            "settings.validation.rules.link must be a mapping, got "
+            f"{type(link_rules).__name__}"
+        )
+
+    skip_folder = link_rules.get("skip_folder")
+    # YAML ``skip_folder:`` without a value loads as ``None``; treat it as an
+    # explicit "no exclusions" together with an empty list.
+    # YAML ``skip_folder:`` без значения загружается как ``None``; считаем это
+    # явным отключением исключений вместе с пустым списком.
+    if skip_folder is None:
+        return ValidationSettings(link_skip_folders=None)
+    if isinstance(skip_folder, list):
+        return ValidationSettings(link_skip_folders=list(skip_folder))
+    if isinstance(skip_folder, str):
+        return ValidationSettings(link_skip_folders=[skip_folder])
+
+    raise ValueError(
+        "settings.validation.rules.link.skip_folder must be a list, string or null, "
+        f"got {type(skip_folder).__name__}"
+    )

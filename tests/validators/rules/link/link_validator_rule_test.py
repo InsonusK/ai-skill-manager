@@ -6,10 +6,11 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
-from ai_skill_manager.validators.rules.link_validation_rule import LinkValidationRule
+from ai_skill_manager.validators.rules.link import LinkValidationRule
+from ai_skill_manager.validators.rules.link.exclude_rule import SkipFolderExcludeRule
 
 
-MOCK_DIR = Path(__file__).parent.parent / "mock" / "test_link_validation_rule"
+MOCK_DIR = Path(__file__).parent.parent.parent.parent / "mock" / "test_link_validation_rule"
 
 
 class TestLinkValidationRule(unittest.TestCase):
@@ -296,6 +297,70 @@ class TestLinkValidationRule(unittest.TestCase):
                 ("link_validation", 1, 1),
             ],
         )
+
+    def test_examples_folder_is_skipped_by_default(self):
+        # EN: Links inside files under an ``examples`` directory are not
+        # validated by default.
+        # RU: Ссылки внутри файлов под директорией ``examples`` по умолчанию
+        # не валидируются.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        examples_dir = skill_dir / "examples"
+        examples_dir.mkdir()
+        example_file = examples_dir / "example.md"
+        example_file.write_text(
+            "---\nname: example\n---\n# Example\n[missing](./missing.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule()
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
+    def test_custom_skip_folder_overrides_default(self):
+        # EN: A custom skip_folder list replaces the default ``examples``.
+        # RU: Произвольный список skip_folder заменяет умолчание ``examples``.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        another_dir = skill_dir / "another_folder"
+        another_dir.mkdir()
+        another_file = another_dir / "file.md"
+        another_file.write_text(
+            "---\nname: file\n---\n# File\n[missing](./missing.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule(
+            exclude_rules=[
+                SkipFolderExcludeRule(skip_folders=["another_folder"])
+            ]
+        )
+        result = rule.validate([skill])
+
+        self.assertEqual(result, {})
+
+    def test_empty_skip_folder_list_disables_exclusions(self):
+        # EN: An empty skip_folder list means no folder-based exclusions.
+        # RU: Пустой список skip_folder означает отсутствие исключений по
+        # директориям.
+        root = self._copy_mock("internal_link")
+        skill_dir = root / "skill"
+        examples_dir = skill_dir / "examples"
+        examples_dir.mkdir()
+        example_file = examples_dir / "example.md"
+        example_file.write_text(
+            "---\nname: example\n---\n# Example\n[missing](./missing.md)\n"
+        )
+        skill = self._dir_skill(root, "skill")
+
+        rule = LinkValidationRule(
+            exclude_rules=[SkipFolderExcludeRule(skip_folders=[])]
+        )
+        result = rule.validate([skill])
+
+        self.assertIn(skill, result)
+        self.assertTrue(result[skill].has_errors)
 
 
 if __name__ == "__main__":

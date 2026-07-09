@@ -16,7 +16,9 @@ from ..config import (
     build_sources_from_config,
     load_config,
     parse_target_settings,
+    parse_validation_settings,
 )
+from ..validation_settings import ValidationSettings
 from ..entities import Source
 from ..progress import ProgressCallback
 from ..service.sync import discover_and_validate, sync_to_target
@@ -104,6 +106,7 @@ def run_sync(
     resolved_sources: Sequence[Source]
     config_base: Optional[Path] = None
     targets: List[TargetSpec]
+    validation_settings: Optional[ValidationSettings] = None
 
     if config_path is not None:
         config_path = config_path.resolve()
@@ -114,6 +117,7 @@ def run_sync(
         if sources is None:
             config = load_config(config_path)
             settings = config.get("settings", {})
+            validation_settings = parse_validation_settings(settings)
 
             # Resolve target(s): CLI override > config > default.
             # Определяем target(ы): CLI > конфиг > умолчание.
@@ -147,7 +151,9 @@ def run_sync(
         resolved_targets.append((spec.name, path.resolve(), spec.adapters))
 
     try:
-        skills = discover_and_validate(resolved_sources, progress=progress)
+        skills = discover_and_validate(
+            resolved_sources, settings=validation_settings, progress=progress
+        )
         per_target: Dict[str, dict] = {}
         for name, path, adapter_classes in resolved_targets:
             per_target[name] = sync_to_target(
@@ -159,6 +165,7 @@ def run_sync(
                 force=force,
                 progress=progress,
                 repo_path=base,
+                settings=validation_settings,
             )
     finally:
         for src in resolved_sources:

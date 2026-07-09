@@ -12,6 +12,7 @@ import logging
 from typing import Optional
 
 from ..command.check import run_check
+from ..config import load_config, parse_validation_settings
 from ..progress import progress_context
 from ..validators import ValidationFailedError
 
@@ -44,6 +45,20 @@ def add_parser(subparsers):
     return parser
 
 
+def _resolve_validation_settings(config_path: Optional) -> Optional:
+    """Load validation settings from a config file when available.
+
+    Загружает настройки валидации из файла конфигурации, если он доступен.
+    """
+    if config_path is None:
+        return None
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        return None
+    return parse_validation_settings(config.get("settings", {}))
+
+
 def run(args) -> int:
     """Execute the ``check`` command from parsed CLI arguments.
 
@@ -56,10 +71,13 @@ def run(args) -> int:
         Exit code. / Код завершения.
     """
     try:
-        sources, _ = build_sources_from_args(args)
+        sources, config_path = build_sources_from_args(args)
+        validation_settings = _resolve_validation_settings(config_path)
 
         with progress_context() as progress:
-            skills, report = run_check(sources, progress=progress)
+            skills, report = run_check(
+                sources, settings=validation_settings, progress=progress
+            )
 
         print_skills(skills)
         if report.has_errors:

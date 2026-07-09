@@ -14,10 +14,12 @@ from ..functions.managed_state import is_managed, read_managed_state, write_mana
 
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
+from ..validation_settings import ValidationSettings
 from ..entities import LocalSource, Skill, Source
 from ..entities.skill_format import SkillFormat
 from ..progress import ProgressCallback
 from ..validators import ValidationFailedError, Validator
+from ..validators.rules import build_default_rules
 from .discover import discover
 
 # Module logger / Логгер модуля.
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 def discover_and_validate(
     sources: Sequence[Source],
+    settings: Optional[ValidationSettings] = None,
     progress: Optional[ProgressCallback] = None,
 ) -> List[Skill]:
     """Discover skills from ``sources`` and validate them.
@@ -57,7 +60,7 @@ def discover_and_validate(
     skills: List[Skill] = discover(sources, progress=progress)
     logger.debug("Discovered %d skill(s)", len(skills))
 
-    validator = Validator()
+    validator = Validator(build_default_rules(settings))
     validation_report = validator.validate(skills, progress=progress)
     if validation_report.has_errors:
         logger.debug("Validation failed with errors")
@@ -76,6 +79,7 @@ def sync_to_target(
     force: bool = False,
     progress: Optional[ProgressCallback] = None,
     repo_path: Optional[Path] = None,
+    settings: Optional[ValidationSettings] = None,
 ) -> dict:
     """Copy and adapt already-discovered skills into a single target directory.
 
@@ -128,7 +132,7 @@ def sync_to_target(
     links_replaced = 0
     # Capture validator versions for the managed state file.
     # Сохраняем версии валидаторов для файла управляемого состояния.
-    validator = Validator()
+    validator = Validator(build_default_rules(settings))
     validator_versions = [
         {
             "name": registered_rule[0],
@@ -195,6 +199,7 @@ def sync_to_target(
         skill_mapping=skill_mapping,
         target_dir=target_dir,
         copied_files=copied_files,
+        validation_settings=settings,
     )
     logger.debug("Adapting %d copied skill(s)", len(skills_to_adapt))
     if progress is not None:
@@ -252,6 +257,7 @@ def run_sync(
     force: bool = False,
     progress: Optional[ProgressCallback] = None,
     repo_path: Optional[Path] = None,
+    settings: Optional[ValidationSettings] = None,
 ) -> dict:
     """Discover, validate, copy and adapt all skills into a single target.
 
@@ -284,7 +290,9 @@ def run_sync(
     """
     logger.debug("Starting sync: sources=%d target_dir=%s dry_run=%s force=%s", len(sources), target_dir, dry_run, force)
     try:
-        skills = discover_and_validate(sources, progress=progress)
+        skills = discover_and_validate(
+            sources, settings=settings, progress=progress
+        )
         return sync_to_target(
             skills,
             target_dir,
@@ -294,6 +302,7 @@ def run_sync(
             force=force,
             progress=progress,
             repo_path=repo_path,
+            settings=settings,
         )
     finally:
         # Release temporary resources acquired by remote sources.

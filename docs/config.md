@@ -268,6 +268,38 @@ Global settings that apply to the synchronization.
 | `on_conflict` | string / строка | `error` | How to handle duplicate skill names: `error` or `last_wins`. / Как обрабатывать дублирующиеся имена навыков: `error` или `last_wins`. |
 | `dry_run` | boolean / булево | `false` | When `true`, preview changes without writing anything. / При значении `true` показывать изменения без записи. |
 
+### Validation settings / Настройки валидации
+
+`settings.validation.rules.link.skip_folder` controls which directories are excluded from link validation and link rewriting.
+`settings.validation.rules.link.skip_folder` управляет тем, какие директории исключаются из валидации ссылок и их перезаписи.
+
+| Setting / Настройка | Type / Тип | Default / По умолчанию | Description / Описание |
+|---------------------|------------|------------------------|------------------------|
+| `skip_folder` | list of strings / список строк | `["examples"]` | Folder names whose files are skipped during link validation and adaptation. Use an empty list or `null` to disable folder-based exclusions. / Имена директорий, файлы которых пропускаются при валидации и адаптации ссылок. Используйте пустой список или `null`, чтобы отключить исключения по директориям. |
+
+Example / Пример:
+
+```yaml
+settings:
+  validation:
+    rules:
+      link:
+        skip_folder:
+          - examples
+          - another_folder
+```
+
+To disable the default `examples` exclusion, use an empty list:
+Чтобы отключить встроенное исключение `examples`, используйте пустой список:
+
+```yaml
+settings:
+  validation:
+    rules:
+      link:
+        skip_folder: []
+```
+
 ## Multi-target sync / Мульти-target синхронизация
 
 `settings.target` can be a mapping of several named targets instead of a single string. Each target copies **the same discovered skills**, independently, into its own directory with its own adapter list.

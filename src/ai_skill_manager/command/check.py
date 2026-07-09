@@ -9,6 +9,7 @@ No console output is produced here.
 
 from typing import List, Optional, Tuple
 
+from ..validation_settings import ValidationSettings
 from ..entities import Source
 from ..progress import ProgressCallback
 from ..service.discover import discover
@@ -18,6 +19,7 @@ from ..validators import ValidationReport
 
 def run_check(
     sources: List[Source],
+    settings: Optional[ValidationSettings] = None,
     progress: Optional[ProgressCallback] = None,
 ) -> Tuple[List, ValidationReport]:
     """Discover skills from ``sources`` and validate them.
@@ -26,6 +28,8 @@ def run_check(
 
     Args:
         sources: Skill sources to scan. / Источники навыков для сканирования.
+        settings: Optional validation settings.
+            / Опциональные настройки валидации.
         progress: Optional ``(stage, current, total)`` callback for progress
             reporting. / Опциональный callback для отчёта о прогрессе.
 
@@ -33,5 +37,5 @@ def run_check(
         Tuple of ``(skills, report)``. / Кортеж ``(навыки, отчёт)``.
     """
     skills = discover(sources, progress=progress)
-    report = validate(skills, progress=progress)
+    report = validate(skills, settings=settings, progress=progress)
     return skills, report
