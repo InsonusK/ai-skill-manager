@@ -172,6 +172,23 @@ class TestRunSync(unittest.TestCase):
             '{"key": "value"}\n',
         )
 
+    def test_copies_skipped_subdirectories(self):
+        # EN: Subdirectories listed in skip_folder must still be copied as part
+        # of the directory skill, even though they are excluded from nested-skill
+        # detection.
+        # RU: Поддиректории из skip_folder должны всё равно копироваться
+        # вместе с директориальным навыком, несмотря на исключение из
+        # обнаружения вложенных навыков.
+        skill = self._dir_skill("skill")
+        examples = skill / "examples"
+        examples.mkdir()
+        (examples / "sample.md").write_text("# Sample\n")
+        (skill / "SKILL.md").write_text("---\nname: skill\n---\n# Skill\n")
+
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertTrue((self.target_dir / "skill" / "examples" / "sample.md").exists())
+
     def test_preserves_link_fragments(self):
         a = self._dir_skill("skill-a")
         b = self._dir_skill("skill-b")

@@ -53,6 +53,13 @@ class LocalSource(Source):
     #: Tag filter expressions applied to skills from this source.
     #: Выражения-фильтры тегов, применяемые к навыкам из этого источника.
 
+    skip_folder: Tuple[str, ...] = ("examples",)
+    #: Directory names inside a directory skill that are ignored when checking
+    #: for nested skills. The directories are still copied as part of the skill.
+    #: Имена директорий внутри директориального навыка, которые игнорируются при
+    #: проверке на вложенные навыки. Сами директории всё равно копируются
+    #: вместе с навыком.
+
     def __str__(self) -> str:
         return str(self.scan_path)
 
@@ -79,6 +86,8 @@ class LocalSource(Source):
             result["original_repo_path"] = self.original_repo_path.as_posix()
         if self.tags:
             result["tags"] = list(self.tags)
+        if self.skip_folder:
+            result["skip_folder"] = list(self.skip_folder)
         return result
 
     def get_scan_location(self) -> ScanLocation:

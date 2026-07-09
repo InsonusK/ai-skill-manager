@@ -42,6 +42,7 @@ def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
                     tree=src.tree,
                     subpath=sp,
                     tags=src.tags,
+                    skip_folder=src.skip_folder,
                 )
         else:
             yield src
@@ -88,6 +89,7 @@ def discover(
                 if src.original_repo_path
                 else None,
                 tags=src.tags,
+                skip_folder=src.skip_folder,
             )
 
         scan_location = src.get_scan_location()

@@ -92,6 +92,7 @@ List of source locations to scan for skills. Each source is a dictionary with th
 | `type` | No / Нет | `auto` | Source type: `auto` (local filesystem) or `github`. Values `flat` and `directory` are accepted for backward compatibility and treated as `auto`. / Тип источника: `auto` (локальная файловая система) или `github`. Значения `flat` и `directory` принимаются для обратной совместимости и обрабатываются как `auto`. |
 | `name` | No / Нет | — | Explicit skill name override. / Явное переопределение имени навыка. |
 | `tags` | No / Нет | — | List of tag filter expressions. Skills must match every expression to be included. / Список выражений-фильтров тегов. Навык включается, только если соответствует каждому выражению. |
+| `skip_folder` | No / Нет | `["examples"]` | Directory names inside a directory skill that are ignored when checking for nested skills. The directories are still copied as part of the skill. / Имена директорий внутри директориального навыка, которые игнорируются при проверке на вложенные навыки. Сами директории всё равно копируются вместе с навыком. |
 
 #### `tags` syntax / Синтаксис `tags`
 

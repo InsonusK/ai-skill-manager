@@ -102,6 +102,69 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
             self.assertIsInstance(source, GitHubSource)
             self.assertEqual(source.tags, ("python | cli",))
 
+    def test_default_skip_folder_is_examples(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: local\n"
+            "    path: skills\n"
+        )
+        (self.tmpdir / "skills").mkdir()
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].skip_folder, ("examples",))
+
+    def test_build_local_source_with_skip_folder(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: local\n"
+            "    path: skills\n"
+            "    skip_folder:\n"
+            "      - abc\n"
+            "      - xyz\n"
+        )
+        (self.tmpdir / "skills").mkdir()
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].skip_folder, ("abc", "xyz"))
+
+    def test_build_local_source_with_string_skip_folder(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: local\n"
+            "    path: skills\n"
+            "    skip_folder: abc\n"
+        )
+        (self.tmpdir / "skills").mkdir()
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].skip_folder, ("abc",))
+
+    def test_build_github_source_with_skip_folder(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: github\n"
+            "    path: https://github.com/owner/repo\n"
+            "    tree: main\n"
+            "    subpath:\n"
+            "      - skills\n"
+            "      - docs\n"
+            "    skip_folder:\n"
+            "      - abc\n"
+        )
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 2)
+        for source in sources:
+            self.assertIsInstance(source, GitHubSource)
+            self.assertEqual(source.skip_folder, ("abc",))
+
 
 if __name__ == "__main__":
     unittest.main()

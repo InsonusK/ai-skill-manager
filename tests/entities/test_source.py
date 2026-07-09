@@ -16,7 +16,10 @@ class TestSource(unittest.TestCase):
             source = LocalSource(scan_path=path)
             self.assertIsInstance(source, Source)
             self.assertEqual(source.source_type, "local")
-            self.assertEqual(source.to_dict(), {"type": "local", "path": path.as_posix()})
+            self.assertEqual(
+                source.to_dict(),
+                {"type": "local", "path": path.as_posix(), "skip_folder": ["examples"]},
+            )
         finally:
             shutil.rmtree(tmpdir)
 
@@ -61,6 +64,7 @@ class TestSource(unittest.TestCase):
                     "type": "local",
                     "path": scan_path.as_posix(),
                     "repo_path": repo_path.as_posix(),
+                    "skip_folder": ["examples"],
                 },
             )
         finally:
@@ -81,6 +85,7 @@ class TestSource(unittest.TestCase):
                 "repo_url": "https://github.com/owner/repo",
                 "tree": "main",
                 "subpath": "skills",
+                "skip_folder": ["examples"],
             },
         )
 
@@ -109,6 +114,7 @@ class TestSource(unittest.TestCase):
                     "type": "local",
                     "path": scan_path.as_posix(),
                     "tags": ["python", "!web"],
+                    "skip_folder": ["examples"],
                 },
             )
         finally:
@@ -129,6 +135,42 @@ class TestSource(unittest.TestCase):
                 "tree": "main",
                 "subpath": "skills",
                 "tags": ["python | cli"],
+                "skip_folder": ["examples"],
+            },
+        )
+
+    def test_local_source_to_dict_includes_skip_folder(self):
+        tmpdir = Path(tempfile.mkdtemp())
+        try:
+            scan_path = tmpdir / "skills"
+            scan_path.mkdir()
+            source = LocalSource(scan_path=scan_path, skip_folder=("abc", "xyz"))
+            self.assertEqual(
+                source.to_dict(),
+                {
+                    "type": "local",
+                    "path": scan_path.as_posix(),
+                    "skip_folder": ["abc", "xyz"],
+                },
+            )
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_github_source_to_dict_includes_skip_folder(self):
+        source = GitHubSource(
+            repo_url="https://github.com/owner/repo",
+            tree="main",
+            subpath="skills",
+            skip_folder=("abc",),
+        )
+        self.assertEqual(
+            source.to_dict(),
+            {
+                "type": "github",
+                "repo_url": "https://github.com/owner/repo",
+                "tree": "main",
+                "subpath": "skills",
+                "skip_folder": ["abc"],
             },
         )
 

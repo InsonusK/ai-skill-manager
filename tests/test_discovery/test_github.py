@@ -293,6 +293,7 @@ class TestGitHubSource(unittest.TestCase):
                 "repo_url": "https://github.com/owner/repo",
                 "tree": "main",
                 "subpath": "skills",
+                "skip_folder": ["examples"],
             },
         )
 
