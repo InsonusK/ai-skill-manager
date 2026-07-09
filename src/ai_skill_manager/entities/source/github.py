@@ -156,6 +156,10 @@ class GitHubSource(Source):
     subpath: Optional[str] = None
     #: Subpath inside the repository to scan. / Подпуть внутри репозитория для сканирования.
 
+    tags: Tuple[str, ...] = ()
+    #: Tag filter expressions applied to skills from this source.
+    #: Выражения-фильтры тегов, применяемые к навыкам из этого источника.
+
     __context: Context = field(init=False, compare=False, hash=False, default_factory=Context)
 
     def __str__(self) -> str:
@@ -184,6 +188,8 @@ class GitHubSource(Source):
         }
         if self.subpath is not None:
             result["subpath"] = self.subpath
+        if self.tags:
+            result["tags"] = list(self.tags)
         return result
 
     def get_scan_location(self) -> ScanLocation:

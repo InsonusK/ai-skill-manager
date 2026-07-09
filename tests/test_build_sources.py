@@ -65,6 +65,43 @@ class TestBuildSourcesFromConfig(unittest.TestCase):
         self.assertEqual(sources[0].subpath, "skills")
         self.assertEqual(sources[1].subpath, "docs")
 
+    def test_build_local_source_with_tags(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: local\n"
+            "    path: skills\n"
+            "    tags:\n"
+            "      - python & cli\n"
+            "      - !web\n"
+        )
+        (self.tmpdir / "skills").mkdir()
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertIsInstance(sources[0], LocalSource)
+        self.assertEqual(sources[0].tags, ("python & cli", "!web"))
+
+    def test_build_github_source_with_tags(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: github\n"
+            "    path: https://github.com/owner/repo\n"
+            "    tree: main\n"
+            "    subpath:\n"
+            "      - skills\n"
+            "      - docs\n"
+            "    tags:\n"
+            "      - python | cli\n"
+        )
+        sources = build_sources_from_config(config)
+
+        self.assertEqual(len(sources), 2)
+        for source in sources:
+            self.assertIsInstance(source, GitHubSource)
+            self.assertEqual(source.tags, ("python | cli",))
+
 
 if __name__ == "__main__":
     unittest.main()

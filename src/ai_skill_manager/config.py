@@ -6,7 +6,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Tuple, Type
 
 from .adapters.rules import absAdapter, resolve_adapters
 from .entities import GitHubSource, LocalSource, Source
@@ -37,10 +37,34 @@ def load_config(config_path: Path) -> dict:
     if config_path.suffix in ('.yaml', '.yml'):
         try:
             import yaml
-            return yaml.safe_load(content)
         except ImportError:
             raise ImportError(
                 "PyYAML required for .yaml files. Install: pip install pyyaml")
+
+        from yaml import ScalarNode
+        from yaml.constructor import ConstructorError
+
+        class _ConfigYamlLoader(yaml.SafeLoader):
+            """Loader that preserves unknown scalar tags as literal strings.
+
+            Needed so tag expressions such as ``!web`` are not treated as
+            YAML custom tags. / Загрузчик, который сохраняет неизвестные
+            скалярные теги как строки, чтобы выражения вроде ``!web`` не
+            воспринимались как пользовательские YAML-теги.
+            """
+
+        def _construct_unknown_scalar(loader, node):
+            if not isinstance(node, ScalarNode):
+                raise ConstructorError(
+                    None,
+                    None,
+                    f"cannot construct non-scalar tag {node.tag!r}",
+                    node.start_mark,
+                )
+            return f"{node.tag}{node.value}"
+
+        _ConfigYamlLoader.add_constructor(None, _construct_unknown_scalar)
+        return yaml.load(content, Loader=_ConfigYamlLoader)
 
     return json.loads(content)
 
@@ -61,6 +85,26 @@ def _normalize_subpaths(subpath: Any) -> List[str | None]:
     if isinstance(subpath, list):
         return subpath
     return [subpath]
+
+
+def _normalize_tags(tags: Any) -> Tuple[str, ...]:
+    """Convert a tag filter config value into a tuple of expressions.
+
+    Преобразует значение фильтра тегов из конфигурации в кортеж выражений.
+
+    ``None`` becomes an empty tuple; a single string becomes a one-element
+    tuple; a list is converted to a tuple of strings.
+
+    ``None`` становится пустым кортежем; одиночная строка — кортежем из
+    одного элемента; список преобразуется в кортеж строк.
+    """
+    if tags is None:
+        return ()
+    if isinstance(tags, str):
+        return (tags,)
+    if isinstance(tags, (list, tuple)):
+        return tuple(str(tag) for tag in tags)
+    return (str(tags),)
 
 
 def build_sources_from_config(config_path: Path) -> List[Source]:
@@ -85,6 +129,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
     for src in config.get("sources", []):
         src_type = src.get("type", "auto")
         src_path = src.get("path", "")
+        tags = _normalize_tags(src.get("tags"))
 
         # EN: GitHub sources are created from a repository URL and optional tree/subpath.
         # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
@@ -97,6 +142,7 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                         repo_url=src_path,
                         tree=src.get("tree", "master"),
                         subpath=sp,
+                        tags=tags,
                     )
                 )
         elif src_type == "local":
@@ -114,7 +160,8 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
                 sources.append(
                     LocalSource(
                         scan_path=sp_path,
-                        repo_path=repo_path
+                        repo_path=repo_path,
+                        tags=tags,
                     )
                 )
         else:

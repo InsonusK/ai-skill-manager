@@ -91,6 +91,58 @@ List of source locations to scan for skills. Each source is a dictionary with th
 | `path` | Yes / Да | — | Directory path relative to the config file (or GitHub repo URL when `type: github`). / Путь к директории относительно файла конфигурации (или URL репозитория GitHub при `type: github`). |
 | `type` | No / Нет | `auto` | Source type: `auto` (local filesystem) or `github`. Values `flat` and `directory` are accepted for backward compatibility and treated as `auto`. / Тип источника: `auto` (локальная файловая система) или `github`. Значения `flat` и `directory` принимаются для обратной совместимости и обрабатываются как `auto`. |
 | `name` | No / Нет | — | Explicit skill name override. / Явное переопределение имени навыка. |
+| `tags` | No / Нет | — | List of tag filter expressions. Skills must match every expression to be included. / Список выражений-фильтров тегов. Навык включается, только если соответствует каждому выражению. |
+
+#### `tags` syntax / Синтаксис `tags`
+
+Each item in `tags` is a string expression that can use the following operators:
+Каждый элемент `tags` — строковое выражение, в котором можно использовать следующие операторы:
+
+| Operator / Оператор | Meaning / Значение |
+|---------------------|--------------------|
+| `&` | AND — skill must have both tags. / И — навык должен иметь оба тега. |
+| `\|` | OR — skill must have at least one of the tags. / ИЛИ — навык должен иметь хотя бы один из тегов. |
+| `!` | NOT — skill must not have the tag. / НЕ — навык не должен иметь тега. |
+| `(`/`)` | Grouping. / Группировка. |
+| `/` | Hierarchical tag separator. / Разделитель иерархических тегов. |
+
+Examples / Примеры:
+
+```yaml
+sources:
+  - path: ./my-skills
+    type: auto
+    tags:
+      - python & cli
+      - "!deprecated"
+  - path: https://github.com/InsonusK/ai-skills.git
+    type: github
+    tree: master
+    subpath: skills
+    tags:
+      - (python & cli) | web
+      - a/b/c
+```
+
+- `python & cli` — skills tagged with both `python` and `cli`.
+  `python & cli` — навыки с тегами `python` и `cli` одновременно.
+- `python | cli` — skills tagged with `python` or `cli`.
+  `python | cli` — навыки с тегом `python` или `cli`.
+- `(python & cli) | web` — skills with both `python` and `cli`, or skills with `web`.
+  `(python & cli) | web` — навыки с `python` и `cli`, либо с `web`.
+- `!deprecated` — skills without the `deprecated` tag.
+  `!deprecated` — навыки без тега `deprecated`.
+- `a/b/c` — matches any consecutive segment (`a`, `b`, `c`, `a/b`, `b/c`, `a/b/c`).
+  `a/b/c` — совпадает с любым последовательным сегментом (`a`, `b`, `c`, `a/b`, `b/c`, `a/b/c`).
+
+Expressions starting with `!` should be quoted in YAML so they are not parsed as YAML tags:
+Выражения, начинающиеся с `!`, следует заключать в кавычки в YAML, чтобы они не воспринимались как YAML-теги:
+
+```yaml
+tags:
+  - "!deprecated"
+```
+
 
 ### Discovery types / Типы обнаружения
 

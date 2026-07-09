@@ -15,6 +15,7 @@ from typing import Iterator, List, Optional, Sequence
 from ..discovery.skill import AutoDiscovery
 from ..entities import GitHubSource, LocalSource, Skill, Source
 from ..progress import ProgressCallback
+from ..functions.tag_filter import filter_skills_by_tags
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
                     repo_url=src.repo_url,
                     tree=src.tree,
                     subpath=sp,
+                    tags=src.tags,
                 )
         else:
             yield src
@@ -82,6 +84,10 @@ def discover(
             src = LocalSource(
                 scan_path=Path(src.scan_path).resolve(),
                 repo_path=Path(src.repo_path).resolve() if src.repo_path else None,
+                original_repo_path=Path(src.original_repo_path).resolve()
+                if src.original_repo_path
+                else None,
+                tags=src.tags,
             )
 
         scan_location = src.get_scan_location()
@@ -108,8 +114,28 @@ def discover(
             len(normalized_sources),
             len(source_skills),
         )
+
+        if src.tags:
+            source_skills = filter_skills_by_tags(source_skills, src.tags)
+            logger.debug(
+                "Source %d/%d retained %d skill(s) after tag filter",
+                index,
+                len(normalized_sources),
+                len(source_skills),
+            )
+
         all_skills.extend(source_skills)
         if progress is not None:
             progress("discover", index, len(normalized_sources))
 
-    return all_skills
+    # EN: Remove duplicate skills discovered from overlapping sources.
+    # RU: Убираем дублирующиеся навыки, обнаруженные из пересекающихся источников.
+    seen: set[Path] = set()
+    deduplicated: List[Skill] = []
+    for skill in all_skills:
+        if skill.file_path in seen:
+            continue
+        seen.add(skill.file_path)
+        deduplicated.append(skill)
+
+    return deduplicated
