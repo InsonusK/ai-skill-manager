@@ -44,6 +44,50 @@ class TestRunSync(unittest.TestCase):
         synced_a = (self.target_dir / "skill-a" / "SKILL.md").read_text()
         self.assertIn("[link to b](skill-b/SKILL.md)", synced_a)
 
+    def test_rewrites_repo_absolute_link_to_own_nested_file_ignoring_name_collision(self):
+        # EN: A repo-absolute link to a file nested inside the *same* skill
+        # must resolve as a self-link, even when an unrelated skill elsewhere
+        # in the repo happens to be named after one of the path's
+        # intermediate segments (here "templates"). The old heuristic
+        # resolved such links by re-parsing them against the *copied* tree,
+        # which - for repo-absolute links with a prefix not preserved by the
+        # (flattened) copy - reclassified this self-link as a cross-skill
+        # link and then risked matching the nearest same-named skill instead
+        # of walking out to the true owning skill.
+        # RU: Repo-absolute ссылка на файл, вложенный внутрь *того же*
+        # скилла, должна резолвиться как self-ссылка, даже если где-то ещё в
+        # репозитории есть несвязанный скилл, названный так же, как один из
+        # промежуточных сегментов пути (здесь "templates"). Старая эвристика
+        # резолвила такие ссылки, повторно парся их относительно
+        # *скопированного* дерева, что для repo-absolute ссылок с префиксом,
+        # не сохраняющимся при (уплощённом) копировании, переклассифицировало
+        # эту self-ссылку в межскилловую и рисковало совпасть с ближайшим
+        # одноимённым скиллом вместо того, чтобы дойти до настоящего
+        # владеющего скилла.
+        feature_dir = self.source_dir / "skills" / "create-feature"
+        feature_dir.mkdir(parents=True)
+        templates_dir = feature_dir / "templates"
+        templates_dir.mkdir()
+        (templates_dir / "plan.md").write_text("# Plan\n")
+        (feature_dir / "SKILL.md").write_text(
+            "---\nname: create-feature\n---\n# Create feature\n"
+            "[plan](skills/create-feature/templates/plan.md)\n"
+        )
+
+        # An unrelated skill whose name collides with the intermediate
+        # "templates" path segment used inside create-feature's own folder.
+        templates_skill_dir = self.source_dir / "templates"
+        templates_skill_dir.mkdir()
+        (templates_skill_dir / "SKILL.md").write_text(
+            "---\nname: templates\n---\n# Templates\n"
+        )
+
+        result = run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertEqual(result["skills_count"], 2)
+        synced = (self.target_dir / "create-feature" / "SKILL.md").read_text()
+        self.assertIn("[plan](create-feature/templates/plan.md)", synced)
+
     def test_rewrites_cross_skill_link_with_repo_path_above_target_dir(self):
         # EN: When repo_path is above target_dir, links include the target_dir
         # prefix in repo-absolute form.

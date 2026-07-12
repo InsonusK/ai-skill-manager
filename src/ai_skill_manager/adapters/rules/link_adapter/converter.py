@@ -10,11 +10,10 @@ import os
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from ....entities import LinkKind, PathKind, absLink
-from ....entities.link.path_link import _existing_file
-from ....entities.link.path_utils import same_path
+from ....entities import LinkKind, absLink
+from ....entities.link.path_utils import is_relative_to_resolved, same_path
 
 if TYPE_CHECKING:
     from ....entities import Skill
@@ -61,6 +60,20 @@ def _repo_absolute_path(os_path: Path, repo_path: Path) -> str:
     return Path(os.path.relpath(os_path, repo_path)).as_posix()
 
 
+def _default_repo_path(link: absLink) -> Path:
+    """Fall back to the link's own skill's repo path when none is supplied.
+
+    Used only by call sites (mostly tests) that resolve a link without going
+    through a real sync run, where the link's owning skill already sits at
+    its final location.
+
+    Используется только вызывающими сторонами (в основном тестами), которые
+    разрешают ссылку без реального прогона синхронизации, где скилл, которому
+    принадлежит ссылка, уже находится в своём итоговом расположении.
+    """
+    return link.skill_file.skill.source.get_scan_location().repo_path
+
+
 class absLinkConverter(ABC):
     """Abstract converter from :class:`absLink` to agent skill-link target string.
 
@@ -73,6 +86,7 @@ class absLinkConverter(ABC):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        **kwargs,
     ) -> str:
         """Convert a link to the agent skill-link format.
 
@@ -81,14 +95,15 @@ class absLinkConverter(ABC):
         Args:
             link: The parsed link to convert.
                 Распарсенная ссылка для преобразования.
-            skills: All known skills for resolving cross-skill links.
-                Все известные навыки для разрешения меж-скилловых ссылок.
-            skill_mapping: Optional mapping from original source skill to copied
-                target skill. Used to resolve source links that still point to
-                the original source paths after copying.
-                / Опциональное отображение исходного скилла в скопированный.
-                Используется для разрешения source-ссылок, которые после
-                копирования всё ещё указывают на исходные пути.
+            skills: All known *source* skills for resolving cross-skill links.
+                Все известные *исходные* навыки для разрешения меж-скилловых ссылок.
+            skill_mapping: Mapping from original source skill to its current
+                location this run. Used to translate a resolved source-skill
+                identity into the path the link should ultimately point at.
+                / Отображение исходного скилла в его текущее расположение в
+                этом запуске. Используется, чтобы перевести разрешённую
+                идентичность исходного скилла в путь, на который должна
+                указывать ссылка.
 
         Returns:
             The new link target string.
@@ -101,6 +116,16 @@ class SkillLinkConverter(absLinkConverter):
     """Converts links that point inside the current skill.
 
     Для ссылок, которые указывают внутрь текущего скилла.
+
+    Resolution is anchored on the link's *owning* skill (``link.skill_file.skill``),
+    which - as long as the caller feeds this converter links parsed from the
+    original source files - is always the true source skill, never a guess
+    derived from a copied path.
+
+    Резолюция опирается на скилл-владелец ссылки (``link.skill_file.skill``),
+    который - пока вызывающая сторона передаёт этому конвертеру ссылки,
+    распарсенные из исходных файлов - всегда является настоящим исходным
+    скиллом, а не догадкой, выведенной из скопированного пути.
     """
 
     def convert(
@@ -108,13 +133,22 @@ class SkillLinkConverter(absLinkConverter):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
+        repo_path: Optional[Path] = None,
         **kwargs,
     ) -> str:
         """Return the repo-absolute path to the target, preserving any header."""
-        # EN: Internal skill links are rewritten to repo-absolute paths.
-        # RU: Внутренние ссылки скилла переписываются в repo-absolute пути.
-        repo_path = link.skill_file.skill.source.get_scan_location().repo_path
-        target = _repo_absolute_path(link.path.os_path, repo_path)
+        old_skill = link.skill_file.skill
+        new_skill = (skill_mapping or {}).get(old_skill, old_skill)
+        target_path = link.path.os_path
+
+        if old_skill.folder_path is not None and not same_path(target_path, old_skill.file_path):
+            rel = target_path.relative_to(old_skill.folder_path)
+            final_path = new_skill.folder_path / rel
+        else:
+            final_path = new_skill.file_path
+
+        effective_repo_path = repo_path if repo_path is not None else _default_repo_path(link)
+        target = _repo_absolute_path(final_path, effective_repo_path)
         return _append_header(target, link.header)
 
 
@@ -170,33 +204,6 @@ class ExternalFileConverter:
         source_path = link.path.os_path
         logger.debug("Converting external file link: %s", source_path)
 
-        # EN: When a copied skill is scanned from a different root, repo-absolute
-        # links may resolve to a non-existent path under the target root while
-        # the original source file still exists. Fall back to the original repo
-        # root so the file can be copied.
-        # RU: Когда скопированный скилл сканируется из другого корня, repo-absolute
-        # ссылки могут разрешаться в несуществующий путь под целевым корнем,
-        # хотя исходный файл всё ещё существует. Возвращаемся к исходному корню
-        # репозитория, чтобы файл можно было скопировать.
-        if not source_path.exists():
-            raw_path = getattr(link, "path_raw", None)
-            original_repo_path = getattr(
-                link.skill_file.skill.source, "original_repo_path", None
-            )
-            if (
-                raw_path is not None
-                and original_repo_path is not None
-                and raw_path.kind == PathKind.repo_absolute
-            ):
-                original_candidate = _existing_file(
-                    (original_repo_path / raw_path.path.replace("\\", "/")).resolve()
-                )
-                if original_candidate is not None:
-                    logger.debug(
-                        "Falling back to original repo path: %s", original_candidate
-                    )
-                    source_path = original_candidate
-
         if source_path in self._copied_files:
             copied_path = self._copied_files[source_path]
             rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
@@ -231,212 +238,59 @@ class SourceLinkConverter(absLinkConverter):
     """Converts links that point to files inside another known skill.
 
     Для ссылок, которые указывают на файлы внутри другого известного скилла.
+
+    Resolution walks the *source* skill list with plain path-containment
+    checks - the same checks link validation already performs (see
+    ``LinkWithContext.is_link_to_another_skill`` / ``target_skill``) - and
+    only translates the result into a final location via ``skill_mapping`` at
+    the very end. There is no name-based guessing: a link that validation
+    accepted always resolves here the same way, because both use the same
+    source-of-truth skill graph.
+
+    Резолюция обходит список *исходных* скиллов простыми проверками на
+    вхождение пути - теми же проверками, что уже выполняет валидация ссылок
+    (см. ``LinkWithContext.is_link_to_another_skill`` / ``target_skill``) - и
+    лишь в самом конце переводит результат в итоговое расположение через
+    ``skill_mapping``. Угадывания по имени здесь нет: ссылка, принятая
+    валидацией, всегда резолвится здесь так же, потому что обе стороны
+    используют один и тот же граф скиллов как источник истины.
     """
 
     def __init__(self) -> None:
         """Initialize the converter."""
         self._external_converter: Optional[ExternalFileConverter] = None
-        self._norm_cache: dict[Path, Path] = {}
-        self._resolve_indexes: Optional[dict] = None
-        self._resolve_indexes_key: Optional[tuple] = None
 
-    def _build_resolve_indexes(
-        self,
-        skills: List[Skill],
-        skill_mapping: Optional[Dict[Skill, Skill]],
-    ) -> dict:
-        """Build lookup tables for fast skill resolution.
-
-        The original implementation compared the link target against every
-        known skill path for every link. These indexes turn the same lookup
-        into a handful of dictionary accesses and a short parent walk.
-        """
-        _norm = self._norm
-
-        target_file_to_skill: dict[Path, "Skill"] = {}
-        target_folder_to_skill: dict[Path, "Skill"] = {}
-        for skill in skills:
-            target_file_to_skill[_norm(skill.file_path)] = skill
-            if skill.folder_path is not None:
-                target_folder_to_skill[_norm(skill.folder_path)] = skill
-
-        old_file_to_new: dict[Path, Tuple["Skill", bool, Optional[Path]]] = {}
-        old_folder_full: dict[Path, Tuple["Skill", Path]] = {}
-        old_folder_name: dict[str, List[Tuple["Skill", Path]]] = {}
-        old_identities: List[Tuple[Path, Tuple[str, ...], "Skill", Path]] = []
-        old_flat_identities: List[Tuple[Path, Tuple[str, ...], "Skill"]] = []
-        old_file_names: dict[str, List[Tuple["Skill", bool, Optional[Path]]]] = {}
-        old_stem_names: dict[str, List[Tuple["Skill", bool, Optional[Path]]]] = {}
-
-        norm_source_path: Optional[Path] = None
-        if skill_mapping:
-            if skills:
-                norm_source_path = _norm(skills[0].source_path)
-
-            for old_skill, new_skill in skill_mapping.items():
-                norm_old_file = _norm(old_skill.file_path)
-                old_file_to_new[norm_old_file] = (new_skill, True, None)
-
-                if old_skill.folder_path is not None:
-                    norm_old_folder = _norm(old_skill.folder_path)
-                    old_main_rel = old_skill.file_path.relative_to(old_skill.folder_path)
-
-                    # Exact old folder -> main file link.
-                    old_folder_full[norm_old_folder] = (new_skill, old_main_rel)
-
-                    # Name-based match for skills moved to a different root.
-                    old_folder_name.setdefault(norm_old_folder.name, []).append(
-                        (new_skill, old_main_rel)
-                    )
-
-                    norm_old_source_path = _norm(old_skill.source_path)
-                    old_identity = norm_old_folder.relative_to(norm_old_source_path)
-                    old_identities.append(
-                        (old_identity, tuple(old_identity.parts), new_skill, old_main_rel)
-                    )
-                else:
-                    norm_old_source_path = _norm(old_skill.source_path)
-                    old_identity = norm_old_file.relative_to(norm_old_source_path)
-                    old_flat_identities.append(
-                        (old_identity, tuple(old_identity.parts), new_skill)
-                    )
-
-                    old_file_names.setdefault(old_skill.file_path.name, []).append(
-                        (new_skill, True, None)
-                    )
-                    old_stem_names.setdefault(old_skill.file_path.stem, []).append(
-                        (new_skill, True, None)
-                    )
-
-        return {
-            "norm_source_path": norm_source_path,
-            "target_file_to_skill": target_file_to_skill,
-            "target_folder_to_skill": target_folder_to_skill,
-            "old_file_to_new": old_file_to_new,
-            "old_folder_full": old_folder_full,
-            "old_folder_name": old_folder_name,
-            "old_identities": old_identities,
-            "old_flat_identities": old_flat_identities,
-            "old_file_names": old_file_names,
-            "old_stem_names": old_stem_names,
-        }
-
+    @staticmethod
     def _resolve_skill(
-        self,
         target_path: Path,
         skills: List[Skill],
-        skill_mapping: Optional[Dict[Skill, Skill]],
     ) -> Optional[Tuple["Skill", bool, Optional[Path]]]:
-        """Find the copied skill that owns ``target_path``.
+        """Find the source skill that owns ``target_path``.
+
+        Находит исходный скилл, которому принадлежит ``target_path``.
+
+        Returns a triple (skill, is_main_file, rel_path). ``rel_path`` is set
+        when the target is a nested file inside the skill's folder.
 
         Возвращает тройку (skill, is_main_file, rel_path). ``rel_path``
-        заполняется, когда цель найдена по старому имени папки/файла, и
-        указывает путь внутри скопированного скилла.
+        заполняется, когда цель — вложенный файл внутри папки скилла.
         """
-        norm_target = self._norm(target_path)
+        # EN: Exact match against a skill's main file or folder first.
+        # RU: Сначала точное совпадение с основным файлом или папкой скилла.
+        for skill in skills:
+            if same_path(target_path, skill.file_path):
+                return skill, True, None
+            if skill.folder_path is not None and same_path(target_path, skill.folder_path):
+                return skill, True, None
 
-        cache_key = (id(skills), id(skill_mapping))
-        if cache_key != self._resolve_indexes_key:
-            self._resolve_indexes = self._build_resolve_indexes(skills, skill_mapping)
-            self._resolve_indexes_key = cache_key
-        idx = self._resolve_indexes
-        assert idx is not None
-
-        # EN: Exact match against copied target skills first.
-        # RU: Сначала точное совпадение со скопированными навыками.
-        skill = idx["target_file_to_skill"].get(norm_target)
-        if skill is not None:
-            return skill, True, None
-        skill = idx["target_folder_to_skill"].get(norm_target)
-        if skill is not None:
-            return skill, True, None
-
-        if skill_mapping:
-            # EN: Exact match against original source skill paths.
-            result = idx["old_file_to_new"].get(norm_target)
-            if result is not None:
-                return result
-
-            # EN: Exact match against original source skill folders (repo-absolute
-            # links that point to the folder itself, e.g. without ``.md``).
-            # RU: Точное совпадение с исходными папками скиллов (repo-absolute
-            # ссылки, указывающие на саму папку, например без ``.md``).
-            result = idx["old_folder_full"].get(norm_target)
-            if result is not None:
-                new_skill, _ = result
-                return new_skill, True, None
-
-            # EN: Target is inside an original source skill folder.
-            for parent in norm_target.parents:
-                entry = idx["old_folder_full"].get(parent)
-                if entry is not None:
-                    new_skill, old_main_rel = entry
-                    rel_path = norm_target.relative_to(parent)
-                    is_main = rel_path == Path(".") or rel_path == old_main_rel
-                    return new_skill, is_main, None if is_main else rel_path
-
-            # EN: Match by the relative identity of the original skill inside
-            # the repository (repo-absolute links with preserved structure).
-            norm_source_path = idx["norm_source_path"]
-            if norm_source_path is not None and norm_target.is_relative_to(norm_source_path):
-                target_rel = norm_target.relative_to(norm_source_path)
-                target_rel_parts = target_rel.parts
-
-                for old_identity, old_identity_parts, new_skill, old_main_rel in idx["old_identities"]:
-                    n = len(old_identity_parts)
-                    if len(target_rel_parts) >= n and target_rel_parts[-n:] == old_identity_parts:
-                        rel_path = target_rel.relative_to(old_identity)
-                        is_main = rel_path == Path(".") or rel_path == old_main_rel
-                        return new_skill, is_main, None if is_main else rel_path
-
-                for old_identity, old_identity_parts, new_skill in idx["old_flat_identities"]:
-                    n = len(old_identity_parts)
-                    if len(target_rel_parts) >= n and target_rel_parts[-n:] == old_identity_parts:
-                        return new_skill, True, None
-
-            # EN: Skill moved to a different root directory -- match by folder
-            # or file name while walking up the target path.
-            for parent in norm_target.parents:
-                entries = idx["old_folder_name"].get(parent.name)
-                if entries:
-                    for new_skill, old_main_rel in entries:
-                        rel_path = norm_target.relative_to(parent)
-                        is_main = rel_path == Path(".") or rel_path == old_main_rel
-                        return new_skill, is_main, None if is_main else rel_path
-
-            # EN: Flat skill fallback by file name or stem.
-            entries = idx["old_file_names"].get(norm_target.name)
-            if entries:
-                return entries[0]
-            entries = idx["old_stem_names"].get(norm_target.name)
-            if entries:
-                return entries[0]
-
-        # EN: Last resort: the target is somewhere inside a copied skill folder.
-        for parent in norm_target.parents:
-            skill = idx["target_folder_to_skill"].get(parent)
-            if skill is not None:
-                return skill, False, None
+        # EN: Otherwise, the target may be a file nested inside a skill folder.
+        # RU: Иначе цель может быть файлом, вложенным в папку скилла.
+        for skill in skills:
+            if skill.folder_path is not None and is_relative_to_resolved(target_path, skill.folder_path):
+                rel = target_path.relative_to(skill.folder_path)
+                return skill, False, rel
 
         return None
-
-    @property
-    def _norm(self):
-        """Return a cached path normaliser."""
-        cache = self._norm_cache
-
-        def _norm_path(path: Path) -> Path:
-            cached = cache.get(path)
-            if cached is not None:
-                return cached
-            if path.exists():
-                result = path.resolve()
-            else:
-                result = path
-            cache[path] = result
-            return result
-
-        return _norm_path
 
     def convert(
         self,
@@ -445,6 +299,8 @@ class SourceLinkConverter(absLinkConverter):
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
+        repo_path: Optional[Path] = None,
+        **kwargs,
     ) -> str:
         """Resolve a source link against known skills.
 
@@ -460,27 +316,26 @@ class SourceLinkConverter(absLinkConverter):
         ``target_skill_folder``, копируем файл в ``files/``.
         """
         target_path = link.path.os_path
-        resolved = self._resolve_skill(target_path, skills, skill_mapping)
+        resolved = self._resolve_skill(target_path, skills)
 
         if resolved is not None:
-            skill, is_main_file, rel_path_override = resolved
+            skill, is_main_file, rel_path = resolved
+            new_skill = (skill_mapping or {}).get(skill, skill)
 
-            # EN: Determine the absolute target path inside the resolved skill.
-            # RU: Определяем абсолютный путь цели внутри разрешённого скилла.
-            if is_main_file or same_path(target_path, skill.file_path):
-                final_path = skill.file_path
+            # EN: Determine the absolute target path inside the resolved skill's
+            # current (possibly freshly copied) location.
+            # RU: Определяем абсолютный путь цели внутри текущего (возможно,
+            # только что скопированного) расположения разрешённого скилла.
+            if is_main_file:
+                final_path = new_skill.file_path
             else:
-                folder = skill.folder_path
-                assert folder is not None, "skill with nested file must have a folder"
-                if rel_path_override is not None:
-                    final_path = folder / rel_path_override
-                else:
-                    final_path = target_path
+                assert new_skill.folder_path is not None, "skill with nested file must have a folder"
+                final_path = new_skill.folder_path / rel_path
 
             # EN: Rewrite the link as a repo-absolute path.
             # RU: Переписываем ссылку в repo-absolute путь.
-            repo_path = link.skill_file.skill.source.get_scan_location().repo_path
-            target = _repo_absolute_path(final_path, repo_path)
+            effective_repo_path = repo_path if repo_path is not None else _default_repo_path(link)
+            target = _repo_absolute_path(final_path, effective_repo_path)
             return _append_header(target, link.header)
 
         # EN: Not part of any known skill: copy to files/ if the adapter
@@ -495,22 +350,10 @@ class SourceLinkConverter(absLinkConverter):
             f"  {s.properties.name}: file={s.file_path.as_posix()}, folder={s.folder_path.as_posix() if s.folder_path else None}"
             for s in skills
         ]
-        mapping_infos = []
-        if skill_mapping:
-            for old, new in skill_mapping.items():
-                mapping_infos.append(
-                    f"  old({old.format.value}) name={old.properties.name} "
-                    f"file={old.file_path.as_posix()} "
-                    f"folder={old.folder_path.as_posix() if old.folder_path else None} "
-                    f"-> new({new.format.value}) name={new.properties.name} "
-                    f"file={new.file_path.as_posix()} "
-                    f"folder={new.folder_path.as_posix() if new.folder_path else None}"
-                )
         raise ValueError(
             f"Cannot convert source link {link.raw!r} into skill format: "
             f"no matching skill for {target_path.as_posix()!r}\n"
-            f"Known target skills:\n" + "\n".join(skill_infos) + "\n"
-            f"Source-to-target mapping:\n" + "\n".join(mapping_infos)
+            f"Known source skills:\n" + "\n".join(skill_infos)
         )
 
 
@@ -531,6 +374,7 @@ class OsLinkConverter(absLinkConverter):
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
+        **kwargs,
     ) -> str:
         """Copy the linked OS file into ``files/`` and return relative path."""
         if target_skill_folder is None or copied_files is None:
@@ -563,23 +407,30 @@ class LinkConverter:
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
+        repo_path: Optional[Path] = None,
     ) -> str:
         """Convert ``link`` to the repo-absolute format.
 
         Args:
             link: Parsed link to convert.
                 Распарсенная ссылка для преобразования.
-            skills: Known skills used for resolving source links.
-                Известные навыки, используемые для разрешения source-ссылок.
-            skill_mapping: Optional mapping from original source skill to copied
-                target skill.
-                / Опциональное отображение исходного скилла в скопированный.
+            skills: Known *source* skills used for resolving source links.
+                Известные *исходные* навыки, используемые для разрешения source-ссылок.
+            skill_mapping: Mapping from original source skill to its current
+                location this run.
+                / Отображение исходного скилла в его текущее расположение в
+                этом запуске.
             target_skill_folder: Folder of the skill currently being adapted.
                 Used to copy external files into ``files/``.
                 / Папка скилла, который сейчас адаптируется. Используется для
                 копирования внешних файлов в ``files/``.
             copied_files: Shared registry of already copied external files.
                 / Общий реестр уже скопированных внешних файлов.
+            repo_path: Repository root of the sync destination. Falls back to
+                the link's own skill's repo path when omitted.
+                / Корень репозитория целевого расположения синхронизации. При
+                отсутствии используется корень репозитория скилла-владельца
+                ссылки.
 
         Returns:
             New link target in repo-absolute notation.
@@ -598,4 +449,5 @@ class LinkConverter:
             skill_mapping,
             target_skill_folder=target_skill_folder,
             copied_files=copied_files,
+            repo_path=repo_path,
         )

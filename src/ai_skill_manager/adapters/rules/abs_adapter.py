@@ -63,6 +63,14 @@ class absAdapter(ABC):
         Настройки валидации, используемые адаптерами, связанными со ссылками.
         """
 
+        repo_path: Optional[Path] = None
+        """Repository root of the sync destination, used to format
+        repo-absolute link targets.
+
+        Корень репозитория целевого расположения синхронизации, используемый
+        для формирования repo-absolute целей ссылок.
+        """
+
     def __init__(self, adapter_context: absAdapter.Context):
         """Initialize the adapter with the shared context.
 

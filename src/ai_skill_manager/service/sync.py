@@ -189,17 +189,24 @@ def sync_to_target(
         if progress is not None:
             progress("copy", index, len(skills))
 
-    # Run adapters only on skills that were actually copied.
+    # Run adapters only on skills that were actually copied. The adapter
+    # resolves links against the original *source* skills (not the copies),
+    # then uses skill_mapping to translate a resolved identity into its
+    # current-run location - see Adapter's docstring for why.
     # Запускаем адаптеры только на тех скиллах, которые реально скопировались.
+    # Адаптер разрешает ссылки относительно исходных *source*-скиллов (а не
+    # копий), а затем переводит разрешённую идентичность в текущее
+    # расположение через skill_mapping - см. docstring Adapter.
     skill_mapping = dict(zip(skills, copied_skills))
     copied_files: Dict[Path, Path] = {}
     adapter = Adapter(
-        copied_skills,
+        skills,
         adapter_list,
         skill_mapping=skill_mapping,
         target_dir=target_dir,
         copied_files=copied_files,
         validation_settings=settings,
+        repo_path=repo_path,
     )
     logger.debug("Adapting %d copied skill(s)", len(skills_to_adapt))
     if progress is not None:

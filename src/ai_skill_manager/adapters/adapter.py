@@ -39,26 +39,44 @@ class Adapter:
         target_dir: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
         validation_settings: Optional[ValidationSettings] = None,
+        repo_path: Optional[Path] = None,
     ):
         """Initialize the adapter with the available skills and adapter classes.
 
         Args:
-            skills: All known skills, used as context for link resolution.
-                / Все известные навыки, используемые как контекст для разрешения ссылок.
+            skills: All discovered *source* skills (before copying), used as
+                context for link resolution. Resolving against the original
+                source skills - rather than re-deriving identity from copied
+                paths - is what lets link resolution reuse the exact same
+                matching rules as validation.
+                / Все обнаруженные *исходные* скиллы (до копирования),
+                используемые как контекст для разрешения ссылок. Разрешение
+                относительно исходных скиллов, а не повторное угадывание
+                идентичности по скопированным путям, позволяет резолюции
+                ссылок использовать те же самые правила сопоставления, что и
+                валидация.
             adapter_list: Adapter classes to instantiate.
                 / Классы адаптеров для инстанцирования.
-            skill_mapping: Optional mapping from original source skill to copied
-                target skill. Used by link adapters to resolve source links that
-                still point to the original source paths after copying.
-                / Опциональное отображение исходного скилла в скопированный.
-                Используется адаптерами ссылок для разрешения source-ссылок,
-                которые после копирования всё ещё указывают на исходные пути.
+            skill_mapping: Mapping from original source skill to its current
+                location this run (a freshly copied skill, or its existing
+                target-directory location if the copy was skipped). Used to
+                translate a resolved source-skill identity into the path the
+                link should ultimately point at.
+                / Отображение исходного скилла в его текущее расположение в
+                этом запуске (свежескопированный скилл или его существующее
+                расположение в target, если копирование было пропущено).
+                Используется, чтобы перевести разрешённую идентичность
+                исходного скилла в путь, на который должна указывать ссылка.
             target_dir: Root target directory of the current sync.
                 / Корневая целевая директория текущего синка.
             copied_files: Shared registry of external files already copied into
                 target skills. Maps original source path -> copied path.
                 / Общий реестр внешних файлов, уже скопированных в целевые
                 скиллы. Отображает исходный путь -> скопированный путь.
+            repo_path: Repository root of the sync destination, used to format
+                repo-absolute link targets.
+                / Корень репозитория целевого расположения синхронизации,
+                используемый для формирования repo-absolute целей ссылок.
 
         Raises:
             AssertionError: If two adapters share the same name.
@@ -80,6 +98,7 @@ class Adapter:
             target_dir=target_dir,
             copied_files=copied_files if copied_files is not None else {},
             validation_settings=validation_settings,
+            repo_path=repo_path,
         )
 
         # Instantiate each adapter with the shared context.
