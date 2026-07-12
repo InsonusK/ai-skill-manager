@@ -14,8 +14,10 @@ from rich.console import Console
 from rich.text import Text
 from rich.tree import Tree
 
+from ...adapters.models.sync_error import SyncError
 from ...entities.skill import Skill
 from ...entities.source import Source
+from ...sync_exception import SyncFailedError
 from ...validators.models import ValidationReport
 from ...validators.rules import absValidationRule
 
@@ -201,3 +203,34 @@ def print_validation_report(report: ValidationReport) -> None:
         len(r.errors) for s in report.result.values() for r in s.values()
     )
     console.print(f"\nTotal: {total} error(s)")
+
+
+def print_sync_errors(error: SyncFailedError) -> None:
+    """Print materialization failures collected during a sync run.
+
+    Печатает ошибки материализации, собранные во время синхронизации.
+
+    Args:
+        error: The raised sync failure, carrying the collected errors and
+            the staging/target paths.
+            / Возникшая ошибка синхронизации, содержащая собранные ошибки и
+            пути staging/target.
+    """
+    console = Console()
+    tree = Tree(f"[bold red]Sync Failed[/bold red] ({len(error.errors)} error(s))")
+    by_skill: Dict[str, List[SyncError]] = {}
+    for sync_error in error.errors:
+        by_skill.setdefault(sync_error.skill_name, []).append(sync_error)
+
+    for skill_name, skill_errors in by_skill.items():
+        skill_branch = tree.add(f"[cyan]{skill_name}[/cyan]")
+        for sync_error in skill_errors:
+            text = Text(
+                sync_error.file and f"{sync_error.file}: {sync_error.message}" or sync_error.message,
+                style="red",
+            )
+            skill_branch.add(text)
+
+    console.print(tree)
+    console.print(f"\n[bold]{error.target_dir}[/bold] was left unchanged.")
+    console.print(f"Inspect the staged output at [bold]{error.staging_dir}[/bold].")

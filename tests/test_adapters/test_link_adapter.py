@@ -245,6 +245,35 @@ class TestLinkAdapter(unittest.TestCase):
         content = (skill_dir / "SKILL.md").read_text()
         self.assertIn("[details](skill/details.md)", content)
 
+    def test_replaces_unresolvable_link_with_placeholder_and_records_error(self):
+        # EN: A link to an external file that does not exist must not abort
+        # adaptation: it is replaced with a placeholder and recorded as an
+        # error, while the remaining links in the same file still convert.
+        # RU: Ссылка на несуществующий внешний файл не должна прерывать
+        # адаптацию: она заменяется заглушкой и фиксируется как ошибка, а
+        # остальные ссылки в том же файле всё равно конвертируются.
+        root = self.tmpdir / "broken_external"
+        root.mkdir()
+        skill_dir = root / "skill"
+        skill_dir.mkdir()
+        (root / "also-ok.md").write_text("# OK\n")
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill\n---\n# Skill\n"
+            "[missing](../extra.md)\n[ok](../also-ok.md)\n"
+        )
+        # Note: ../extra.md is intentionally never created.
+        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
+
+        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
+        adapter.adapt(skill, skill)
+
+        content = (skill_dir / "SKILL.md").read_text()
+        self.assertIn("[missing](#unresolved-link)", content)
+        self.assertIn("[ok](./files/also-ok.md)", content)
+        self.assertEqual(len(adapter.errors), 1)
+        self.assertIn("extra.md", adapter.errors[0].message)
+        self.assertEqual(adapter.errors[0].skill_name, "skill")
+
     def test_rewrites_windows_separator_source_link(self):
         # EN: A link authored with Windows backslashes to a file outside any
         # skill must be copied into files/ and rewritten as a relative link.

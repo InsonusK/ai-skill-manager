@@ -74,6 +74,52 @@ def _default_repo_path(link: absLink) -> Path:
     return link.skill_file.skill.source.get_scan_location().repo_path
 
 
+def _finalize_target(
+    new_skill: Skill,
+    rel: Optional[Path],
+    is_main: bool,
+    repo_path: Path,
+    target_dir: Optional[Path],
+) -> str:
+    """Build the repo-absolute link string for a location inside ``new_skill``.
+
+    Формирует строку repo-absolute ссылки для расположения внутри ``new_skill``.
+
+    When ``target_dir`` is known, the string is built purely from the
+    skill's *name* and the sync's directory layout (``target_dir`` relative
+    to ``repo_path``) - never from ``new_skill``'s own ``folder_path``. This
+    matters because during materialization a skill's bytes may still be
+    sitting in a staging directory rather than its final location; the link
+    text written into those bytes must reflect where the skill will end up,
+    not where it currently physically is.
+
+    Falls back to ``new_skill``'s own (real) ``folder_path``/``file_path``
+    when ``target_dir`` is not supplied - used by callers that resolve a
+    link directly against an already-final skill (e.g. unit tests).
+
+    Когда ``target_dir`` известен, строка строится исключительно из *имени*
+    скилла и раскладки директорий синка (``target_dir`` относительно
+    ``repo_path``) - никогда из собственного ``folder_path`` у ``new_skill``.
+    Это важно, потому что во время материализации байты скилла могут всё ещё
+    находиться в staging-директории, а не в итоговом расположении; текст
+    ссылки, записываемый в эти байты, должен отражать, где скилл окажется, а
+    не где он находится физически сейчас.
+
+    При отсутствии ``target_dir`` используется собственный (реальный)
+    ``folder_path``/``file_path`` у ``new_skill`` - для вызывающих сторон,
+    которые разрешают ссылку напрямую относительно уже финального скилла
+    (например, юнит-тесты).
+    """
+    if target_dir is not None:
+        offset = Path(os.path.relpath(target_dir, repo_path))
+        skill_root = offset / new_skill.properties.name
+        final = skill_root / "SKILL.md" if is_main else skill_root / rel
+        return final.as_posix()
+
+    final_path = new_skill.file_path if is_main else new_skill.folder_path / rel
+    return _repo_absolute_path(final_path, repo_path)
+
+
 class absLinkConverter(ABC):
     """Abstract converter from :class:`absLink` to agent skill-link target string.
 
@@ -134,6 +180,7 @@ class SkillLinkConverter(absLinkConverter):
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         repo_path: Optional[Path] = None,
+        target_dir: Optional[Path] = None,
         **kwargs,
     ) -> str:
         """Return the repo-absolute path to the target, preserving any header."""
@@ -141,14 +188,11 @@ class SkillLinkConverter(absLinkConverter):
         new_skill = (skill_mapping or {}).get(old_skill, old_skill)
         target_path = link.path.os_path
 
-        if old_skill.folder_path is not None and not same_path(target_path, old_skill.file_path):
-            rel = target_path.relative_to(old_skill.folder_path)
-            final_path = new_skill.folder_path / rel
-        else:
-            final_path = new_skill.file_path
+        is_main = old_skill.folder_path is None or same_path(target_path, old_skill.file_path)
+        rel = None if is_main else target_path.relative_to(old_skill.folder_path)
 
         effective_repo_path = repo_path if repo_path is not None else _default_repo_path(link)
-        target = _repo_absolute_path(final_path, effective_repo_path)
+        target = _finalize_target(new_skill, rel, is_main, effective_repo_path, target_dir)
         return _append_header(target, link.header)
 
 
@@ -300,6 +344,7 @@ class SourceLinkConverter(absLinkConverter):
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
         repo_path: Optional[Path] = None,
+        target_dir: Optional[Path] = None,
         **kwargs,
     ) -> str:
         """Resolve a source link against known skills.
@@ -322,20 +367,10 @@ class SourceLinkConverter(absLinkConverter):
             skill, is_main_file, rel_path = resolved
             new_skill = (skill_mapping or {}).get(skill, skill)
 
-            # EN: Determine the absolute target path inside the resolved skill's
-            # current (possibly freshly copied) location.
-            # RU: Определяем абсолютный путь цели внутри текущего (возможно,
-            # только что скопированного) расположения разрешённого скилла.
-            if is_main_file:
-                final_path = new_skill.file_path
-            else:
-                assert new_skill.folder_path is not None, "skill with nested file must have a folder"
-                final_path = new_skill.folder_path / rel_path
-
             # EN: Rewrite the link as a repo-absolute path.
             # RU: Переписываем ссылку в repo-absolute путь.
             effective_repo_path = repo_path if repo_path is not None else _default_repo_path(link)
-            target = _repo_absolute_path(final_path, effective_repo_path)
+            target = _finalize_target(new_skill, rel_path, is_main_file, effective_repo_path, target_dir)
             return _append_header(target, link.header)
 
         # EN: Not part of any known skill: copy to files/ if the adapter
@@ -408,6 +443,7 @@ class LinkConverter:
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
         repo_path: Optional[Path] = None,
+        target_dir: Optional[Path] = None,
     ) -> str:
         """Convert ``link`` to the repo-absolute format.
 
@@ -431,6 +467,16 @@ class LinkConverter:
                 / Корень репозитория целевого расположения синхронизации. При
                 отсутствии используется корень репозитория скилла-владельца
                 ссылки.
+            target_dir: Root target directory of the current sync. When
+                given, repo-absolute targets are built from the skill's name
+                and ``target_dir``'s offset from ``repo_path`` alone, so they
+                are correct even while the skill's bytes are still sitting in
+                a staging directory.
+                / Корневая целевая директория текущего синка. При наличии
+                repo-absolute цели строятся исключительно из имени скилла и
+                смещения ``target_dir`` относительно ``repo_path``, поэтому
+                они корректны, даже пока байты скилла всё ещё находятся в
+                staging-директории.
 
         Returns:
             New link target in repo-absolute notation.
@@ -450,4 +496,5 @@ class LinkConverter:
             target_skill_folder=target_skill_folder,
             copied_files=copied_files,
             repo_path=repo_path,
+            target_dir=target_dir,
         )

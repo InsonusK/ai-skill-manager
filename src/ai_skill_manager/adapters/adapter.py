@@ -9,14 +9,19 @@ to the target location.
 в целевое расположение.
 """
 
+import logging
 from pathlib import Path
 
 from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
 from .models.adapter_message import AdapterMessage
+from .models.sync_error import SyncError
 from ..validation_settings import ValidationSettings
 from typing import Dict, Optional, Tuple
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
 
 
 class Adapter:
@@ -114,10 +119,29 @@ class Adapter:
         """
         return [(adapter.name(), adapter.version()) for adapter in self.__adapters]
 
+    @property
+    def errors(self) -> List[SyncError]:
+        """Return failures collected so far across every ``adapt`` call.
+
+        Возвращает ошибки, собранные до сих пор за все вызовы ``adapt``.
+        """
+        return self.__ac.errors
+
     def adapt(self, old_skill: Skill, new_skill: Skill) -> Dict[str, AdapterMessage]:
         """Run all adapters on ``new_skill`` using ``old_skill`` as reference.
 
         Запускает все адаптеры на ``new_skill``, используя ``old_skill`` как эталон.
+
+        An adapter that raises does not abort the batch: the failure is
+        recorded on :attr:`errors` (the caller decides what that means for
+        the overall sync) and the remaining adapters still run, so a single
+        misbehaving adapter cannot hide problems in the others.
+
+        Адаптер, выбрасывающий исключение, не прерывает всю партию: ошибка
+        записывается в :attr:`errors` (что это означает для синхронизации в
+        целом, решает вызывающая сторона), а остальные адаптеры всё равно
+        запускаются, поэтому один сломанный адаптер не может скрыть проблемы
+        в других.
 
         Args:
             old_skill: Original skill before copying.
@@ -129,10 +153,21 @@ class Adapter:
             Mapping from adapter name to its message.
                 / Отображение имени адаптера на его сообщение.
         """
+        skill_name = old_skill.properties.name if old_skill is not None else "<unknown>"
         results = {}
         for adapter in self.__adapters:
             # Run the adapter and store its returned message.
             # Запускаем адаптер и сохраняем возвращённое сообщение.
-            msg = adapter.adapt(old_skill, new_skill)
+            try:
+                msg = adapter.adapt(old_skill, new_skill)
+            except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+                logger.debug("Adapter %s failed on skill %s", adapter.name(), skill_name, exc_info=True)
+                self.__ac.errors.append(
+                    SyncError(
+                        skill_name=skill_name,
+                        message=f"{adapter.name()} failed: {exc}",
+                    )
+                )
+                msg = AdapterMessage(message="failed: {reason}", params={"reason": str(exc)})
             results[adapter.name()] = msg
         return results

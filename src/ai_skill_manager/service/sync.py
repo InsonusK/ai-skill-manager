@@ -14,6 +14,7 @@ from ..functions.managed_state import is_managed, read_managed_state, write_mana
 
 from ..adapters import Adapter
 from ..adapters.rules import DEFAULT_RULES, LinkAdapter, absAdapter
+from ..sync_exception import SyncFailedError
 from ..validation_settings import ValidationSettings
 from ..entities import LocalSource, Skill, Source
 from ..entities.skill_format import SkillFormat
@@ -70,6 +71,22 @@ def discover_and_validate(
     return skills
 
 
+def _staging_dir_for(target_dir: Path) -> Path:
+    """Return the scratch directory used to stage a sync of ``target_dir``.
+
+    The staging directory is a sibling of ``target_dir`` (same filesystem),
+    so moving a materialized skill into place is a plain rename rather than
+    a cross-device copy.
+
+    Возвращает вспомогательную директорию, используемую для стейджинга
+    синхронизации ``target_dir``. Директория staging - соседняя с
+    ``target_dir`` (та же файловая система), поэтому перенос
+    материализованного скилла на место - обычное переименование, а не
+    копирование между устройствами.
+    """
+    return target_dir.parent / f".ai-skill-manager-tmp-{target_dir.name}"
+
+
 def sync_to_target(
     skills: List[Skill],
     target_dir: Path,
@@ -85,6 +102,19 @@ def sync_to_target(
 
     Копирует и адаптирует уже обнаруженные скиллы в одну целевую директорию.
 
+    Skills that need copying are first materialized into a scratch staging
+    directory next to ``target_dir``. Only once every skill has materialized
+    without error are the staged directories moved into ``target_dir`` (or,
+    for ``dry_run``, discarded). This means a failure - or a dry run - never
+    leaves ``target_dir`` partially written.
+
+    Скиллы, которые нужно скопировать, сначала материализуются во
+    вспомогательной staging-директории рядом с ``target_dir``. И только
+    после того как каждый скилл материализовался без ошибок,
+    материализованные директории переносятся в ``target_dir`` (а при
+    ``dry_run`` — отбрасываются). Это означает, что ошибка — или dry run —
+    никогда не оставляют ``target_dir`` частично записанным.
+
     Args:
         skills: Skills discovered and validated via :func:`discover_and_validate`.
             Скиллы, обнаруженные и валидированные через :func:`discover_and_validate`.
@@ -93,8 +123,10 @@ def sync_to_target(
         adapters: Adapter classes to apply after copying.
             По умолчанию используется :data:`DEFAULT_RULES`.
             Классы адаптеров, применяемые после копирования.
-        dry_run: If ``True``, do not write any changes.
-            Если ``True``, не записывать изменения.
+        dry_run: If ``True``, materialize and report what would happen but
+            never touch ``target_dir``.
+            Если ``True``, материализовать и сообщить, что произошло бы, но
+            не трогать ``target_dir``.
         cleanup_orphans: If ``True``, remove orphan skills from target.
             Если ``True``, удалять осиротевшие скиллы из целевой директории.
         force: If ``True``, ignore hash and adapter-version checks and copy
@@ -106,6 +138,14 @@ def sync_to_target(
     Returns:
         Summary dict with counts and the target directory.
         Сводный словарь с количеством и целевой директорией.
+
+    Raises:
+        SyncFailedError: If materializing any skill or link failed.
+            ``target_dir`` is left untouched and the staging directory is
+            kept for inspection.
+            / Если материализация какого-либо скилла или ссылки не удалась.
+            ``target_dir`` остаётся нетронутым, а директория staging
+            сохраняется для изучения.
     """
     logger.debug("Starting sync to target: target_dir=%s dry_run=%s force=%s", target_dir, dry_run, force)
 
@@ -114,17 +154,13 @@ def sync_to_target(
         repo_path = target_dir
     logger.debug("Resolved target_dir=%s repo_path=%s", target_dir, repo_path)
 
-    # In dry-run mode return a summary without touching the filesystem.
-    # В режиме dry-run возвращаем сводку, не затрагивая файловую систему.
-    if dry_run:
-        return {
-            "skills_count": len(skills),
-            "target_dir": str(target_dir),
-            "links_replaced": 0,
-            "dry_run": True,
-        }
-
-    target_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir = _staging_dir_for(target_dir)
+    if staging_dir.exists():
+        # EN: Never trust leftovers from a previous, possibly failed run as a
+        # cache - always start this run's staging area from scratch.
+        # RU: Никогда не доверяем остаткам предыдущего, возможно неудачного
+        # запуска как кэшу - всегда начинаем staging-область этого запуска с чистого листа.
+        shutil.rmtree(staging_dir)
 
     copied_skills: List[Skill] = []
     skills_to_adapt: List[Tuple[Skill, Skill]] = []
@@ -154,8 +190,13 @@ def sync_to_target(
         for registered_adapter in Adapter([], adapter_list).registered_adapters_name_version
     ]
 
-    # Copy each skill into the target directory.
-    # Копируем каждый навык в целевую директорию.
+    # Materialize each skill that changed into the staging directory. Skills
+    # that are already up to date are left alone in target_dir and simply
+    # referenced from there, so unrelated skills stay untouched by this run.
+    # Материализуем в staging-директории каждый изменившийся скилл. Скиллы,
+    # которые уже актуальны, остаются нетронутыми в target_dir и просто
+    # берутся оттуда, поэтому не связанные с изменениями скиллы этим запуском
+    # не затрагиваются.
     if progress is not None:
         progress("copy", 0, len(skills))
     for index, skill in enumerate(skills, start=1):
@@ -165,23 +206,24 @@ def sync_to_target(
             raise ValueError(
                 f"Skill {skill.file_path} has no 'name' in frontmatter")
 
-        skill_target_dir = target_dir / name
+        real_skill_dir = target_dir / name
         source_hash = compute_skill_hash(skill)
         if not force and _is_skill_up_to_date(
-                skill, skill_target_dir, adapters_version):
+                skill, real_skill_dir, adapters_version):
             logger.debug("Skill '%s' is up to date, skipping copy", name)
             new_skill = _build_target_skill(
-                skill_target_dir / "SKILL.md",
-                skill_target_dir,
+                real_skill_dir / "SKILL.md",
+                real_skill_dir,
                 repo_path=repo_path,
                 old_skill=skill,
             )
         else:
             logger.debug("Skill '%s' needs copy (force=%s)", name, force)
+            staged_skill_dir = staging_dir / name
             if skill.is_flat():
-                new_skill = _copy_flat_skill(skill, skill_target_dir, repo_path=repo_path)
+                new_skill = _copy_flat_skill(skill, staged_skill_dir, repo_path=repo_path)
             else:
-                new_skill = _copy_dir_skill(skill, skill_target_dir, repo_path=repo_path)
+                new_skill = _copy_dir_skill(skill, staged_skill_dir, repo_path=repo_path)
             skills_to_adapt.append((skill, new_skill))
 
         copied_skills.append(new_skill)
@@ -189,14 +231,15 @@ def sync_to_target(
         if progress is not None:
             progress("copy", index, len(skills))
 
-    # Run adapters only on skills that were actually copied. The adapter
-    # resolves links against the original *source* skills (not the copies),
-    # then uses skill_mapping to translate a resolved identity into its
-    # current-run location - see Adapter's docstring for why.
-    # Запускаем адаптеры только на тех скиллах, которые реально скопировались.
-    # Адаптер разрешает ссылки относительно исходных *source*-скиллов (а не
-    # копий), а затем переводит разрешённую идентичность в текущее
-    # расположение через skill_mapping - см. docstring Adapter.
+    # Run adapters only on skills that were actually (re)materialized. The
+    # adapter resolves links against the original *source* skills (not the
+    # copies), then uses skill_mapping to translate a resolved identity into
+    # its current-run location - see Adapter's docstring for why.
+    # Запускаем адаптеры только на тех скиллах, которые реально были
+    # (пере)материализованы. Адаптер разрешает ссылки относительно исходных
+    # *source*-скиллов (а не копий), а затем переводит разрешённую
+    # идентичность в текущее расположение через skill_mapping - см. docstring
+    # Adapter.
     skill_mapping = dict(zip(skills, copied_skills))
     copied_files: Dict[Path, Path] = {}
     adapter = Adapter(
@@ -208,7 +251,7 @@ def sync_to_target(
         validation_settings=settings,
         repo_path=repo_path,
     )
-    logger.debug("Adapting %d copied skill(s)", len(skills_to_adapt))
+    logger.debug("Adapting %d materialized skill(s)", len(skills_to_adapt))
     if progress is not None:
         progress("adapt", 0, len(skills_to_adapt))
     for index, (old_skill, new_skill) in enumerate(skills_to_adapt, start=1):
@@ -220,25 +263,84 @@ def sync_to_target(
         if progress is not None:
             progress("adapt", index, len(skills_to_adapt))
 
-    # Persist managed state for each copied skill.
+    # A non-empty error pool fails the whole sync: target_dir is never
+    # touched and the staging directory is kept so the failures - and the
+    # broken-link placeholders left in its files - can be inspected.
+    # Непустой пул ошибок приводит к неудаче всей синхронизации: target_dir
+    # никогда не трогается, а директория staging сохраняется, чтобы можно
+    # было изучить ошибки и оставленные в её файлах заглушки битых ссылок.
+    if adapter.errors:
+        logger.debug("Sync failed with %d error(s); keeping %s for inspection", len(adapter.errors), staging_dir)
+        raise SyncFailedError(list(adapter.errors), staging_dir=staging_dir, target_dir=target_dir)
+
+    # Persist managed state for each freshly materialized skill as part of
+    # its staged directory, so it moves into target_dir as a single unit.
     # The stored hash represents the *source* skill, so unchanged sources
     # can be detected on the next run.
-    # Сохраняем управляемое состояние для каждого скопированного навыка.
-    # Хранимый хеш относится к *исходному* скиллу, чтобы при следующем
-    # запуске обнаружить неизменённые источники.
-    logger.debug("Writing managed state for %d skill(s)", len(copied_skills))
+    # Сохраняем управляемое состояние для каждого свежематериализованного
+    # скилла как часть его staged-директории, чтобы оно переносилось в
+    # target_dir единым целым. Хранимый хеш относится к *исходному* скиллу,
+    # чтобы при следующем запуске обнаружить неизменённые источники.
+    logger.debug("Writing managed state for %d materialized skill(s)", len(skills_to_adapt))
     if progress is not None:
-        progress("write_managed_state", 0, len(copied_skills))
-    for index, new_skill in enumerate(copied_skills, start=1):
+        progress("write_managed_state", 0, len(skills_to_adapt))
+    for index, (old_skill, new_skill) in enumerate(skills_to_adapt, start=1):
         state = {
             "hash": source_hashes[new_skill],
             "validators": validator_versions,
-            "adapters": adapters_version
+            "adapters": adapters_version,
         }
         logger.debug("Managed state for %s: %s", new_skill.folder_path, state)
-        _write_managed_state_if_changed(new_skill.folder_path, state)
+        write_managed_state(new_skill.folder_path, state)
         if progress is not None:
-            progress("write_managed_state", index, len(copied_skills))
+            progress("write_managed_state", index, len(skills_to_adapt))
+
+    if dry_run:
+        logger.debug("Dry run: discarding staging directory %s", staging_dir)
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        return {
+            "skills_count": len(skills),
+            "target_dir": str(target_dir),
+            "links_replaced": links_replaced,
+            "skipped_count": len(skills) - len(skills_to_adapt),
+            "dry_run": True,
+        }
+
+    # Everything materialized cleanly: move each staged skill into place,
+    # replacing any previous copy, then rebuild its Skill to point at the
+    # real target location for orphan removal.
+    # Всё материализовалось без ошибок: переносим каждый staged-скилл на
+    # место, заменяя предыдущую копию, затем перестраиваем его Skill так,
+    # чтобы он указывал на реальное расположение в target для удаления
+    # осиротевших скиллов.
+    target_dir.mkdir(parents=True, exist_ok=True)
+    staged_by_old_skill = dict(skills_to_adapt)
+    final_skills: List[Skill] = []
+    for old_skill, current_skill in zip(skills, copied_skills):
+        staged_new_skill = staged_by_old_skill.get(old_skill)
+        if staged_new_skill is None:
+            # Unchanged skill: already sitting at its real target location.
+            # Неизменившийся скилл: уже находится в своём реальном расположении в target.
+            final_skills.append(current_skill)
+            continue
+
+        real_skill_dir = target_dir / old_skill.properties.name
+        if real_skill_dir.exists():
+            shutil.rmtree(real_skill_dir)
+        logger.debug("Moving staged skill into place: %s -> %s", staged_new_skill.folder_path, real_skill_dir)
+        shutil.move(str(staged_new_skill.folder_path), str(real_skill_dir))
+        final_skills.append(
+            _build_target_skill(
+                real_skill_dir / "SKILL.md",
+                real_skill_dir,
+                repo_path=repo_path,
+                old_skill=old_skill,
+            )
+        )
+    copied_skills = final_skills
+
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
     # Remove previously copied skills that are no longer present.
     # Удаляем ранее скопированные навыки, которых больше нет в источниках.
@@ -427,23 +529,6 @@ def _is_skill_up_to_date(
         up_to_date,
     )
     return up_to_date
-
-
-def _write_managed_state_if_changed(skill_dir: Path, state: dict) -> None:
-    """Write managed state only when it differs from the existing state.
-
-    Write managed state only when it differs from the existing state.
-
-    Записывает управляемое состояние только если оно отличается от уже
-    существующего. Это избавляет от лишнего перетирания файла для скиллов,
-    которые не изменились.
-    """
-    existing = read_managed_state(skill_dir)
-    if existing == state:
-        logger.debug("Managed state unchanged for %s, skipping write", skill_dir)
-        return
-    logger.debug("Writing managed state to %s", skill_dir)
-    write_managed_state(skill_dir, state)
 
 
 def _copy_flat_skill(skill: Skill, skill_target_dir: Path, repo_path: Path) -> Skill:

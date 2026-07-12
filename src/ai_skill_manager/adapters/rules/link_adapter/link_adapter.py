@@ -3,6 +3,7 @@
 Адаптер, переписывающий ссылки в формат skill-link.
 """
 
+import logging
 from typing import List, Optional, Tuple
 
 from ....entities import Skill, SkillFile, absLink
@@ -10,8 +11,19 @@ from ....entities.link.path_utils import same_path
 from ....models import LinkWithContext
 from ....validators.rules.link.exclude_rule import build_link_exclude_rules
 from ...models.adapter_message import AdapterMessage
+from ...models.sync_error import SyncError
 from ..abs_adapter import absAdapter
 from .converter import LinkConverter
+
+# Module logger / Логгер модуля.
+logger = logging.getLogger(__name__)
+
+# Placeholder substituted for a link target that could not be converted.
+# Kept free of spaces/parentheses so it never breaks markdown link syntax.
+# Заглушка, подставляемая вместо цели ссылки, которую не удалось
+# преобразовать. Не содержит пробелов/скобок, чтобы не сломать синтаксис
+# markdown-ссылки.
+BROKEN_LINK_PLACEHOLDER = "#unresolved-link"
 
 
 class LinkAdapter(absAdapter):
@@ -150,6 +162,16 @@ class LinkAdapter(absAdapter):
                 pairs.append((old_file, new_file))
         return pairs
 
+    @staticmethod
+    def _relative_file(skill: Skill, skill_file: SkillFile) -> str:
+        """Return ``skill_file``'s path relative to the skill for error reporting.
+
+        Возвращает путь ``skill_file`` относительно скилла для отчёта об ошибке.
+        """
+        if same_path(skill_file.path, skill.file_path):
+            return skill_file.path.name
+        return skill_file.path.relative_to(skill.folder_path).as_posix()
+
     def _should_exclude(
         self,
         link: absLink,
@@ -233,7 +255,31 @@ class LinkAdapter(absAdapter):
             if self._should_exclude(link, skill, skill_file, other_skills):
                 continue
 
-            new_target = self._compute_new_target(link, skill_file, skill, other_skills)
+            try:
+                new_target = self._compute_new_target(link, skill_file, skill, other_skills)
+            except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+                # EN: A single unresolvable link must not abort adaptation of
+                # the rest of the file (or the rest of the batch): substitute
+                # a placeholder so remaining links keep getting checked, and
+                # record the failure. The sync still fails overall - see
+                # SyncError - nothing here is silently accepted.
+                # RU: Одна нерезолвящаяся ссылка не должна прерывать
+                # адаптацию остальной части файла (или всей партии):
+                # подставляем заглушку, чтобы остальные ссылки продолжали
+                # проверяться, и фиксируем ошибку. Синхронизация в целом
+                # всё равно завершится неудачей — см. SyncError — здесь
+                # ничего не принимается молча.
+                logger.debug("Failed to convert link %r", link.raw, exc_info=True)
+                rel_file = self._relative_file(skill, skill_file)
+                self._adapter_context.errors.append(
+                    SyncError(
+                        skill_name=skill.properties.name,
+                        file=rel_file,
+                        message=f"unresolved link {link.raw!r}: {exc}",
+                    )
+                )
+                new_target = BROKEN_LINK_PLACEHOLDER
+
             if new_target is None:
                 # Nothing to do for this link.
                 # Для этой ссылки ничего делать не нужно.
@@ -311,4 +357,5 @@ class LinkAdapter(absAdapter):
             target_skill_folder=new_skill.folder_path,
             copied_files=self._adapter_context.copied_files,
             repo_path=self._adapter_context.repo_path,
+            target_dir=self._adapter_context.target_dir,
         )

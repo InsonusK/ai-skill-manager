@@ -8,5 +8,6 @@ Exports the message type returned by file adapters.
 """
 
 from .adapter_message import AdapterMessage
+from .sync_error import SyncError
 
-__all__ = ["AdapterMessage"]
+__all__ = ["AdapterMessage", "SyncError"]

@@ -7,9 +7,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from ..models.adapter_message import AdapterMessage
+from ..models.sync_error import SyncError
 from ...validation_settings import ValidationSettings
 from ...entities import Skill
 
@@ -69,6 +70,17 @@ class absAdapter(ABC):
 
         Корень репозитория целевого расположения синхронизации, используемый
         для формирования repo-absolute целей ссылок.
+        """
+
+        errors: List[SyncError] = field(default_factory=list)
+        """Failures collected while adapting, shared across every adapter
+        instance in this run. A non-empty list fails the sync overall, but
+        does not stop adaptation early - see :class:`SyncError`.
+
+        Ошибки, собранные во время адаптации, общие для всех экземпляров
+        адаптеров в этом запуске. Непустой список приводит к неудаче
+        синхронизации в целом, но не прерывает адаптацию раньше времени —
+        см. :class:`SyncError`.
         """
 
     def __init__(self, adapter_context: absAdapter.Context):

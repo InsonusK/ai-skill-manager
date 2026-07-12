@@ -11,6 +11,7 @@ from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
 from ai_skill_manager.service.sync import remove_orphans, run_sync
 from ai_skill_manager.functions.hash import compute_skill_hash
 from ai_skill_manager.functions.managed_state import tag_managed
+from ai_skill_manager.sync_exception import SyncFailedError
 from ai_skill_manager.validators import ValidationFailedError
 
 
@@ -395,6 +396,71 @@ class TestRunSync(unittest.TestCase):
 
         self.assertNotIn("# stale", target_file.read_text())
         self.assertEqual(result["skipped_count"], 0)
+
+    def _staging_dir(self) -> Path:
+        return self.target_dir.parent / f".ai-skill-manager-tmp-{self.target_dir.name}"
+
+    def test_staging_dir_removed_after_successful_sync(self):
+        self._dir_skill("skill")
+
+        run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        self.assertFalse(self._staging_dir().exists())
+        self.assertTrue((self.target_dir / "skill" / "SKILL.md").exists())
+
+    def test_dry_run_materializes_and_reports_but_leaves_target_untouched(self):
+        # EN: Dry-run must actually materialize skills (so link conversion
+        # errors are caught, matching the check/sync contract) but must
+        # never touch target_dir or leave the staging directory behind.
+        # RU: Dry-run должен реально материализовать скиллы (чтобы ошибки
+        # конвертации ссылок были пойманы, в соответствии с контрактом
+        # check/sync), но никогда не должен трогать target_dir или оставлять
+        # после себя staging-директорию.
+        a = self._dir_skill("skill-a")
+        self._dir_skill("skill-b")
+        (a / "SKILL.md").write_text(
+            "---\nname: skill-a\n---\n# A\n[link to b](../skill-b/SKILL.md)\n"
+        )
+
+        result = run_sync(
+            [LocalSource(scan_path=self.source_dir)], self.target_dir, dry_run=True
+        )
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["links_replaced"], 1)
+        self.assertFalse(self.target_dir.exists())
+        self.assertFalse(self._staging_dir().exists())
+
+    def test_materialization_failure_raises_and_preserves_staging(self):
+        # EN: An adapter failure must fail the whole sync, leave target_dir
+        # untouched, and keep the staging directory around for inspection.
+        # RU: Ошибка адаптера должна приводить к неудаче всей синхронизации,
+        # оставлять target_dir нетронутым и сохранять staging-директорию для
+        # изучения.
+        class ExplodingAdapter(absAdapter):
+            @classmethod
+            def version(cls) -> str:
+                return "1.0.0"
+
+            def adapt(self, old_skill, new_skill):
+                raise RuntimeError("boom")
+
+        self._dir_skill("skill")
+
+        with self.assertRaises(SyncFailedError) as ctx:
+            run_sync(
+                [LocalSource(scan_path=self.source_dir)],
+                self.target_dir,
+                adapters=[ExplodingAdapter],
+            )
+
+        error = ctx.exception
+        self.assertEqual(len(error.errors), 1)
+        self.assertIn("boom", error.errors[0].message)
+        self.assertFalse(self.target_dir.exists())
+        self.assertTrue(error.staging_dir.exists())
+        self.assertTrue((error.staging_dir / "skill" / "SKILL.md").exists())
+        shutil.rmtree(error.staging_dir)
 
 
 class TestRemoveOrphans(unittest.TestCase):
