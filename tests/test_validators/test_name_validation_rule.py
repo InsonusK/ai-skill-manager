@@ -132,6 +132,25 @@ class TestNameValidationRule(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertTrue(list(result.values())[0].has_errors)
 
+    def test_is_kebab_case_allows_double_dash_separator(self):
+        self.assertTrue(NameValidationRule.is_kebab_case("plateau-async-monolith--project-feature-data-access"))
+        self.assertTrue(NameValidationRule.is_kebab_case("a--b"))
+
+    def test_is_kebab_case_rejects_triple_dash(self):
+        self.assertFalse(NameValidationRule.is_kebab_case("plateau---invalid"))
+        self.assertFalse(NameValidationRule.is_kebab_case("a---b"))
+
+    def test_is_kebab_case_rejects_leading_or_trailing_dash(self):
+        self.assertFalse(NameValidationRule.is_kebab_case("-plateau"))
+        self.assertFalse(NameValidationRule.is_kebab_case("plateau-"))
+
+    def test_flat_valid_name_with_double_dash(self):
+        md = self.tmpdir / "plateau-async-monolith--project-feature-data-access.skill.md"
+        skill = self._skill(md, None, name="plateau-async-monolith--project-feature-data-access")
+        rule = NameValidationRule()
+        result = rule.validate([skill])
+        self.assertEqual(result, {})
+
 
 if __name__ == "__main__":
     unittest.main()

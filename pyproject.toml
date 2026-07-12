@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-skill-manager"
-version = "1.4.0"
+version = "1.5.0"
 description = "Sync AI agent skills into .agents/skills/ from local directories or GitHub repositories"
 readme = "README.md"
 license = "MIT"

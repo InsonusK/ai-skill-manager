@@ -10,7 +10,7 @@ htmlcov/
 .coverage
 .ai-worktree/
 profiling/**.prof
-profiling/skills
+profiling/tmp
 profiling/ai-skills
 .agents/skills
 .claude/skills
