@@ -237,7 +237,7 @@ class NameValidationRule(absValidationRule):
     @staticmethod
     def is_kebab_case(name: str) -> bool:
         if not name or \
-                name.startswith("-") or name.endswith("-") or "--" in name or \
+                name.startswith("-") or name.endswith("-") or "---" in name or \
                 not re.match(r'^[a-z0-9-]+$', name) or not re.match(r'^[a-z0-9]', name):
             return False
         return True
