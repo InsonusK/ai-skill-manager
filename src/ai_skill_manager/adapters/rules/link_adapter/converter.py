@@ -73,7 +73,7 @@ class absLinkConverter(ABC):
         link: absLink,
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
-    ) -> Optional[str]:
+    ) -> str:
         """Convert a link to the agent skill-link format.
 
         Преобразует ссылку в формат агентской skill-link.
@@ -91,9 +91,8 @@ class absLinkConverter(ABC):
                 копирования всё ещё указывают на исходные пути.
 
         Returns:
-            The new link target string, or ``None`` to leave the link unchanged.
-                Новая строка цели ссылки или ``None``, чтобы оставить ссылку без
-                изменений.
+            The new link target string.
+                Новая строка цели ссылки.
         """
         ...
 
@@ -110,7 +109,7 @@ class SkillLinkConverter(absLinkConverter):
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         **kwargs,
-    ) -> Optional[str]:
+    ) -> str:
         """Return the repo-absolute path to the target, preserving any header."""
         # EN: Internal skill links are rewritten to repo-absolute paths.
         # RU: Внутренние ссылки скилла переписываются в repo-absolute пути.
@@ -131,7 +130,7 @@ class ExternalLinkConverter(absLinkConverter):
         skills: List[Skill],
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         **kwargs,
-    ) -> Optional[str]:
+    ) -> str:
         """Return the external URL unchanged, preserving any header."""
         # EN: External links are kept as-is.
         # RU: Внешние ссылки оставляем без изменений.
@@ -158,7 +157,7 @@ class ExternalFileConverter:
         self,
         link: absLink,
         target_skill_folder: Path,
-    ) -> Optional[str]:
+    ) -> str:
         """Return ``./files/<name>`` for the linked file or directory, copying if needed.
 
         If the same source path has already been copied, reuse the existing
@@ -166,7 +165,7 @@ class ExternalFileConverter:
 
         Returns:
             Relative target string such as ``./files/diagram.png`` or
-            ``./files/assets``, or ``None`` if the source does not exist.
+            ``./files/assets``.
         """
         source_path = link.path.os_path
         logger.debug("Converting external file link: %s", source_path)
@@ -198,39 +197,11 @@ class ExternalFileConverter:
                     )
                     source_path = original_candidate
 
-        # EN: If the source still cannot be found, skip the link and warn.
-        # Validation should catch broken links; crashing here aborts the whole
-        # sync for a single bad reference. Returning None tells the adapter to
-        # leave the original link text untouched.
-        # RU: Если исходный файл всё равно не найден, пропускаем ссылку и
-        # предупреждаем. Валидация должна ловить битые ссылки; падение здесь
-        # прерывает всю синхронизацию из-за одной некорректной ссылки.
-        # Возвращаем None, чтобы адаптер оставил исходную ссылку без изменений.
-        if not source_path.exists():
-            logger.warning(
-                "External link target does not exist, leaving unchanged: %s",
-                source_path,
-            )
-            return None
-
         if source_path in self._copied_files:
             copied_path = self._copied_files[source_path]
-            # EN: The previously copied file may belong to another skill. If it is
-            # not inside the current skill's folder, copy it again locally instead
-            # of computing an invalid relative path.
-            # RU: Ранее скопированный файл может принадлежать другому скиллу. Если
-            # он не внутри папки текущего скилла, копируем его ещё раз локально,
-            # вместо того чтобы вычислять некорректный относительный путь.
-            if not copied_path.is_relative_to(target_skill_folder):
-                logger.debug(
-                    "Previously copied external path is outside current skill folder, "
-                    "copying again: %s",
-                    source_path,
-                )
-            else:
-                rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
-                logger.debug("Reusing previously copied external path: %s -> %s", source_path, copied_path)
-                return _append_header(rel, link.header)
+            rel = "./" + copied_path.relative_to(target_skill_folder).as_posix()
+            logger.debug("Reusing previously copied external path: %s -> %s", source_path, copied_path)
+            return _append_header(rel, link.header)
 
         files_dir = target_skill_folder / "files"
         files_dir.mkdir(parents=True, exist_ok=True)
@@ -244,26 +215,12 @@ class ExternalFileConverter:
             target_path = files_dir / f"{stem}_{counter}{suffix}"
             counter += 1
 
-        try:
-            if source_path.is_dir():
-                logger.debug("Copying external directory: %s -> %s", source_path, target_path)
-                shutil.copytree(source_path, target_path)
-            else:
-                logger.debug("Copying external file: %s -> %s", source_path, target_path)
-                shutil.copy2(source_path, target_path)
-        except OSError as exc:
-            logger.warning(
-                "Failed to copy external link target %s: %s. Leaving link unchanged.",
-                source_path,
-                exc,
-            )
-            if target_path.exists():
-                if target_path.is_dir():
-                    shutil.rmtree(target_path, ignore_errors=True)
-                else:
-                    target_path.unlink(missing_ok=True)
-            return None
-
+        if source_path.is_dir():
+            logger.debug("Copying external directory: %s -> %s", source_path, target_path)
+            shutil.copytree(source_path, target_path)
+        else:
+            logger.debug("Copying external file: %s -> %s", source_path, target_path)
+            shutil.copy2(source_path, target_path)
         self._copied_files[source_path] = target_path
 
         rel = "./" + target_path.relative_to(target_skill_folder).as_posix()
@@ -488,7 +445,7 @@ class SourceLinkConverter(absLinkConverter):
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
-    ) -> Optional[str]:
+    ) -> str:
         """Resolve a source link against known skills.
 
         If the target belongs to a known skill, rewrite it as a repo-absolute
@@ -574,7 +531,7 @@ class OsLinkConverter(absLinkConverter):
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
-    ) -> Optional[str]:
+    ) -> str:
         """Copy the linked OS file into ``files/`` and return relative path."""
         if target_skill_folder is None or copied_files is None:
             raise ValueError(
@@ -606,7 +563,7 @@ class LinkConverter:
         skill_mapping: Optional[Dict[Skill, Skill]] = None,
         target_skill_folder: Optional[Path] = None,
         copied_files: Optional[Dict[Path, Path]] = None,
-    ) -> Optional[str]:
+    ) -> str:
         """Convert ``link`` to the repo-absolute format.
 
         Args:

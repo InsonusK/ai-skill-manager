@@ -268,62 +268,6 @@ class TestLinkAdapter(unittest.TestCase):
         self.assertIn("[extra](./files/extra.md)", content)
         self.assertTrue((skill_dir / "files" / "extra.md").exists())
 
-    def test_missing_external_link_is_left_unchanged(self):
-        # EN: A link to a non-existent external file must not crash sync.
-        # RU: Ссылка на несуществующий внешний файл не должна ломать синхронизацию.
-        root = self.tmpdir / "missing_external"
-        root.mkdir()
-        skill_dir = root / "skill"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: skill\n---\n# Skill\n[missing](../missing.md)\n"
-        )
-        skill = self._skill(skill_dir / "SKILL.md", skill_dir, repo_path=root)
-
-        adapter = Adapter(skills=[skill], adapter_list=[LinkAdapter])
-        msg = adapter.adapt(skill, skill)["LinkAdapter"]
-
-        self.assertEqual(msg.params["count"], 0)
-        content = (skill_dir / "SKILL.md").read_text()
-        self.assertIn("[missing](../missing.md)", content)
-        self.assertFalse((skill_dir / "files").exists())
-
-    def test_external_file_copied_again_for_different_skill(self):
-        # EN: When the same external file is referenced by two different skills,
-        # it must be copied into each skill's files/ folder instead of reusing a
-        # path that is outside the current skill folder.
-        # RU: Когда один внешний файл используется двумя разными скиллами, он
-        # должен копироваться в папку files/ каждого скилла, а не переиспользоваться
-        # путь, лежащий вне папки текущего скилла.
-        root = self.tmpdir / "shared_external"
-        root.mkdir()
-        (root / "extra.md").write_text("# Extra\n")
-
-        skill_a_dir = root / "skill-a"
-        skill_a_dir.mkdir()
-        (skill_a_dir / "SKILL.md").write_text(
-            "---\nname: skill-a\n---\n# Skill A\n[extra](../extra.md)\n"
-        )
-        skill_a = self._skill(skill_a_dir / "SKILL.md", skill_a_dir, repo_path=root)
-
-        skill_b_dir = root / "skill-b"
-        skill_b_dir.mkdir()
-        (skill_b_dir / "SKILL.md").write_text(
-            "---\nname: skill-b\n---\n# Skill B\n[extra](../extra.md)\n"
-        )
-        skill_b = self._skill(skill_b_dir / "SKILL.md", skill_b_dir, repo_path=root)
-
-        adapter = Adapter(skills=[skill_a, skill_b], adapter_list=[LinkAdapter])
-        adapter.adapt(skill_a, skill_a)["LinkAdapter"]
-        adapter.adapt(skill_b, skill_b)["LinkAdapter"]
-
-        content_a = (skill_a_dir / "SKILL.md").read_text()
-        content_b = (skill_b_dir / "SKILL.md").read_text()
-        self.assertIn("[extra](./files/extra.md)", content_a)
-        self.assertIn("[extra](./files/extra.md)", content_b)
-        self.assertTrue((skill_a_dir / "files" / "extra.md").exists())
-        self.assertTrue((skill_b_dir / "files" / "extra.md").exists())
-
 
 if __name__ == "__main__":
     unittest.main()
