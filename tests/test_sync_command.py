@@ -11,7 +11,7 @@ from unittest.mock import patch
 from ai_skill_manager.cli import main
 from ai_skill_manager.command.sync import DEFAULT_TARGET, run_sync
 from ai_skill_manager.cli.sync import run as sync_run
-from ai_skill_manager.validators import ValidationFailedError
+from ai_skill_manager.sync_exception import SyncFailedError
 
 
 class TestSyncAPI(unittest.TestCase):
@@ -89,7 +89,7 @@ class TestSyncAPI(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             run_sync(config_path=self.tmp / "missing.yaml")
 
-    def test_sync_conflict_is_validation_error(self):
+    def test_sync_conflict_fails_sync(self):
         src_a = self.tmp / "repo_a"
         src_a.mkdir()
         (src_a / "same.skill.md").write_text("---\nname: same\n---\n# A")
@@ -104,10 +104,12 @@ class TestSyncAPI(unittest.TestCase):
             "settings": {"target": "./target"}
         }))
 
-        with self.assertRaises(ValidationFailedError) as ctx:
+        with self.assertRaises(SyncFailedError) as ctx:
             run_sync(config_path=config)
 
-        self.assertTrue(ctx.exception.report.has_errors)
+        self.assertTrue(ctx.exception.errors)
+        shutil.rmtree(ctx.exception.staging_dir, ignore_errors=True)
+        self.assertFalse((self.tmp / "target").exists())
 
     def test_sync_link_includes_target_dir_relative_to_config_base(self):
         # EN: When target is a subdirectory of the config base (repo root),

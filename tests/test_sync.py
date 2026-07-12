@@ -12,7 +12,6 @@ from ai_skill_manager.service.sync import remove_orphans, run_sync
 from ai_skill_manager.functions.hash import compute_skill_hash
 from ai_skill_manager.functions.managed_state import tag_managed
 from ai_skill_manager.sync_exception import SyncFailedError
-from ai_skill_manager.validators import ValidationFailedError
 
 
 class TestRunSync(unittest.TestCase):
@@ -156,8 +155,11 @@ class TestRunSync(unittest.TestCase):
             "---\nname: skill\n---\n# Skill\n[bad](../nowhere.md)\n"
         )
 
-        with self.assertRaises(ValidationFailedError):
+        with self.assertRaises(SyncFailedError) as ctx:
             run_sync([LocalSource(scan_path=self.source_dir)], self.target_dir)
+
+        shutil.rmtree(ctx.exception.staging_dir, ignore_errors=True)
+        self.assertFalse(self.target_dir.exists())
 
     def test_handles_flat_skill(self):
         md = self.source_dir / "guide.skill.md"

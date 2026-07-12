@@ -1,6 +1,6 @@
 ---
 name: ai-skill-manager
-description: Use the ai-skill-manager CLI to sync and validate AI agent skills from local directories or GitHub repositories into a target skills folder.
+description: Use the ai-skill-manager CLI to sync AI agent skills from local directories or GitHub repositories into a target skills folder.
 whenToUse: >
   Apply this skill when you need to install, import, or invoke ai-skill-manager
   to sync AI skills into `.agents/skills/`, `.claude/skills/`, or another target
@@ -15,14 +15,14 @@ tags:
 ---
 
 # Goal
-- Give an AI agent exact commands to run `ai-skill-manager` for syncing and checking skills.
+- Give an AI agent exact commands to run `ai-skill-manager` for syncing skills.
 - Define the CLI entry points, required and optional arguments, config-file shape, and exit behavior.
 - Make it possible to use the tool without reading human-oriented documentation.
 
 # Core Principle
 - Prefer `ai-skills.yaml` as the source of truth; use CLI flags only to override config values or for one-off checks.
-- Always run `ai-skill-manager sync --dry-run` before writing changes when you are unsure what will be copied or deleted.
-- Treat exit code `0` as success and `1` as failure; inspect the printed validation report or logs on failure.
+- Always run `ai-skill-manager sync --dry-run` before writing changes when you are unsure what will be copied or deleted. `--dry-run` fully materializes every skill (including structural checks and link resolution) into a scratch directory and reports every problem it finds - it never touches the real target directory, but the check it performs is real, not a shortcut.
+- Treat exit code `0` as success and `1` as failure; on failure, inspect the printed error report (or logs with `--debug`). A failed sync never partially writes the target directory - it is left exactly as it was before the run.
 
 # Rule
 
@@ -37,11 +37,7 @@ tags:
   aism <command> [options]
   ```
 - Provide either a config file (`-c` or default `ai-skills.yaml`) **or** both `--type` and `--path` for source-less mode.
-- Validate skills before syncing when the source is new or changed:
-  ```bash
-  ai-skill-manager check
-  ```
-- Use `--dry-run` to preview changes before applying them:
+- Use `--dry-run` to preview and validate changes before applying them:
   ```bash
   ai-skill-manager sync --dry-run
   ```
@@ -54,7 +50,7 @@ tags:
 
 ## MAY
 - Use multi-target `settings.target` to write the same skills to both `.agents/skills` and `.claude/skills` with different adapters.
-- Use `--profile` and `--profile-output <file>` to diagnose slow sync/check operations.
+- Use `--profile` and `--profile-output <file>` to diagnose slow sync operations.
 
 ## SHOULD NOT
 - Use `--force` routinely; it skips hash and version checks and may cause unnecessary writes.
@@ -105,14 +101,14 @@ ai-skill-manager sync [-c CONFIG] [-t {auto,github}] [-p PATH] [--subpath SUBPAT
 
 **Output / return value**
 - Prints a table of discovered skills and a summary of copied/skipped/removed counts.
-- Returns exit code `0` on success, `1` on validation or runtime errors.
+- Returns exit code `0` on success, `1` if any skill failed a structural check (bad name, duplicate name) or failed to materialize (a link or an adapter). On failure the target directory is left completely untouched, and the staging directory used to build the sync is kept (not cleaned up) so its contents - including placeholder text left in place of any link that failed to convert - can be inspected; the printed error report names that path.
 
 **Examples**
 ```bash
 # Sync from default config
 ai-skill-manager sync
 
-# Preview changes
+# Preview changes (also validates - see Core Principle)
 ai-skill-manager sync --dry-run
 
 # Sync from a custom config
@@ -125,35 +121,6 @@ ai-skill-manager sync -t github \
 
 # Force full re-copy
 ai-skill-manager sync -f
-```
-
-### `check`
-Discovers and validates skills without copying anything.
-
-**Usage**
-```bash
-ai-skill-manager check [-c CONFIG] [-t {auto,github}] [-p PATH] [--subpath SUBPATH]
-```
-
-**Options**
-- Same source-related options as `sync` (`-c`, `-t`, `-p`, `--subpath`) plus `--debug`.
-
-**Output / return value**
-- Prints the discovered skills and `✅ Validation passed` if no errors.
-- Prints a validation report and returns `1` if validation fails.
-
-**Examples**
-```bash
-# Check default config
-ai-skill-manager check
-
-# Check a local source
-ai-skill-manager check -t auto -p ./my-skills
-
-# Check a GitHub repo subpath
-ai-skill-manager check -t github \
-  -p "https://github.com/InsonusK/ai-skills.git main" \
-  --subpath skills
 ```
 
 ### Global options
@@ -244,15 +211,15 @@ If none of these resolve, the command exits with code `1` and a `FileNotFoundErr
 ## Error handling / common failures
 - `FileNotFoundError`: config file or source path does not exist. Verify the path and current working directory.
 - `ValueError`: `--type` given without `--path`, unknown source type, or malformed `settings.target`. Provide both `--type` and `--path` or fix the config.
-- `ValidationFailedError`: discovered skills are invalid. Read the printed validation report, fix the skill files, and rerun `check`.
+- `SyncFailedError`: one or more skills failed a structural check (bad/duplicate name) or failed to materialize (a broken link, or an adapter error). Read the printed error report (grouped by skill), fix the skill files, and rerun. The target directory was not touched; the staging directory named in the report holds the partially-materialized output - including placeholder text in place of any link that failed to convert - for inspection, and is not cleaned up automatically after a failure.
 - `--remove-orphans` + `--keep-orphans`: the last flag wins; avoid combining them.
 - GitHub source fails to download: check the URL, branch name, and network access.
 
 ## Exit codes
 | Code | Meaning |
 |------|---------|
-| `0` | Success (sync completed or validation passed). |
-| `1` | Failure (file not found, validation error, unhandled exception). |
+| `0` | Success (sync completed, or `--dry-run` completed with no errors). |
+| `1` | Failure (file not found, bad arguments, structural/link/adapter error, unhandled exception). |
 
 # Anti-patterns
 - **Writing skills to the target directory by hand and then running `sync` with `remove_orphans: true`**
@@ -281,5 +248,5 @@ If none of these resolve, the command exits with code `1` and a `FileNotFoundErr
 - [ ] A config file or `--type` + `--path` is provided.
 - [ ] `--dry-run` is used first when the outcome is uncertain.
 - [ ] Mutually exclusive flags (`--remove-orphans` / `--keep-orphans`) are not combined.
-- [ ] Exit code `1` is treated as failure and the printed error/validation report is read.
+- [ ] Exit code `1` is treated as failure and the printed error report is read.
 - [ ] Examples use exact commands, not conceptual descriptions.

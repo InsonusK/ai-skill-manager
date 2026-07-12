@@ -15,14 +15,8 @@ from typing import Optional
 from ..command.sync import run_sync
 from ..progress import progress_context
 from ..sync_exception import SyncFailedError
-from ..validators import ValidationFailedError
 
-from .common.formatters import (
-    format_sync_result,
-    print_skills,
-    print_sync_errors,
-    print_validation_report,
-)
+from .common.formatters import format_sync_result, print_skills, print_sync_errors
 from .common.source_parser import add_source_arguments, build_sources_from_args
 
 # Module logger / Логгер модуля.
@@ -132,13 +126,6 @@ def run(args) -> int:
         return 1
     except ValueError as e:
         logger.error("%s", e)
-        return 1
-    except ValidationFailedError as e:
-        if e.skills:
-            print_skills(e.skills)
-            print()
-        print_validation_report(e.report)
-        logger.error("Validation errors: %s", e)
         return 1
     except SyncFailedError as e:
         print_sync_errors(e)

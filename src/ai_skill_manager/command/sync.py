@@ -21,7 +21,8 @@ from ..config import (
 from ..validation_settings import ValidationSettings
 from ..entities import Source
 from ..progress import ProgressCallback
-from ..service.sync import discover_and_validate, sync_to_target
+from ..service.discover import discover
+from ..service.sync import sync_to_target
 
 DEFAULT_TARGET = ".agents/skills"
 #: Default target directory. / Целевая директория по умолчанию.
@@ -94,6 +95,10 @@ def run_sync(
             or if ``settings.target`` is malformed.
             / Если не указан ни ``config_path``, ни ``sources``, либо
             ``settings.target`` некорректен.
+        SyncFailedError: If any skill failed a structural check or failed to
+            materialize into a target.
+            / Если какой-либо скилл не прошёл структурную проверку или не
+            материализовался в target.
 
     Example:
         >>> from pathlib import Path
@@ -151,9 +156,7 @@ def run_sync(
         resolved_targets.append((spec.name, path.resolve(), spec.adapters))
 
     try:
-        skills = discover_and_validate(
-            resolved_sources, settings=validation_settings, progress=progress
-        )
+        skills = discover(resolved_sources, progress=progress)
         per_target: Dict[str, dict] = {}
         for name, path, adapter_classes in resolved_targets:
             per_target[name] = sync_to_target(

@@ -1,11 +1,11 @@
 """CLI output formatters.
 
-Converts command results and validation reports into human-readable terminal
-output. Rich console rendering stays in the CLI layer.
+Converts command results into human-readable terminal output. Rich console
+rendering stays in the CLI layer.
 
 Форматёры вывода CLI.
-Преобразуют результаты команд и отчёты валидации в читаемый терминальный
-вывод. Рендеринг через Rich остаётся в слое CLI.
+Преобразуют результаты команд в читаемый терминальный вывод. Рендеринг
+через Rich остаётся в слое CLI.
 """
 
 from typing import Any, Dict, List
@@ -18,8 +18,6 @@ from ...adapters.models.sync_error import SyncError
 from ...entities.skill import Skill
 from ...entities.source import Source
 from ...sync_exception import SyncFailedError
-from ...validators.models import ValidationReport
-from ...validators.rules import absValidationRule
 
 
 def format_sync_result(result: Dict[str, Any]) -> str:
@@ -140,69 +138,6 @@ def print_skills(skills: List[Skill]) -> None:
 
     console.print(tree)
     console.print(f"\nTotal: {len(skills)} skill(s)")
-
-
-def format_validation_report(report: ValidationReport) -> str:
-    """Format a validation report as a plain string.
-
-    Args:
-        report: Validation report. / Отчёт о валидации.
-
-    Returns:
-        Formatted report string. / Отформатированный отчёт.
-    """
-    lines = ["Validation Failed"]
-    for skill, rule_errors in report.result.items():
-        lines.append(f"  {skill.source}")
-        lines.append(f"    {skill.name}")
-        lines.append(f"    {skill.file_path}")
-        for rule, result in rule_errors.items():
-            lines.append(
-                f"      {rule.name} {rule.version}: {len(result.errors)} error(s)"
-            )
-            for error in result.errors:
-                lines.append(f"        {error}")
-
-    total = sum(
-        len(r.errors) for s in report.result.values() for r in s.values()
-    )
-    lines.append(f"\nTotal: {total} error(s)")
-    return "\n".join(lines)
-
-
-def print_validation_report(report: ValidationReport) -> None:
-    """Print a validation report as a rich tree.
-
-    Args:
-        report: Validation report. / Отчёт о валидации.
-    """
-    console = Console()
-    tree = Tree("[bold red]Validation Failed[/bold red]")
-    source_reports: Dict[Source, Dict[Skill, Dict[absValidationRule, Any]]] = {}
-    for skill, rule_errors in report.result.items():
-        source_report: Dict[Skill, Dict[absValidationRule, Any]] = source_reports.get(
-            skill.source, {}
-        )
-        source_report[skill] = rule_errors
-        source_reports[skill.source] = source_report
-
-    for source, source_report in source_reports.items():
-        source_branch = tree.add(f"[cyan]{source}")
-        for skill, rule_errors in source_report.items():
-            skill_branch = source_branch.add(f"{skill.name}\n{skill.file_path}")
-            for rule, result in rule_errors.items():
-                rule_branch = skill_branch.add(
-                    f"[green]{rule.name} {rule.version}[/green]: "
-                    f"{len(result.errors)} error(s)"
-                )
-                for error in result.errors:
-                    text = Text(str(error), style="red")
-                    rule_branch.add(text)
-    console.print(tree)
-    total = sum(
-        len(r.errors) for s in report.result.values() for r in s.values()
-    )
-    console.print(f"\nTotal: {total} error(s)")
 
 
 def print_sync_errors(error: SyncFailedError) -> None:

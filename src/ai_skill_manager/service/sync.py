@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
+from ..adapters.models.sync_error import SyncError
 from ..entities.link.path_utils import same_path
 from ..functions.hash import compute_hash, compute_skill_hash
 from ..functions.managed_state import is_managed, read_managed_state, write_managed_state
@@ -19,56 +20,40 @@ from ..validation_settings import ValidationSettings
 from ..entities import LocalSource, Skill, Source
 from ..entities.skill_format import SkillFormat
 from ..progress import ProgressCallback
-from ..validators import ValidationFailedError, Validator
-from ..validators.rules import build_default_rules
+from ..validators import Validator
+from ..validators.rules import DEFAULT_RULES as _PRECHECK_RULES
 from .discover import discover
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
 
 
-def discover_and_validate(
-    sources: Sequence[Source],
-    settings: Optional[ValidationSettings] = None,
+def _precheck_skills(
+    skills: Sequence[Skill],
     progress: Optional[ProgressCallback] = None,
-) -> List[Skill]:
-    """Discover skills from ``sources`` and validate them.
+) -> Tuple[List[SyncError], set]:
+    """Run cheap structural checks and return failures plus the invalid skills.
 
-    Обнаруживает скиллы из ``sources`` и валидирует их.
+    Skills that fail here are excluded from materialization entirely (there
+    is no valid target directory to write them into), but this does not
+    short-circuit the run: every skill is still checked, and every failure
+    is collected - see :class:`SyncError`.
 
-    This is the target-independent half of a sync run: it does not touch
-    any target directory, so it can be run once and its result reused for
-    multiple targets.
-
-    Это часть синхронизации, не зависящая от target'а: она не затрагивает
-    целевую директорию, поэтому может быть выполнена один раз и переиспользована
-    для нескольких target'ов.
-
-    Args:
-        sources: Sources to discover skills from.
-            Источники для обнаружения скиллов.
-        progress: Optional ``(stage, current, total)`` callback for progress
-            reporting. / Опциональный callback для отчёта о прогрессе.
-
-    Returns:
-        The discovered, validated skills. / Обнаруженные, валидированные скиллы.
-
-    Raises:
-        ValidationFailedError: If validation reports any errors.
-            / Если валидация обнаружила ошибки.
+    Запускает дешёвые структурные проверки и возвращает ошибки вместе с
+    набором невалидных скиллов. Скиллы, не прошедшие эту проверку, полностью
+    исключаются из материализации (для них нет корректной целевой
+    директории), но это не прерывает выполнение раньше времени: каждый
+    скилл всё равно проверяется, и каждая ошибка собирается - см.
+    :class:`SyncError`.
     """
-    logger.debug("Starting discovery: sources=%d", len(sources))
-    skills: List[Skill] = discover(sources, progress=progress)
-    logger.debug("Discovered %d skill(s)", len(skills))
-
-    validator = Validator(build_default_rules(settings))
-    validation_report = validator.validate(skills, progress=progress)
-    if validation_report.has_errors:
-        logger.debug("Validation failed with errors")
-        raise ValidationFailedError(validation_report, skills=skills)
-    logger.debug("Validation passed")
-
-    return skills
+    report = Validator(_PRECHECK_RULES).validate(list(skills), progress=progress)
+    errors: List[SyncError] = []
+    for skill, rule_results in report.errors.items():
+        skill_label = skill.properties.name or skill.file_path.name
+        for result in rule_results.values():
+            for validation_error in result.errors:
+                errors.append(SyncError(skill_name=skill_label, message=str(validation_error)))
+    return errors, set(report.errors.keys())
 
 
 def _staging_dir_for(target_dir: Path) -> Path:
@@ -116,8 +101,12 @@ def sync_to_target(
     никогда не оставляют ``target_dir`` частично записанным.
 
     Args:
-        skills: Skills discovered and validated via :func:`discover_and_validate`.
-            Скиллы, обнаруженные и валидированные через :func:`discover_and_validate`.
+        skills: Skills discovered via :func:`~.discover.discover`. Structural
+            validity (name, conflicts) and link resolution are both checked
+            as part of this call, not beforehand.
+            / Скиллы, обнаруженные через :func:`~.discover.discover`.
+            Структурная валидность (имя, конфликты) и разрешение ссылок
+            проверяются в рамках этого вызова, а не заранее.
         target_dir: Directory to copy the skills into.
             Директория, в которую копируются скиллы.
         adapters: Adapter classes to apply after copying.
@@ -140,10 +129,12 @@ def sync_to_target(
         Сводный словарь с количеством и целевой директорией.
 
     Raises:
-        SyncFailedError: If materializing any skill or link failed.
+        SyncFailedError: If any skill failed a structural check (name,
+            conflicts) or failed to materialize (a link or an adapter).
             ``target_dir`` is left untouched and the staging directory is
             kept for inspection.
-            / Если материализация какого-либо скилла или ссылки не удалась.
+            / Если какой-либо скилл не прошёл структурную проверку (имя,
+            конфликты) или не материализовался (ссылка или адаптер).
             ``target_dir`` остаётся нетронутым, а директория staging
             сохраняется для изучения.
     """
@@ -161,21 +152,34 @@ def sync_to_target(
         # RU: Никогда не доверяем остаткам предыдущего, возможно неудачного
         # запуска как кэшу - всегда начинаем staging-область этого запуска с чистого листа.
         shutil.rmtree(staging_dir)
+    # EN: Create it unconditionally, even if every skill ends up failing the
+    # precheck below and nothing is ever staged into it - a SyncFailedError
+    # always names this path as "inspect the staged output here", and that
+    # claim must hold even when there is nothing to materialize.
+    # RU: Создаём безусловно, даже если все скиллы ниже провалят precheck и
+    # в неё ничего так и не попадёт - SyncFailedError всегда указывает этот
+    # путь как "изучите staged-вывод здесь", и это утверждение должно быть
+    # верным, даже если материализовывать нечего.
+    staging_dir.mkdir(parents=True)
+
+    # Cheap structural checks (name validity, kebab-case, duplicate names)
+    # run first: a skill that fails here has no valid target directory to
+    # write into, so it is excluded from materialization below. This does
+    # not stop the run - failures are collected into the same error pool
+    # the adapters feed into further down.
+    # Дешёвые структурные проверки (валидность имени, kebab-case, дубликаты
+    # имён) выполняются первыми: скилл, не прошедший их, не имеет
+    # корректной целевой директории для записи, поэтому исключается из
+    # материализации ниже. Это не останавливает запуск - ошибки собираются
+    # в тот же пул ошибок, в который дальше пишут адаптеры.
+    errors, invalid_skills = _precheck_skills(skills, progress=progress)
+    valid_skills = [s for s in skills if s not in invalid_skills]
 
     copied_skills: List[Skill] = []
     skills_to_adapt: List[Tuple[Skill, Skill]] = []
     source_hashes: Dict[Skill, str] = {}
+    skill_mapping: Dict[Skill, Skill] = {}
     links_replaced = 0
-    # Capture validator versions for the managed state file.
-    # Сохраняем версии валидаторов для файла управляемого состояния.
-    validator = Validator(build_default_rules(settings))
-    validator_versions = [
-        {
-            "name": registered_rule[0],
-            "version": registered_rule[1]() if callable(registered_rule[1]) else registered_rule[1],
-        }
-        for registered_rule in validator.registered_rules_name_version
-    ]
 
     adapter_list = list(adapters) if adapters is not None else DEFAULT_RULES
     logger.debug("Adapters: %s", [a.__name__ for a in adapter_list])
@@ -198,13 +202,10 @@ def sync_to_target(
     # берутся оттуда, поэтому не связанные с изменениями скиллы этим запуском
     # не затрагиваются.
     if progress is not None:
-        progress("copy", 0, len(skills))
-    for index, skill in enumerate(skills, start=1):
+        progress("copy", 0, len(valid_skills))
+    for index, skill in enumerate(valid_skills, start=1):
         name = skill.properties.name
-        logger.debug("Processing skill %d/%d: name=%s file=%s format=%s", index, len(skills), name, skill.file_path, skill.format.value)
-        if name is None:
-            raise ValueError(
-                f"Skill {skill.file_path} has no 'name' in frontmatter")
+        logger.debug("Processing skill %d/%d: name=%s file=%s format=%s", index, len(valid_skills), name, skill.file_path, skill.format.value)
 
         real_skill_dir = target_dir / name
         source_hash = compute_skill_hash(skill)
@@ -227,20 +228,25 @@ def sync_to_target(
             skills_to_adapt.append((skill, new_skill))
 
         copied_skills.append(new_skill)
+        skill_mapping[skill] = new_skill
         source_hashes[new_skill] = source_hash
         if progress is not None:
-            progress("copy", index, len(skills))
+            progress("copy", index, len(valid_skills))
 
     # Run adapters only on skills that were actually (re)materialized. The
     # adapter resolves links against the original *source* skills (not the
     # copies), then uses skill_mapping to translate a resolved identity into
-    # its current-run location - see Adapter's docstring for why.
+    # its current-run location - see Adapter's docstring for why. The full
+    # (not just valid_skills) list is passed so links to an invalid skill
+    # still resolve to *something* identifiable while the run is failing
+    # anyway.
     # Запускаем адаптеры только на тех скиллах, которые реально были
     # (пере)материализованы. Адаптер разрешает ссылки относительно исходных
     # *source*-скиллов (а не копий), а затем переводит разрешённую
     # идентичность в текущее расположение через skill_mapping - см. docstring
-    # Adapter.
-    skill_mapping = dict(zip(skills, copied_skills))
+    # Adapter. Передаётся полный список (а не только valid_skills), чтобы
+    # ссылки на невалидный скилл всё равно резолвились хоть во что-то
+    # опознаваемое, пока запуск и так завершается неудачей.
     copied_files: Dict[Path, Path] = {}
     adapter = Adapter(
         skills,
@@ -269,9 +275,10 @@ def sync_to_target(
     # Непустой пул ошибок приводит к неудаче всей синхронизации: target_dir
     # никогда не трогается, а директория staging сохраняется, чтобы можно
     # было изучить ошибки и оставленные в её файлах заглушки битых ссылок.
-    if adapter.errors:
-        logger.debug("Sync failed with %d error(s); keeping %s for inspection", len(adapter.errors), staging_dir)
-        raise SyncFailedError(list(adapter.errors), staging_dir=staging_dir, target_dir=target_dir)
+    errors.extend(adapter.errors)
+    if errors:
+        logger.debug("Sync failed with %d error(s); keeping %s for inspection", len(errors), staging_dir)
+        raise SyncFailedError(errors, staging_dir=staging_dir, target_dir=target_dir)
 
     # Persist managed state for each freshly materialized skill as part of
     # its staged directory, so it moves into target_dir as a single unit.
@@ -287,7 +294,6 @@ def sync_to_target(
     for index, (old_skill, new_skill) in enumerate(skills_to_adapt, start=1):
         state = {
             "hash": source_hashes[new_skill],
-            "validators": validator_versions,
             "adapters": adapters_version,
         }
         logger.debug("Managed state for %s: %s", new_skill.folder_path, state)
@@ -368,12 +374,12 @@ def run_sync(
     repo_path: Optional[Path] = None,
     settings: Optional[ValidationSettings] = None,
 ) -> dict:
-    """Discover, validate, copy and adapt all skills into a single target.
+    """Discover skills, then materialize and adapt them into a single target.
 
-    Discover, validate, copy and adapt all skills into a single target.
+    Discover skills, then materialize and adapt them into a single target.
 
-    Обнаруживает, валидирует, копирует и адаптирует все скиллы в одну
-    целевую директорию.
+    Обнаруживает скиллы, затем материализует и адаптирует их в одну целевую
+    директорию.
 
     Args:
         sources: Sources to discover skills from.
@@ -399,9 +405,7 @@ def run_sync(
     """
     logger.debug("Starting sync: sources=%d target_dir=%s dry_run=%s force=%s", len(sources), target_dir, dry_run, force)
     try:
-        skills = discover_and_validate(
-            sources, settings=settings, progress=progress
-        )
+        skills = discover(sources, progress=progress)
         return sync_to_target(
             skills,
             target_dir,
