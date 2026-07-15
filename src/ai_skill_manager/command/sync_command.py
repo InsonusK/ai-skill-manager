@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
+from typing import Callable, List, Optional, Sequence, TYPE_CHECKING
 
 from ..entities.skill_file_v2 import MarkdownSkillFile
-from ..functions.file_discovery import FileDiscovery
+from ..functions.file_discovery import discover as discover_skill_files
 from ..functions.link_discovery import LinkDiscovery
 from ..functions.skill_dict_builder import SkillDictBuilder
 from ..functions.skill_discovery import SkillDiscovery
@@ -19,6 +19,7 @@ from ..functions.skill_discovery import SkillDiscovery
 if TYPE_CHECKING:
     from ..entities import Source
     from ..entities.skill_v2 import Skill
+    from ..entities.skill_file_v2 import SkillFile
     from ..functions.copy_skills.abs_copy_skills import CopySkills
 
 
@@ -58,25 +59,27 @@ class SyncCommand:
 
     Contains no business rules of its own beyond sequencing: each step's
     logic lives in its own unit (``SkillDiscovery``, ``SkillDictBuilder``,
-    ``FileDiscovery``, ``LinkDiscovery``, the configured ``CopySkills`` per
-    target). In particular, this is the seam between file discovery and link
-    discovery: ``FileDiscovery`` only finds and classifies a skill's files,
-    ``LinkDiscovery`` only resolves the links of one already-known markdown
-    file - walking a skill's freshly-discovered files and calling
-    ``LinkDiscovery`` for each markdown one is this orchestrator's job, kept
-    here instead of nested inside ``FileDiscovery`` so neither unit depends
-    on the other.
+    ``file_discovery.discover``, ``LinkDiscovery``, the configured
+    ``CopySkills`` per target). In particular, this is the seam between file
+    discovery and link discovery: ``file_discovery.discover`` only finds and
+    classifies a skill's files (a plain function - it holds no state and
+    needs no collaborator), ``LinkDiscovery`` only resolves the links of one
+    already-known markdown file - walking a skill's freshly-discovered files
+    and calling ``LinkDiscovery`` for each markdown one is this
+    orchestrator's job, kept here instead of nested inside file discovery so
+    neither unit depends on the other.
 
     Не содержит собственных бизнес-правил, кроме последовательности: логика
     каждого шага живёт в своём юните (``SkillDiscovery``,
-    ``SkillDictBuilder``, ``FileDiscovery``, ``LinkDiscovery``, настроенный
-    ``CopySkills`` на каждый target). В частности, это стык между
-    обнаружением файлов и обнаружением ссылок: ``FileDiscovery`` только
-    находит и классифицирует файлы скилла, ``LinkDiscovery`` только
+    ``SkillDictBuilder``, ``file_discovery.discover``, ``LinkDiscovery``,
+    настроенный ``CopySkills`` на каждый target). В частности, это стык между
+    обнаружением файлов и обнаружением ссылок: ``file_discovery.discover``
+    только находит и классифицирует файлы скилла (простая функция - у неё
+    нет состояния и не нужен коллаборатор), ``LinkDiscovery`` только
     разрешает ссылки одного уже известного markdown-файла - обход
     только что обнаруженных файлов скилла и вызов ``LinkDiscovery`` для
     каждого markdown-файла - задача этого оркестратора, оставленная здесь,
-    а не вложенная внутрь ``FileDiscovery``, чтобы ни один из юнитов не
+    а не вложенная внутрь обнаружения файлов, чтобы ни один из юнитов не
     зависел от другого.
     """
 
@@ -84,13 +87,13 @@ class SyncCommand:
         self,
         skill_discovery: SkillDiscovery = None,
         skill_dict_builder: SkillDictBuilder = None,
-        file_discovery: FileDiscovery = None,
+        file_discovery: Callable[["Skill"], List["SkillFile"]] = None,
         link_discovery: LinkDiscovery = None,
     ) -> None:
         """Initialize with the discovery/enrichment collaborators."""
         self._skill_discovery = skill_discovery or SkillDiscovery()
         self._skill_dict_builder = skill_dict_builder or SkillDictBuilder()
-        self._file_discovery = file_discovery or FileDiscovery()
+        self._file_discovery = file_discovery or discover_skill_files
         self._link_discovery = link_discovery or LinkDiscovery()
 
     def run(
@@ -141,7 +144,7 @@ class SyncCommand:
                 errors.extend(merge_errors)
                 merged_count = len(queue)
 
-            self._file_discovery.discover(skill)
+            skill.files.extend(self._file_discovery(skill))
 
             for skill_file in skill.files:
                 if not isinstance(skill_file, MarkdownSkillFile):

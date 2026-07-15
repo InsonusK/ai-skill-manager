@@ -77,12 +77,12 @@ class TestSyncCommand(unittest.TestCase):
 
     def test_collects_link_errors_from_multiple_files_without_stopping(self):
         # EN: A broken link in one file must not stop link discovery for the
-        # skill's other files - this is SyncCommand's job now that
-        # FileDiscovery only finds files and LinkDiscovery only resolves one
+        # skill's other files - this is SyncCommand's job now that file
+        # discovery only finds files and LinkDiscovery only resolves one
         # file's links.
         # RU: Битая ссылка в одном файле не должна останавливать обнаружение
         # ссылок для остальных файлов скилла - это задача SyncCommand,
-        # раз FileDiscovery теперь только находит файлы, а LinkDiscovery
+        # раз обнаружение файлов теперь только находит файлы, а LinkDiscovery
         # только разрешает ссылки одного файла.
         folder = self._dir_skill("skill-a", "---\nname: skill-a\n---\n[bad](../nowhere.md)\n")
         (folder / "notes.md").write_text("# Notes\n[also-bad](../also-nowhere.md)\n")

@@ -53,7 +53,7 @@ replays the already-resolved target, it never re-resolves.
 | Build config-driven inputs and decorator chain for a sync run | run_sync | Command |
 | Discover skills from configured sources | SkillDiscovery | Function |
 | Merge discovered skills into the working dict, rejecting duplicate names | SkillDictBuilder | Function |
-| Populate a skill's own file list, recursing into directory skills | FileDiscovery | Function |
+| Populate a skill's own file list, recursing into directory skills | file_discovery.discover | Function |
 | Find and resolve every link in a markdown file | LinkDiscovery | Function |
 | Decide whether an unknown skill gets queued or reported as an error | SkillRelationQueuer | Function |
 | Resolve a link's raw path to a `SkillLinkTarget`/`ExternalLinkTarget` | LinkTargetResolver | Function |
@@ -72,7 +72,7 @@ replays the already-resolved target, it never re-resolves.
 
 ## Units
 
-- **SyncCommand** (Command) — orchestrate discover → enrich (queue-driven, error-collecting) → copy for one sync run, with no business rules of its own beyond sequencing. This is also the seam between `FileDiscovery` and `LinkDiscovery`: it walks each skill's freshly-discovered files and calls `LinkDiscovery` on the markdown ones, so neither of those two units depends on the other.
+- **SyncCommand** (Command) — orchestrate discover → enrich (queue-driven, error-collecting) → copy for one sync run, with no business rules of its own beyond sequencing. This is also the seam between `file_discovery.discover` and `LinkDiscovery`: it walks each skill's freshly-discovered files and calls `LinkDiscovery` on the markdown ones, so neither of those two units depends on the other.
   - depends on: skill discovery, skill dict building, file discovery, link discovery, a `CopySkills` per target
   - usage scenario: called once per sync invocation by `run_sync` with the resolved sources/targets; returns a `SyncResult` that either lists collected errors (nothing copied) or the synced skills.
   - test cases: [tests/command/test_sync_command.py](../../tests/command/test_sync_command.py), [tests/test_sync_command.py](../../tests/test_sync_command.py)
@@ -92,14 +92,14 @@ replays the already-resolved target, it never re-resolves.
   - usage scenario: called with the initial discovery batch, then again with each newly-queued batch as `add_relations` grows the queue.
   - test cases: [tests/functions/test_skill_dict_builder.py](../../tests/functions/test_skill_dict_builder.py)
 
-- **FileDiscovery** (Function) — populate one skill's `files` list: its own file, and every file under a directory skill. Only finds and classifies files - it does not know `LinkDiscovery` exists.
+- **file_discovery.discover** (Function) — return one skill's own files: its own file, and every file under a directory skill. A plain, stateless function (no collaborators, nothing to inject) - it does not know `LinkDiscovery` exists.
   - depends on: nothing beyond the `Skill` passed in
-  - usage scenario: called once per skill in `SyncCommand`'s queue loop; mutates `skill.files` in place.
+  - usage scenario: called once per skill in `SyncCommand`'s queue loop; returns the file list, which `SyncCommand` appends to `skill.files` itself - the function has no side effect on its input.
   - test cases: [tests/functions/test_file_discovery.py](../../tests/functions/test_file_discovery.py)
 
-- **LinkDiscovery** (Function) — find every link in one markdown file's content, drop excluded links (inline code, web links, skip-folders), and resolve each remaining link's target via `FileLinkFactory`. Only resolves links for a file it's handed - it does not know `FileDiscovery` exists.
+- **LinkDiscovery** (Function) — find every link in one markdown file's content, drop excluded links (inline code, web links, skip-folders), and resolve each remaining link's target via `FileLinkFactory`. Only resolves links for a file it's handed - it does not know `file_discovery.discover` exists.
   - depends on: `discovery.link.search_links_in_content` (regex-based markdown/wiki parser, content-only), link exclude rules, `FileLinkFactory`
-  - usage scenario: called once per markdown file by `SyncCommand`, after `FileDiscovery` has populated `skill.files`; returns the resolved `FileLink` list plus errors for links that could not be resolved.
+  - usage scenario: called once per markdown file by `SyncCommand`, after `file_discovery.discover` has populated `skill.files`; returns the resolved `FileLink` list plus errors for links that could not be resolved.
   - test cases: [tests/functions/test_link_discovery.py](../../tests/functions/test_link_discovery.py)
 
 - **SkillRelationQueuer** (Function) — decide whether a skill found at an unknown path gets appended to the discovery queue (`add_relations=True`) or reported as an "unknown file" error (`add_relations=False`), rejecting a name already queued.
@@ -159,12 +159,12 @@ replays the already-resolved target, it never re-resolves.
 
 - **Skill** (Class) — identity and structure of one discovered skill: name (validated kebab-case), path, kind, main file, and enriched file list. Also resolves one of its own files' repo-absolute path (`file_absolute_path`), used by `SyncCommand` to hand `LinkDiscovery` the right file.
   - depends on: `is_kebab_case`
-  - usage scenario: built directly by the `AutoDiscovery` pattern templates (reading the name from frontmatter) at discovery time, then mutated in place by `FileDiscovery` (files) and `LinkDiscovery` (links), both called from `SyncCommand`.
+  - usage scenario: built directly by the `AutoDiscovery` pattern templates (reading the name from frontmatter) at discovery time, then mutated in place by `SyncCommand` as it appends `file_discovery.discover`'s result to `skill.files` and attaches `LinkDiscovery`'s resolved links.
   - test cases: [tests/entities/test_skill_v2.py](../../tests/entities/test_skill_v2.py), [tests/entities/test_kebab_case_name.py](../../tests/entities/test_kebab_case_name.py), [tests/service/discovery/skill/test_auto.py](../../tests/service/discovery/skill/test_auto.py)
 
 - **SkillFile / MarkdownSkillFile** (Class) — one file owned by a skill; the markdown subclass adds the file's resolved `links`.
   - depends on: nothing
-  - usage scenario: constructed by `FileDiscovery` for every file under a skill, markdown files get the `MarkdownSkillFile` subclass so `LinkDiscovery` has somewhere to attach `FileLink`s.
+  - usage scenario: constructed by `file_discovery.discover` for every file under a skill, markdown files get the `MarkdownSkillFile` subclass so `LinkDiscovery` has somewhere to attach `FileLink`s.
   - test cases: [tests/entities/test_skill_file_v2.py](../../tests/entities/test_skill_file_v2.py)
 
 - **SkillAtPathFinder** (Function) — find a skill (already loaded or freshly discoverable) that owns a given filesystem path.

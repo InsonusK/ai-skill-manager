@@ -10,7 +10,7 @@ from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.copy_skills.default_copy_skills import DefaultCopySkills
 from ai_skill_manager.functions.copy_skills.orphan_removing_copy_skills import OrphanRemovingCopySkills
-from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.file_discovery import discover as discover_files
 from ai_skill_manager.functions.link_discovery import LinkDiscovery
 from ai_skill_manager.functions.managed_state import tag_managed
 
@@ -29,7 +29,7 @@ class TestOrphanRemovingCopySkills(unittest.TestCase):
         folder.mkdir(exist_ok=True)
         (folder / "SKILL.md").write_text(content)
         skill = Skill(name=name, path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(skill)
+        skill.files.extend(discover_files(skill))
         link_discovery = LinkDiscovery()
         for skill_file in skill.files:
             if not isinstance(skill_file, MarkdownSkillFile):

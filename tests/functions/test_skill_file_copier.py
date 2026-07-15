@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.file_discovery import discover as discover_files
 from ai_skill_manager.functions.skill_file_copier import SkillFileCopier
 
 
@@ -24,7 +24,7 @@ class TestSkillFileCopier(unittest.TestCase):
         md = self.tmp / "guide.skill.md"
         md.write_text("---\nname: guide\n---\n# Guide\n")
         skill = Skill(name="guide", path=md, kind=SkillKind.flat)
-        FileDiscovery().discover(skill)
+        skill.files.extend(discover_files(skill))
 
         skill_target_dir = self.copier.copy(skill, self.target_dir)
 
@@ -39,7 +39,7 @@ class TestSkillFileCopier(unittest.TestCase):
         (folder / "docs").mkdir()
         (folder / "docs" / "extra.md").write_text("# Extra\n")
         skill = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(skill)
+        skill.files.extend(discover_files(skill))
 
         skill_target_dir = self.copier.copy(skill, self.target_dir)
 

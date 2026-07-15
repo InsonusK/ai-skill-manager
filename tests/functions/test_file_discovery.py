@@ -1,4 +1,4 @@
-"""Tests for FileDiscovery."""
+"""Tests for file_discovery.discover."""
 
 import shutil
 import tempfile
@@ -8,13 +8,12 @@ from pathlib import Path
 from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile, SkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.file_discovery import discover
 
 
 class TestFileDiscovery(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.discovery = FileDiscovery()
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -24,12 +23,13 @@ class TestFileDiscovery(unittest.TestCase):
         md.write_text("---\nname: guide\n---\n# Guide\n")
         skill = Skill(name="guide", path=md, kind=SkillKind.flat)
 
-        self.discovery.discover(skill)
+        files = discover(skill)
 
-        self.assertEqual(len(skill.files), 1)
-        self.assertIsInstance(skill.files[0], MarkdownSkillFile)
-        self.assertEqual(skill.files[0].links, [])
-        self.assertTrue(skill.is_main_file(skill.files[0].path))
+        self.assertEqual(skill.files, [])
+        self.assertEqual(len(files), 1)
+        self.assertIsInstance(files[0], MarkdownSkillFile)
+        self.assertEqual(files[0].links, [])
+        self.assertTrue(skill.is_main_file(files[0].path))
 
     def test_dir_skill_gets_all_nested_files(self):
         folder = self.tmp / "web"
@@ -40,11 +40,11 @@ class TestFileDiscovery(unittest.TestCase):
         (folder / "docs" / "extra.md").write_text("# Extra\n")
         skill = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
 
-        self.discovery.discover(skill)
+        files = discover(skill)
 
-        names = {f.name for f in skill.files}
+        names = {f.name for f in files}
         self.assertEqual(names, {"SKILL.md", "data.json", "extra.md"})
-        by_name = {f.name: f for f in skill.files}
+        by_name = {f.name: f for f in files}
         self.assertIsInstance(by_name["SKILL.md"], MarkdownSkillFile)
         self.assertIsInstance(by_name["extra.md"], MarkdownSkillFile)
         self.assertNotIsInstance(by_name["data.json"], MarkdownSkillFile)

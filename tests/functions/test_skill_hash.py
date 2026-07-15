@@ -7,14 +7,13 @@ from pathlib import Path
 
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.file_discovery import discover as discover_files
 from ai_skill_manager.functions.skill_hash import compute_skill_hash
 
 
 class TestComputeSkillHash(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.discovery = FileDiscovery()
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -23,7 +22,7 @@ class TestComputeSkillHash(unittest.TestCase):
         md = self.tmp / filename
         md.write_text(content)
         skill = Skill(name="guide", path=md, kind=SkillKind.flat)
-        self.discovery.discover(skill)
+        skill.files.extend(discover_files(skill))
         return skill
 
     def test_same_content_same_hash(self):
@@ -42,12 +41,12 @@ class TestComputeSkillHash(unittest.TestCase):
         (folder / "SKILL.md").write_text("---\nname: web\n---\n")
         (folder / "data.json").write_text("{}")
         skill = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        self.discovery.discover(skill)
+        skill.files.extend(discover_files(skill))
         before = compute_skill_hash(skill)
 
         (folder / "data.json").write_text('{"changed": true}')
         skill2 = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        self.discovery.discover(skill2)
+        skill2.files.extend(discover_files(skill2))
         after = compute_skill_hash(skill2)
 
         self.assertNotEqual(before, after)

@@ -20,12 +20,13 @@ def compute_skill_hash(skill: "Skill") -> str:
 
     Вычисляет хеш содержимого собственных файлов ``skill``.
 
-    Requires ``skill.files`` to already be populated (via ``FileDiscovery``).
-    Includes each file's relative path so renaming a file changes the hash.
+    Requires ``skill.files`` to already be populated (via
+    ``file_discovery.discover``). Includes each file's relative path so
+    renaming a file changes the hash.
 
-    Требует, чтобы ``skill.files`` уже был заполнен (через ``FileDiscovery``).
-    Включает относительный путь каждого файла, чтобы переименование файла
-    меняло хеш.
+    Требует, чтобы ``skill.files`` уже был заполнен (через
+    ``file_discovery.discover``). Включает относительный путь каждого файла,
+    чтобы переименование файла меняло хеш.
     """
     if skill.kind is SkillKind.flat:
         return compute_hash(skill.path)
