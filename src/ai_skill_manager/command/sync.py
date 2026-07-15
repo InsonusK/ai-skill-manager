@@ -8,20 +8,22 @@ No console output is produced here.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
-from ..adapters.rules import resolve_adapters
+from .sync_command import SyncCommand, SyncTarget
 from ..config import (
     TargetSpec,
     build_sources_from_config,
     load_config,
     parse_target_settings,
-    parse_validation_settings,
 )
-from ..validation_settings import ValidationSettings
 from ..entities import Source
-from ..progress import ProgressCallback
-from ..service.sync import discover_and_validate, sync_to_target
+from ..functions.copy_skills import (
+    IncrementalCopySkills,
+    OrphanRemovingCopySkills,
+    resolve_copy_skills,
+)
+from ..sync_exception import SyncFailedError
 
 DEFAULT_TARGET = ".agents/skills"
 #: Default target directory. / Целевая директория по умолчанию.
@@ -37,7 +39,7 @@ def _single_target(target_dir: Optional[Path]) -> List[TargetSpec]:
         TargetSpec(
             name="default",
             path=target_dir if target_dir is not None else Path(DEFAULT_TARGET),
-            adapters=resolve_adapters(["link-adapter"]),
+            copy_skills=resolve_copy_skills(["link-adapter"]),
         )
     ]
 
@@ -49,7 +51,8 @@ def run_sync(
     remove_orphans: Optional[bool] = None,
     dry_run: bool = False,
     force: bool = False,
-    progress: Optional[ProgressCallback] = None,
+    add_relations: Optional[bool] = None,
+    progress=None,
 ) -> dict:
     """Run synchronization and return the result dictionary.
 
@@ -76,16 +79,23 @@ def run_sync(
             Удалять ли осиротевшие навыки. По умолчанию ``True``.
         dry_run: If ``True``, do not write any changes. /
             Если ``True``, не записывать изменения.
-        force: If ``True``, skip hash and version checks. /
-            Если ``True``, пропустить проверку хеша и версии.
-        progress: Optional ``(stage, current, total)`` callback for progress
-            reporting. / Опциональный callback для отчёта о прогрессе.
+        force: If ``True``, ignore the incremental hash-skip and re-copy
+            every skill. / Если ``True``, игнорировать инкрементальный
+            hash-skip и копировать каждый скилл заново.
+        add_relations: Whether a link to a skill outside the configured
+            sources auto-queues that skill for discovery. Defaults to the
+            config's ``settings.add_relations`` (``False`` if unset).
+            / Приводит ли ссылка на скилл вне настроенных источников к
+            автоматической постановке этого скилла в очередь на
+            обнаружение. По умолчанию берётся из
+            ``settings.add_relations`` конфигурации (``False``, если не
+            задано).
+        progress: Unused; kept for CLI call-site compatibility.
+            / Не используется; сохранён для совместимости вызова из CLI.
 
     Returns:
-        Result dictionary aggregated across all configured targets, plus a
-        ``targets`` key with each target's individual result keyed by name.
-        / Словарь результата, агрегированный по всем настроенным target'ам,
-        плюс ключ ``targets`` с результатом каждого target'а по имени.
+        Result dictionary with the discovered/synced skills.
+            / Словарь результата с обнаруженными/синхронизированными скиллами.
 
     Raises:
         FileNotFoundError: If the configuration file does not exist.
@@ -94,11 +104,15 @@ def run_sync(
             or if ``settings.target`` is malformed.
             / Если не указан ни ``config_path``, ни ``sources``, либо
             ``settings.target`` некорректен.
+        SyncFailedError: If any skill failed a structural check or failed to
+            resolve a link. ``target_dir`` is left untouched.
+            / Если какой-либо скилл не прошёл структурную проверку или не
+            смог разрешить ссылку. ``target_dir`` остаётся нетронутым.
 
     Example:
         >>> from pathlib import Path
         >>> run_sync(config_path=Path("ai-skills.yaml"), dry_run=True)
-        {'skills_count': 0, 'skipped_count': 0, 'links_replaced': 0, 'targets': {}, 'dry_run': True, 'synced_count': 0, 'skills': []}
+        {'skills_count': 0, 'dry_run': True, 'skills': []}
     """
     if config_path is None and sources is None:
         raise ValueError("Either config_path or sources must be provided")
@@ -106,7 +120,6 @@ def run_sync(
     resolved_sources: Sequence[Source]
     config_base: Optional[Path] = None
     targets: List[TargetSpec]
-    validation_settings: Optional[ValidationSettings] = None
 
     if config_path is not None:
         config_path = config_path.resolve()
@@ -117,7 +130,6 @@ def run_sync(
         if sources is None:
             config = load_config(config_path)
             settings = config.get("settings", {})
-            validation_settings = parse_validation_settings(settings)
 
             # Resolve target(s): CLI override > config > default.
             # Определяем target(ы): CLI > конфиг > умолчание.
@@ -126,10 +138,12 @@ def run_sync(
             else:
                 targets = parse_target_settings(settings.get("target"))
 
-            # Resolve orphan removal: CLI override > config > default.
-            # Определяем удаление осиротевших навыков: CLI > конфиг > умолчание.
+            # Resolve orphan removal / add_relations: CLI override > config > default.
+            # Определяем удаление осиротевших навыков / add_relations: CLI > конфиг > умолчание.
             if remove_orphans is None:
                 remove_orphans = settings.get("remove_orphans", True)
+            if add_relations is None:
+                add_relations = settings.get("add_relations", False)
 
             resolved_sources = build_sources_from_config(config_path)
         else:
@@ -141,47 +155,45 @@ def run_sync(
 
     if remove_orphans is None:
         remove_orphans = True
+    if add_relations is None:
+        add_relations = False
 
     base = config_base if config_base is not None else Path.cwd()
-    resolved_targets = []
+
+    sync_targets: List[SyncTarget] = []
     for spec in targets:
-        path = spec.path
-        if not path.is_absolute():
-            path = base / path
-        resolved_targets.append((spec.name, path.resolve(), spec.adapters))
+        path = spec.path if spec.path.is_absolute() else base / spec.path
+        path = path.resolve()
+
+        copy_skills = IncrementalCopySkills(
+            spec.copy_skills,
+            version=f"{type(spec.copy_skills).__name__}-1",
+            force=force,
+        )
+        if remove_orphans:
+            copy_skills = OrphanRemovingCopySkills(copy_skills)
+
+        sync_targets.append(SyncTarget(name=spec.name, path=path, copy_skills=copy_skills))
 
     try:
-        skills = discover_and_validate(
-            resolved_sources, settings=validation_settings, progress=progress
+        result = SyncCommand().run(
+            sources=resolved_sources,
+            targets=sync_targets,
+            source_repo_path=base,
+            dry_run=dry_run,
+            add_relations=add_relations,
+            output_repo_path=base,
         )
-        per_target: Dict[str, dict] = {}
-        for name, path, adapter_classes in resolved_targets:
-            per_target[name] = sync_to_target(
-                skills,
-                path,
-                adapters=adapter_classes,
-                dry_run=dry_run,
-                cleanup_orphans=remove_orphans,
-                force=force,
-                progress=progress,
-                repo_path=base,
-                settings=validation_settings,
-            )
     finally:
         for src in resolved_sources:
             src.cleanup()
 
-    result: dict = {
-        "skills_count": len(skills),
-        "skipped_count": sum(t.get("skipped_count", 0) for t in per_target.values()),
-        "links_replaced": sum(t.get("links_replaced", 0) for t in per_target.values()),
-        "targets": per_target,
-        "skills": skills,
+    if result.has_errors:
+        raise SyncFailedError(result.errors, target_dir=sync_targets[0].path if sync_targets else base)
+
+    return {
+        "skills_count": len(result.skills),
+        "dry_run": dry_run,
+        "skills": result.skills,
+        "targets": {target.name: {} for target in sync_targets},
     }
-
-    # Preserve legacy fields for formatters and callers.
-    # Сохраняем устаревшие поля для форматёров и вызывающих сторон.
-    result["dry_run"] = dry_run
-    result.setdefault("synced_count", result.get("skills_count", 0))
-
-    return result

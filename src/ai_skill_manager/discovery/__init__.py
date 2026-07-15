@@ -1,7 +1,11 @@
-"""Discovery package.
+"""Link discovery package.
 
-Contains sub-packages for discovering skills and parsing links inside them.
+Contains the sub-package for parsing links inside skill files. Skill
+discovery itself (pattern matching, scanning configured sources) lives in
+``service.discovery``.
 
-Пакет обнаружения.
-Содержит подпакеты для обнаружения навыков и разбора ссылок внутри них.
+Пакет обнаружения ссылок.
+Содержит подпакет для разбора ссылок внутри файлов навыков. Само
+обнаружение навыков (сопоставление по паттернам, сканирование настроенных
+источников) находится в ``service.discovery``.
 """

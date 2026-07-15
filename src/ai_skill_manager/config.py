@@ -6,10 +6,11 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple
 
-from .adapters.rules import absAdapter, resolve_adapters
 from .entities import GitHubSource, LocalSource, Source
+from .functions.copy_skills import resolve_copy_skills
+from .functions.copy_skills.abs_copy_skills import CopySkills
 from .validation_settings import ValidationSettings
 
 #: Default target directory for the reserved "default" target name.
@@ -201,14 +202,14 @@ def build_sources_from_config(config_path: Path) -> List[Source]:
 
 @dataclass(frozen=True)
 class TargetSpec:
-    """A single sync destination: name, path and resolved adapter classes.
+    """A single sync destination: name, path and its CopySkills flavor.
 
-    Одна цель синхронизации: имя, путь и разрешённые классы адаптеров.
+    Одна цель синхронизации: имя, путь и её вариант CopySkills.
     """
 
     name: str
     path: Path
-    adapters: List[Type[absAdapter]]
+    copy_skills: CopySkills
 
 
 def _dedup_adapter_names(*name_lists: List[str]) -> List[str]:
@@ -255,7 +256,7 @@ def parse_target_settings(target_value: Any) -> List[TargetSpec]:
             TargetSpec(
                 name="default",
                 path=Path(target_value),
-                adapters=resolve_adapters(["link-adapter"]),
+                copy_skills=resolve_copy_skills(["link-adapter"]),
             )
         ]
 
@@ -282,7 +283,7 @@ def parse_target_settings(target_value: Any) -> List[TargetSpec]:
             TargetSpec(
                 name="default",
                 path=Path(DEFAULT_TARGET_PATH),
-                adapters=resolve_adapters(merged),
+                copy_skills=resolve_copy_skills(merged),
             )
         ]
 
@@ -315,7 +316,7 @@ def parse_target_settings(target_value: Any) -> List[TargetSpec]:
             TargetSpec(
                 name=name,
                 path=Path(path_value),
-                adapters=resolve_adapters(merged),
+                copy_skills=resolve_copy_skills(merged),
             )
         )
 

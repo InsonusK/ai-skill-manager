@@ -38,6 +38,7 @@ class TestSyncCLI(unittest.TestCase):
             "keep_orphans": False,
             "dry_run": False,
             "force": False,
+            "add_relations": None,
         }
         defaults.update(overrides)
         return type("Args", (), defaults)()

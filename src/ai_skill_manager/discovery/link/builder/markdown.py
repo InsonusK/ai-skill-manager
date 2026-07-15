@@ -9,13 +9,10 @@ Builds :class:`absLink` objects from Markdown-style references such as
 """
 
 import re
-from typing import TYPE_CHECKING, List
+from typing import List
 
 from ....entities.link import PathLink, WebLink, absLink
 from .abs_link_builder import absLinkBuilder
-
-if TYPE_CHECKING:
-    from ....entities.skill_file import SkillFile
 
 # Regex for Markdown links: optional "!", text in brackets, path in parentheses.
 # Регулярное выражение для ссылок Markdown: необязательный "!", текст в скобках,
@@ -31,7 +28,7 @@ class MarkdownLinkBuilder(absLinkBuilder):
     Создаёт объекты :class:`absLink` из ссылок в стиле Markdown.
     """
 
-    def search(self, content: str, skill_file: "SkillFile") -> List[absLink]:
+    def search(self, content: str) -> List[absLink]:
         """Parse all Markdown-style links from ``content``.
 
         Parse all Markdown-style links from ``content``.
@@ -40,8 +37,6 @@ class MarkdownLinkBuilder(absLinkBuilder):
 
         Args:
             content: Markdown text to scan. / Markdown-текст для сканирования.
-            skill_file: Skill file that contains the content.
-                Файл скилла, содержащий содержимое.
 
         Returns:
             List of parsed link objects. / Список разобранных объектов ссылок.
@@ -50,14 +45,10 @@ class MarkdownLinkBuilder(absLinkBuilder):
         # Iterate over every Markdown link match in the content.
         # Перебираем каждое совпадение Markdown-ссылки в содержимом.
         for match in MD_LINK_RE.finditer(content):
-            links.append(self._build_markdown_link(match, skill_file))
+            links.append(self._build_markdown_link(match))
         return links
 
-    def _build_markdown_link(
-        self,
-        match: re.Match,
-        skill_file: "SkillFile",
-    ) -> absLink:
+    def _build_markdown_link(self, match: re.Match) -> absLink:
         """Convert a regex match into a link object.
 
         Convert a regex match into a link object.
@@ -67,8 +58,6 @@ class MarkdownLinkBuilder(absLinkBuilder):
         Args:
             match: Regex match object for a Markdown link. /
                 Объект совпадения регулярного выражения для Markdown-ссылки.
-            skill_file: Skill file that contains the link. /
-                Файл скилла, содержащий ссылку.
 
         Returns:
             A populated link instance. / Заполненный экземпляр ссылки.
@@ -90,7 +79,6 @@ class MarkdownLinkBuilder(absLinkBuilder):
                 format=MarkdownLinkBuilder,
                 start=start,
                 end=end,
-                skill_file_value=skill_file,
                 header_value=header or None,
                 is_image_value=self._is_image(raw),
             )
@@ -101,7 +89,6 @@ class MarkdownLinkBuilder(absLinkBuilder):
             format=MarkdownLinkBuilder,
             start=start,
             end=end,
-            skill_file_value=skill_file,
             raw_path=path_clean,
             header_value=header or None,
             is_image_value=self._is_image(raw),

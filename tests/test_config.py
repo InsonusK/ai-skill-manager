@@ -5,8 +5,8 @@ import tempfile
 import json
 from pathlib import Path
 
-from ai_skill_manager.adapters.rules import ClaudePropertyAdapter, LinkAdapter
 from ai_skill_manager.config import load_config, parse_target_settings, parse_validation_settings
+from ai_skill_manager.functions.copy_skills import ClaudePropertyCopySkills, DefaultCopySkills
 
 
 class TestLoadConfig(unittest.TestCase):
@@ -65,7 +65,7 @@ class TestParseTargetSettings(unittest.TestCase):
         self.assertEqual(len(specs), 1)
         self.assertEqual(specs[0].name, "default")
         self.assertEqual(specs[0].path, Path(".agents/skills"))
-        self.assertEqual(specs[0].adapters, [LinkAdapter])
+        self.assertIsInstance(specs[0].copy_skills, DefaultCopySkills)
 
     def test_none_defaults_like_flat_string(self):
         specs = parse_target_settings(None)
@@ -73,7 +73,7 @@ class TestParseTargetSettings(unittest.TestCase):
         self.assertEqual(len(specs), 1)
         self.assertEqual(specs[0].name, "default")
         self.assertEqual(specs[0].path, Path(".agents/skills"))
-        self.assertEqual(specs[0].adapters, [LinkAdapter])
+        self.assertIsInstance(specs[0].copy_skills, DefaultCopySkills)
 
     def test_multi_target_with_for_each_and_reserved_defaults(self):
         specs = parse_target_settings({
@@ -86,12 +86,10 @@ class TestParseTargetSettings(unittest.TestCase):
         self.assertEqual(set(by_name), {"default", "claude"})
 
         self.assertEqual(by_name["default"].path, Path(".agents/skills"))
-        self.assertEqual(by_name["default"].adapters, [LinkAdapter])
+        self.assertIsInstance(by_name["default"].copy_skills, DefaultCopySkills)
 
         self.assertEqual(by_name["claude"].path, Path(".claude/skills"))
-        self.assertEqual(
-            by_name["claude"].adapters, [LinkAdapter, ClaudePropertyAdapter]
-        )
+        self.assertIsInstance(by_name["claude"].copy_skills, ClaudePropertyCopySkills)
 
     def test_explicit_path_overrides_reserved_default(self):
         specs = parse_target_settings({"default": {"path": "./out"}})
@@ -112,9 +110,7 @@ class TestParseTargetSettings(unittest.TestCase):
             "default": {"adapters": ["link-adapter", "claude-property-adapter"]},
         })
 
-        self.assertEqual(
-            specs[0].adapters, [LinkAdapter, ClaudePropertyAdapter]
-        )
+        self.assertIsInstance(specs[0].copy_skills, ClaudePropertyCopySkills)
 
     def test_invalid_target_type_raises(self):
         with self.assertRaises(ValueError):

@@ -8,13 +8,10 @@ Factory for creating link objects from markdown content.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, List
+from typing import List
 
 from ...entities.link import absLink
 from .builder import absLinkBuilder, MarkdownLinkBuilder, WikilinkBuilder
-
-if TYPE_CHECKING:
-    from ...entities.skill_file import SkillFile
 
 # Registry of link builders used to scan content.
 # Реестр сборщиков ссылок, используемых для сканирования содержимого.
@@ -53,9 +50,7 @@ def _mask_example_blocks(content: str) -> str:
     return _EXAMPLE_BLOCK_RE.sub(_replace_with_spaces, content)
 
 
-def search_links_in_content(
-    content: str, skill_file: "SkillFile"
-) -> List[absLink]:
+def search_links_in_content(content: str) -> List[absLink]:
     """Parse all links from ``content`` and return them in source order.
 
     Parse all links from ``content`` and return them in source order.
@@ -64,8 +59,6 @@ def search_links_in_content(
 
     Args:
         content: Markdown text to scan. / Markdown-текст для сканирования.
-        skill_file: Skill file that contains the content.
-            Файл скилла, содержащий содержимое.
 
     Returns:
         List of discovered link objects sorted by start position. /
@@ -82,7 +75,7 @@ def search_links_in_content(
     # Run every registered builder against the content.
     # Запускаем каждый зарегистрированный сборщик на содержимом.
     for rule in LINK_SEARCH_RULES:
-        rule_links: List[absLink] = rule.search(masked_content, skill_file)
+        rule_links: List[absLink] = rule.search(masked_content)
         links.extend(rule_links)
 
     # Sort by position so callers see links in document order.

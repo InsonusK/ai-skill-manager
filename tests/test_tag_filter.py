@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities.source import LocalSource
-from ai_skill_manager.service.discover import discover
+from ai_skill_manager.service.discovery.discover import discover
 from ai_skill_manager.functions.tag_filter import (
     compile_tag_expression,
     filter_skills_by_tags,
@@ -137,24 +137,24 @@ class TestFilterSkillsByTags(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_filter_keeps_matching_skills(self):
-        skills = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
         self.assertEqual(len(skills), 3)
 
         filtered = filter_skills_by_tags(skills, ["python"])
         self.assertEqual({s.name for s in filtered}, {"py"})
 
     def test_filter_with_and(self):
-        skills = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
         filtered = filter_skills_by_tags(skills, ["python & cli"])
         self.assertEqual({s.name for s in filtered}, {"py"})
 
     def test_filter_with_not(self):
-        skills = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
         filtered = filter_skills_by_tags(skills, ["!python"])
         self.assertEqual({s.name for s in filtered}, {"web", "notags"})
 
     def test_no_expressions_returns_all(self):
-        skills = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
         self.assertEqual(len(filter_skills_by_tags(skills, [])), 3)
 
 

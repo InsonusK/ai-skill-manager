@@ -18,9 +18,3 @@ class TestCLIEntrypoint(unittest.TestCase):
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, 0)
-
-    def test_check_help(self):
-        with patch('sys.argv', ['ai-skill-manager', 'check', '--help']):
-            with self.assertRaises(SystemExit) as cm:
-                main()
-            self.assertEqual(cm.exception.code, 0)

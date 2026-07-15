@@ -14,7 +14,6 @@ import sys
 
 from ..profiling import profile_command
 
-from .check import add_parser as check_add_parser
 from .sync import add_parser as sync_add_parser
 
 __all__ = ["main"]
@@ -60,7 +59,6 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     sync_add_parser(subparsers)
-    check_add_parser(subparsers)
 
     return parser
 

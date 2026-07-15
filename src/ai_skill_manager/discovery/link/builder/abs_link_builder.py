@@ -8,12 +8,9 @@ Provides shared helpers for classifying link paths and splitting fragments.
 """
 
 from abc import ABC
-from typing import TYPE_CHECKING, List, Tuple
+from typing import List, Tuple
 
 from ....entities.path_kind import PathKind
-
-if TYPE_CHECKING:
-    from ....entities.skill_file import SkillFile
 
 
 class absLinkBuilder(ABC):
@@ -28,7 +25,7 @@ class absLinkBuilder(ABC):
     и разделения фрагментов.
     """
 
-    def search(self, content: str, skill_file: "SkillFile") -> List:
+    def search(self, content: str) -> List:
         """Search ``content`` for links supported by this builder.
 
         Search ``content`` for links supported by this builder.
@@ -37,8 +34,6 @@ class absLinkBuilder(ABC):
 
         Args:
             content: Markdown text to scan. / Markdown-текст для сканирования.
-            skill_file: Skill file that contains the content.
-                Файл скилла, содержащий содержимое.
 
         Returns:
             List of matched link objects. / Список найденных объектов ссылок.
