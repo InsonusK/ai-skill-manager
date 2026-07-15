@@ -5,11 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.copy_skills.default_copy_skills import DefaultCopySkills
 from ai_skill_manager.functions.copy_skills.orphan_removing_copy_skills import OrphanRemovingCopySkills
 from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.link_discovery import LinkDiscovery
 from ai_skill_manager.functions.managed_state import tag_managed
 
 
@@ -27,7 +29,19 @@ class TestOrphanRemovingCopySkills(unittest.TestCase):
         folder.mkdir(exist_ok=True)
         (folder / "SKILL.md").write_text(content)
         skill = Skill(name=name, path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        FileDiscovery().discover(skill)
+        link_discovery = LinkDiscovery()
+        for skill_file in skill.files:
+            if not isinstance(skill_file, MarkdownSkillFile):
+                continue
+            links, _errors = link_discovery.discover(
+                skill.file_absolute_path(skill_file),
+                repo_path=self.tmp,
+                known_skills={},
+                queue=[],
+                add_relations=False,
+            )
+            skill_file.links.extend(links)
         return skill
 
     def test_removes_managed_skill_no_longer_present(self):

@@ -5,9 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.link_discovery import LinkDiscovery
 from ai_skill_manager.functions.copy_skills.claude_property_copy_skills import ClaudePropertyCopySkills
 from ai_skill_manager.functions.copy_skills.default_copy_skills import DefaultCopySkills
 
@@ -26,9 +28,19 @@ class TestDefaultCopySkills(unittest.TestCase):
         folder.mkdir()
         (folder / "SKILL.md").write_text(content)
         skill = Skill(name=name, path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(
-            skill, repo_path=self.tmp, known_skills=known_skills or {}, queue=[], add_relations=False,
-        )
+        FileDiscovery().discover(skill)
+        link_discovery = LinkDiscovery()
+        for skill_file in skill.files:
+            if not isinstance(skill_file, MarkdownSkillFile):
+                continue
+            links, _errors = link_discovery.discover(
+                skill.file_absolute_path(skill_file),
+                repo_path=self.tmp,
+                known_skills=known_skills or {},
+                queue=[],
+                add_relations=False,
+            )
+            skill_file.links.extend(links)
         return skill
 
     def test_copies_and_rewrites_cross_skill_links(self):
@@ -61,7 +73,7 @@ class TestClaudePropertyCopySkills(unittest.TestCase):
             "---\nname: skill-a\nwhenToUse: use it\ncustomField: value\n---\n# A\n"
         )
         skill = Skill(name="skill-a", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        FileDiscovery().discover(skill)
 
         copied_dirs = self.copy_skills.copy(
             {"skill-a": skill}, self.target_dir, source_repo_path=self.tmp, output_repo_path=self.target_dir,

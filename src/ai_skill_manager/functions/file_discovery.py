@@ -1,83 +1,56 @@
-"""Build one skill's file list and enrich its markdown files with links.
+"""Build one skill's file list - implements step 2.
 
-Implements step 2 (per-skill): the outer processing-queue loop across all
-skills belongs to the orchestrator (``SyncCommand``), not this unit.
+Only finds and classifies a skill's own files. Enriching markdown files
+with links is a separate concern (``LinkDiscovery``), invoked by the
+orchestrator (``SyncCommand``), not by this unit.
 
-Строит список файлов одного скилла и обогащает его markdown-файлы ссылками.
+Строит список файлов одного скилла - реализует шаг 2.
 
-Реализует шаг 2 (для одного скилла): внешний цикл обработки очереди по всем
-скиллам принадлежит оркестратору (``SyncCommand``), а не этому юниту.
+Только находит и классифицирует собственные файлы скилла. Обогащение
+markdown-файлов ссылками - отдельная забота (``LinkDiscovery``), вызываемая
+оркестратором (``SyncCommand``), а не этим юнитом.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from ..entities.skill_file_v2 import MarkdownSkillFile, SkillFile
 from ..entities.skill_kind import SkillKind
-from ..validation_settings import ValidationSettings
-from .link_discovery import LinkDiscovery
 
 if TYPE_CHECKING:
     from ..entities.skill_v2 import Skill
 
 
 class FileDiscovery:
-    """Populates one skill's ``files`` and their links - implements step 2.
+    """Populates one skill's ``files`` - implements step 2.
 
-    Заполняет ``files`` одного скилла и их ссылки - реализует шаг 2.
+    Заполняет ``files`` одного скилла - реализует шаг 2.
     """
 
-    def __init__(self, validation_settings: Optional[ValidationSettings] = None) -> None:
-        """Initialize with the LinkDiscovery collaborator."""
-        self._link_discovery = LinkDiscovery(validation_settings)
+    def discover(self, skill: "Skill") -> None:
+        """Populate ``skill.files`` in place with its own files.
 
-    def discover(
-        self,
-        skill: "Skill",
-        repo_path: Path,
-        known_skills: Dict[str, "Skill"],
-        queue: List["Skill"],
-        add_relations: bool,
-    ) -> List[str]:
-        """Populate ``skill.files`` in place and enrich markdown files with links.
+        Заполняет ``skill.files`` на месте его собственными файлами.
 
-        Заполняет ``skill.files`` на месте и обогащает markdown-файлы
-        ссылками.
+        Markdown files are classified as ``MarkdownSkillFile`` (with an
+        empty ``links`` list, filled in later) so ``LinkDiscovery`` has
+        somewhere to attach resolved links.
 
-        Returns:
-            Any errors collected while resolving links; discovery does not
-            stop at the first one.
-                / Ошибки, собранные при разрешении ссылок; обнаружение не
-                останавливается на первой из них.
+        Markdown-файлы классифицируются как ``MarkdownSkillFile`` (с
+        пустым списком ``links``, заполняемым позже), чтобы
+        ``LinkDiscovery`` было куда прикрепить разрешённые ссылки.
         """
-        errors: List[str] = []
-
         if skill.kind is SkillKind.flat:
             skill.files.append(MarkdownSkillFile(name=skill.path.name, path=Path(".")))
-        else:
-            for candidate in sorted(skill.path.rglob("*")):
-                if not candidate.is_file():
-                    continue
-                relative_path = candidate.relative_to(skill.path)
-                if candidate.suffix.lower() == ".md":
-                    skill.files.append(MarkdownSkillFile(name=candidate.name, path=relative_path))
-                else:
-                    skill.files.append(SkillFile(name=candidate.name, path=relative_path))
+            return
 
-        for skill_file in skill.files:
-            if not isinstance(skill_file, MarkdownSkillFile):
+        for candidate in sorted(skill.path.rglob("*")):
+            if not candidate.is_file():
                 continue
-            file_absolute_path = skill.path if skill.kind is SkillKind.flat else skill.path / skill_file.path
-            links, link_errors = self._link_discovery.discover(
-                file_absolute_path,
-                repo_path=repo_path,
-                known_skills=known_skills,
-                queue=queue,
-                add_relations=add_relations,
-            )
-            skill_file.links.extend(links)
-            errors.extend(link_errors)
-
-        return errors
+            relative_path = candidate.relative_to(skill.path)
+            if candidate.suffix.lower() == ".md":
+                skill.files.append(MarkdownSkillFile(name=candidate.name, path=relative_path))
+            else:
+                skill.files.append(SkillFile(name=candidate.name, path=relative_path))

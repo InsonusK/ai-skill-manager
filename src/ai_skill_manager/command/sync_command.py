@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
 
+from ..entities.skill_file_v2 import MarkdownSkillFile
 from ..functions.file_discovery import FileDiscovery
+from ..functions.link_discovery import LinkDiscovery
 from ..functions.skill_dict_builder import SkillDictBuilder
 from ..functions.skill_discovery import SkillDiscovery
 
@@ -56,12 +58,26 @@ class SyncCommand:
 
     Contains no business rules of its own beyond sequencing: each step's
     logic lives in its own unit (``SkillDiscovery``, ``SkillDictBuilder``,
-    ``FileDiscovery``, the configured ``CopySkills`` per target).
+    ``FileDiscovery``, ``LinkDiscovery``, the configured ``CopySkills`` per
+    target). In particular, this is the seam between file discovery and link
+    discovery: ``FileDiscovery`` only finds and classifies a skill's files,
+    ``LinkDiscovery`` only resolves the links of one already-known markdown
+    file - walking a skill's freshly-discovered files and calling
+    ``LinkDiscovery`` for each markdown one is this orchestrator's job, kept
+    here instead of nested inside ``FileDiscovery`` so neither unit depends
+    on the other.
 
     Не содержит собственных бизнес-правил, кроме последовательности: логика
     каждого шага живёт в своём юните (``SkillDiscovery``,
-    ``SkillDictBuilder``, ``FileDiscovery``, настроенный ``CopySkills`` на
-    каждый target).
+    ``SkillDictBuilder``, ``FileDiscovery``, ``LinkDiscovery``, настроенный
+    ``CopySkills`` на каждый target). В частности, это стык между
+    обнаружением файлов и обнаружением ссылок: ``FileDiscovery`` только
+    находит и классифицирует файлы скилла, ``LinkDiscovery`` только
+    разрешает ссылки одного уже известного markdown-файла - обход
+    только что обнаруженных файлов скилла и вызов ``LinkDiscovery`` для
+    каждого markdown-файла - задача этого оркестратора, оставленная здесь,
+    а не вложенная внутрь ``FileDiscovery``, чтобы ни один из юнитов не
+    зависел от другого.
     """
 
     def __init__(
@@ -69,11 +85,13 @@ class SyncCommand:
         skill_discovery: SkillDiscovery = None,
         skill_dict_builder: SkillDictBuilder = None,
         file_discovery: FileDiscovery = None,
+        link_discovery: LinkDiscovery = None,
     ) -> None:
         """Initialize with the discovery/enrichment collaborators."""
         self._skill_discovery = skill_discovery or SkillDiscovery()
         self._skill_dict_builder = skill_dict_builder or SkillDictBuilder()
         self._file_discovery = file_discovery or FileDiscovery()
+        self._link_discovery = link_discovery or LinkDiscovery()
 
     def run(
         self,
@@ -123,10 +141,20 @@ class SyncCommand:
                 errors.extend(merge_errors)
                 merged_count = len(queue)
 
-            file_errors = self._file_discovery.discover(
-                skill, repo_path=source_repo_path, known_skills=skills, queue=queue, add_relations=add_relations,
-            )
-            errors.extend(file_errors)
+            self._file_discovery.discover(skill)
+
+            for skill_file in skill.files:
+                if not isinstance(skill_file, MarkdownSkillFile):
+                    continue
+                links, link_errors = self._link_discovery.discover(
+                    skill.file_absolute_path(skill_file),
+                    repo_path=source_repo_path,
+                    known_skills=skills,
+                    queue=queue,
+                    add_relations=add_relations,
+                )
+                skill_file.links.extend(links)
+                errors.extend(link_errors)
 
         if errors:
             return SyncResult(skills=list(skills.values()), errors=errors)

@@ -5,10 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.external_file_copier import ExternalFileCopier
 from ai_skill_manager.functions.file_discovery import FileDiscovery
+from ai_skill_manager.functions.link_discovery import LinkDiscovery
 from ai_skill_manager.functions.copied_link_rewriter import CopiedLinkRewriter
 from ai_skill_manager.functions.skill_file_copier import SkillFileCopier
 
@@ -27,6 +29,7 @@ class TestCopiedLinkRewriter(unittest.TestCase):
         self.target_dir = self.tmp / "target"
         self.output_repo_path = self.target_dir
         self.file_discovery = FileDiscovery()
+        self.link_discovery = LinkDiscovery()
         self.skill_copier = SkillFileCopier()
         self.external_copier = ExternalFileCopier()
         self.rewriter = CopiedLinkRewriter(self.external_copier)
@@ -35,9 +38,18 @@ class TestCopiedLinkRewriter(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def _discover_and_copy(self, skill: Skill, known_skills: dict) -> Path:
-        self.file_discovery.discover(
-            skill, repo_path=self.source_repo_path, known_skills=known_skills, queue=[], add_relations=False,
-        )
+        self.file_discovery.discover(skill)
+        for skill_file in skill.files:
+            if not isinstance(skill_file, MarkdownSkillFile):
+                continue
+            links, _errors = self.link_discovery.discover(
+                skill.file_absolute_path(skill_file),
+                repo_path=self.source_repo_path,
+                known_skills=known_skills,
+                queue=[],
+                add_relations=False,
+            )
+            skill_file.links.extend(links)
         return self.skill_copier.copy(skill, self.target_dir)
 
     def test_rewrites_link_to_another_skills_main_file(self):

@@ -24,7 +24,7 @@ class TestSkillFileCopier(unittest.TestCase):
         md = self.tmp / "guide.skill.md"
         md.write_text("---\nname: guide\n---\n# Guide\n")
         skill = Skill(name="guide", path=md, kind=SkillKind.flat)
-        FileDiscovery().discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        FileDiscovery().discover(skill)
 
         skill_target_dir = self.copier.copy(skill, self.target_dir)
 
@@ -39,7 +39,7 @@ class TestSkillFileCopier(unittest.TestCase):
         (folder / "docs").mkdir()
         (folder / "docs" / "extra.md").write_text("# Extra\n")
         skill = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        FileDiscovery().discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        FileDiscovery().discover(skill)
 
         skill_target_dir = self.copier.copy(skill, self.target_dir)
 

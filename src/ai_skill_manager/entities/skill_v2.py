@@ -74,3 +74,18 @@ class Skill:
         if self.kind is SkillKind.flat:
             return relative_path is None or relative_path == Path(".")
         return relative_path == self.main_file_relative_path
+
+    def file_absolute_path(self, skill_file: "SkillFile") -> Path:
+        """Return the repo-absolute path of one of this skill's own files.
+
+        Возвращает repo-absolute путь одного из файлов этого скилла.
+
+        Works for both kinds: a flat skill's own file has
+        ``skill_file.path == Path(".")``, which joins back to ``self.path``
+        unchanged.
+
+        Работает для обоих типов: собственный файл плоского скилла имеет
+        ``skill_file.path == Path(".")``, что при соединении возвращает
+        ``self.path`` без изменений.
+        """
+        return self.path / skill_file.path

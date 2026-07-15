@@ -23,7 +23,7 @@ class TestComputeSkillHash(unittest.TestCase):
         md = self.tmp / filename
         md.write_text(content)
         skill = Skill(name="guide", path=md, kind=SkillKind.flat)
-        self.discovery.discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        self.discovery.discover(skill)
         return skill
 
     def test_same_content_same_hash(self):
@@ -42,12 +42,12 @@ class TestComputeSkillHash(unittest.TestCase):
         (folder / "SKILL.md").write_text("---\nname: web\n---\n")
         (folder / "data.json").write_text("{}")
         skill = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        self.discovery.discover(skill, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        self.discovery.discover(skill)
         before = compute_skill_hash(skill)
 
         (folder / "data.json").write_text('{"changed": true}')
         skill2 = Skill(name="web", path=folder, kind=SkillKind.dir, main_file_relative_path=Path("SKILL.md"))
-        self.discovery.discover(skill2, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False)
+        self.discovery.discover(skill2)
         after = compute_skill_hash(skill2)
 
         self.assertNotEqual(before, after)
