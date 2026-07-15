@@ -1,14 +1,13 @@
-"""Configuration loading and source building.
+"""Configuration file loading and settings parsing.
 
-Загрузка конфигурации и построение источников.
+Загрузка файла конфигурации и разбор настроек.
 """
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
-from .entities import GitHubSource, LocalSource, Source
 from .functions.copy_skills import resolve_copy_skills
 from .functions.copy_skills.abs_copy_skills import CopySkills
 from .validation_settings import ValidationSettings
@@ -71,133 +70,6 @@ def load_config(config_path: Path) -> dict:
         return yaml.load(content, Loader=_ConfigYamlLoader)
 
     return json.loads(content)
-
-
-def _normalize_subpaths(subpath: Any) -> List[str | None]:
-    """Convert a subpath config value into a list of single subpaths.
-
-    Преобразует значение подпути из конфигурации в список отдельных подпутей.
-
-    ``None`` and a single string become a list with one entry; a list is
-    returned unchanged.
-
-    ``None`` и одиночная строка становятся списком с одним элементом;
-    список возвращается без изменений.
-    """
-    if subpath is None:
-        return [None]
-    if isinstance(subpath, list):
-        return subpath
-    return [subpath]
-
-
-def _normalize_skip_folders(value: Any) -> Tuple[str, ...]:
-    """Convert a skip_folder config value into a tuple of folder names.
-
-    Преобразует значение skip_folder из конфигурации в кортеж имён директорий.
-
-    ``None`` falls back to the default ``("examples",)``. A single string
-    becomes a one-element tuple; a list is converted to a tuple of strings.
-    An empty list disables folder-based exclusions.
-
-    ``None`` заменяется умолчанием ``("examples",)``. Одиночная строка
-    становится кортежем из одного элемента; список преобразуется в кортеж
-    строк. Пустой список отключает исключения по директориям.
-    """
-    if value is None:
-        return ("examples",)
-    if isinstance(value, str):
-        return (value,)
-    if isinstance(value, (list, tuple)):
-        return tuple(str(folder) for folder in value)
-    return (str(value),)
-
-
-def _normalize_tags(tags: Any) -> Tuple[str, ...]:
-    """Convert a tag filter config value into a tuple of expressions.
-
-    Преобразует значение фильтра тегов из конфигурации в кортеж выражений.
-
-    ``None`` becomes an empty tuple; a single string becomes a one-element
-    tuple; a list is converted to a tuple of strings.
-
-    ``None`` становится пустым кортежем; одиночная строка — кортежем из
-    одного элемента; список преобразуется в кортеж строк.
-    """
-    if tags is None:
-        return ()
-    if isinstance(tags, str):
-        return (tags,)
-    if isinstance(tags, (list, tuple)):
-        return tuple(str(tag) for tag in tags)
-    return (str(tags),)
-
-
-def build_sources_from_config(config_path: Path) -> List[Source]:
-    """Convert config sources into universal Source objects.
-
-    Преобразует источники из конфигурации в универсальные объекты Source.
-
-    Args:
-        config_path: Path to the configuration file. / Путь к файлу конфигурации.
-
-    Returns:
-        List of Source objects. / Список объектов Source.
-    """
-    # EN: Load the raw configuration and remember its directory for relative paths.
-    # RU: Загружаем сырую конфигурацию и запоминаем её директорию для относительных путей.
-    config = load_config(config_path)
-    config_dir = config_path.parent
-    sources: List[Source] = []
-
-    # EN: Iterate over the configured sources and create typed Source instances.
-    # RU: Перебираем настроенные источники и создаём типизированные экземпляры Source.
-    for src in config.get("sources", []):
-        src_type = src.get("type", "auto")
-        src_path = src.get("path", "")
-        tags = _normalize_tags(src.get("tags"))
-
-        # EN: GitHub sources are created from a repository URL and optional tree/subpath.
-        # RU: Источники GitHub создаются из URL репозитория и опционального tree/subpath.
-        skip_folders = _normalize_skip_folders(src.get("skip_folder"))
-
-        if src_type == "github":
-            for sp in _normalize_subpaths(src.get("subpath")):
-                sources.append(
-                    # BUG: если в github источнике нескольно subpath, то будет создано несколько GitHubSource каждый из которых будет скачивать репозитарий
-                    #     необходиво подумать на разделением Source на Source (истоник) и ScanPackage (путь сканирования)
-                    GitHubSource(
-                        repo_url=src_path,
-                        tree=src.get("tree", "master"),
-                        subpath=sp,
-                        tags=tags,
-                        skip_folder=skip_folders,
-                    )
-                )
-        elif src_type == "local":
-            src_path = Path(src_path)
-            # EN: Default to a local filesystem source resolved relative to the config file.
-            # RU: По умолчанию используем локальный источник, разрешённый относительно файла конфигурации.
-            repo_path = src_path if src_path.is_absolute() else config_dir / src_path
-            for sp in _normalize_subpaths(src.get("subpath")):
-                if sp is None:
-                    sp_path = repo_path
-                else:
-                    sp_path = Path(sp)
-                    if not sp_path.is_absolute():
-                        sp_path = repo_path / sp_path
-                sources.append(
-                    LocalSource(
-                        scan_path=sp_path,
-                        repo_path=repo_path,
-                        tags=tags,
-                        skip_folder=skip_folders,
-                    )
-                )
-        else:
-            raise ValueError(f"Unkonwn {src_type}")
-
-    return sources
 
 
 @dataclass(frozen=True)

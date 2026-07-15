@@ -123,9 +123,7 @@ class SyncCommand:
                 ``skill-b/SKILL.md``); передайте предка всех target'ов,
                 чтобы включить их относительный префикс.
         """
-        discovered, errors = self._skill_discovery.discover(sources)
-        skills, dict_errors = self._skill_dict_builder.build(discovered)
-        errors.extend(dict_errors)
+        skills, errors = self._skill_discovery.discover(sources)
 
         queue: List["Skill"] = list(skills.values())
         processed_names = set()

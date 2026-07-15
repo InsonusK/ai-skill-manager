@@ -35,7 +35,7 @@ class TestSyncCommand(unittest.TestCase):
         self._dir_skill("skill-b", "---\nname: skill-b\n---\n# B\n")
 
         result = self.command.run(
-            sources=[LocalSource(scan_path=self.source_dir)],
+            sources=[LocalSource(scan_paths=(self.source_dir,))],
             targets=self._targets(),
             source_repo_path=self.source_dir,
             dry_run=False,
@@ -51,7 +51,7 @@ class TestSyncCommand(unittest.TestCase):
         self._dir_skill("skill-a", "---\nname: skill-a\n---\n# A\n")
 
         result = self.command.run(
-            sources=[LocalSource(scan_path=self.source_dir)],
+            sources=[LocalSource(scan_paths=(self.source_dir,))],
             targets=self._targets(),
             source_repo_path=self.source_dir,
             dry_run=True,
@@ -65,7 +65,7 @@ class TestSyncCommand(unittest.TestCase):
         self._dir_skill("skill-a", "---\nname: skill-a\n---\n[bad](../nowhere.md)\n")
 
         result = self.command.run(
-            sources=[LocalSource(scan_path=self.source_dir)],
+            sources=[LocalSource(scan_paths=(self.source_dir,))],
             targets=self._targets(),
             source_repo_path=self.source_dir,
             dry_run=False,
@@ -88,7 +88,7 @@ class TestSyncCommand(unittest.TestCase):
         (folder / "notes.md").write_text("# Notes\n[also-bad](../also-nowhere.md)\n")
 
         result = self.command.run(
-            sources=[LocalSource(scan_path=self.source_dir)],
+            sources=[LocalSource(scan_paths=(self.source_dir,))],
             targets=self._targets(),
             source_repo_path=self.source_dir,
             dry_run=False,
@@ -106,7 +106,7 @@ class TestSyncCommand(unittest.TestCase):
         (other_dir / "SKILL.md").write_text("---\nname: skill-c\n---\n# C\n")
 
         result = self.command.run(
-            sources=[LocalSource(scan_path=self.source_dir)],
+            sources=[LocalSource(scan_paths=(self.source_dir,))],
             targets=self._targets(),
             source_repo_path=self.tmp,
             dry_run=False,

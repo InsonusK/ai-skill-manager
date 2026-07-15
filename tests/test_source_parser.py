@@ -58,7 +58,7 @@ class TestBuildSourcesFromArgs(unittest.TestCase):
 
         self.assertEqual(len(sources), 1)
         self.assertIsInstance(sources[0], LocalSource)
-        self.assertEqual(sources[0].scan_path, src)
+        self.assertEqual(sources[0].scan_paths, (src,))
         self.assertIsNone(config_path)
 
     def test_github_source_default_tree(self):
@@ -69,7 +69,7 @@ class TestBuildSourcesFromArgs(unittest.TestCase):
         self.assertIsInstance(sources[0], GitHubSource)
         self.assertEqual(sources[0].repo_url, "https://github.com/org/repo")
         self.assertEqual(sources[0].tree, "master")
-        self.assertEqual(sources[0].subpath, "skills")
+        self.assertEqual(sources[0].subpaths, ("skills",))
         self.assertIsNone(config_path)
 
     def test_github_source_with_tree_in_path(self):
@@ -85,9 +85,10 @@ class TestBuildSourcesFromArgs(unittest.TestCase):
             self._args(type="github", path="https://github.com/org/repo",
                        subpath=["skills", "extras"]))
 
-        self.assertEqual(len(sources), 2)
-        self.assertEqual(sources[0].subpath, "skills")
-        self.assertEqual(sources[1].subpath, "extras")
+        # A single GitHubSource carries every subpath so the repository is
+        # downloaded only once.
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].subpaths, ("skills", "extras"))
 
     def test_github_requires_path(self):
         with self.assertRaises(ValueError):

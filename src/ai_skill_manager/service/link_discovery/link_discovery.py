@@ -6,11 +6,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from ...discovery.link import search_links_in_content
 from ...entities.link.file_link_factory import FileLinkFactory
-from ...models import LinkWithContext
+from ...models import LinkWithContext, Result
 from ...validation_settings import ValidationSettings
 from .exclude_rule import build_link_exclude_rules
 
@@ -48,7 +48,7 @@ class LinkDiscovery:
         known_skills: Dict[str, "Skill"],
         queue: List["Skill"],
         add_relations: bool,
-    ) -> Tuple[List["FileLink"], List[str]]:
+    ) -> Result[List["FileLink"]]:
         """Discover and resolve the links in ``file_absolute_path``.
 
         Обнаруживает и разрешает ссылки в ``file_absolute_path``.
@@ -84,4 +84,4 @@ class LinkDiscovery:
                 continue
             file_links.append(file_link)
 
-        return file_links, errors
+        return Result(file_links, errors)

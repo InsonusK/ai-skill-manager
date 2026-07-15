@@ -47,7 +47,7 @@ class SkillAtPathFinder:
             return None
 
         scan_root = path if path.is_dir() else path.parent
-        source = LocalSource(scan_path=scan_root)
+        source = LocalSource(scan_paths=(scan_root,))
         skills, _errors = AutoDiscovery(source_path=scan_root, source=source).discover()
 
         for skill in skills:

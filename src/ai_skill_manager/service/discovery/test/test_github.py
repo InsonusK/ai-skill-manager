@@ -94,13 +94,13 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
-            loc = source.get_scan_location()
+            loc = source.get_scan_locations()[0]
 
         self.assertTrue(loc.repo_path.name.startswith("repo-main"))
-        self.assertEqual(loc.source_path, loc.repo_path / "skills")
-        self.assertTrue(loc.source_path.is_dir())
+        self.assertEqual(loc.scan_path, loc.repo_path / "skills")
+        self.assertTrue(loc.scan_path.is_dir())
 
     def test_get_scan_location_caches_result(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -109,13 +109,31 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
-            loc1 = source.get_scan_location()
-            loc2 = source.get_scan_location()
+            loc1 = source.get_scan_locations()[0]
+            loc2 = source.get_scan_locations()[0]
             mock.assert_called_once()
 
         self.assertEqual(loc1, loc2)
+
+    def test_get_scan_locations_multiple_subpaths_downloads_once(self):
+        """A single source with several subpaths reuses one download."""
+        archive = _make_archive_from_mock("multiple_subpaths", "repo-main")
+
+        with _mock_download(archive, self.tmpdir) as mock:
+            source = GitHubSource(
+                repo_url="https://github.com/owner/repo",
+                tree="main",
+                subpaths=("skills", "docs"),
+            )
+            locations = source.get_scan_locations()
+            mock.assert_called_once()
+
+        self.assertEqual(len(locations), 2)
+        self.assertEqual(locations[0].repo_path, locations[1].repo_path)
+        self.assertEqual(locations[0].scan_path, locations[0].repo_path / "skills")
+        self.assertEqual(locations[1].scan_path, locations[0].repo_path / "docs")
 
     def test_get_scan_location_repo_path_for_repo_absolute_links(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -124,11 +142,11 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
-            loc = source.get_scan_location()
+            loc = source.get_scan_locations()[0]
 
-        self.assertEqual(loc.repo_path, loc.source_path.parent)
+        self.assertEqual(loc.repo_path, loc.scan_path.parent)
 
     def test_discover_service_finds_flat_files(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -137,14 +155,12 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
             result, errors = discover([source])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 2)
-        names = {r.name for r in result}
-        self.assertEqual(names, {"guide", "tips"})
+        self.assertEqual(set(result), {"guide", "tips"})
 
     def test_discover_service_finds_directory_skills(self):
         archive = _make_archive_from_mock("discover_directory_skills", "repo-main")
@@ -153,14 +169,13 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
             result, errors = discover([source])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].name, "web")
-        self.assertEqual(result[0].kind, SkillKind.dir)
+        self.assertEqual(set(result), {"web"})
+        self.assertEqual(result["web"].kind, SkillKind.dir)
 
     def test_discover_service_missing_subpath_returns_empty(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -169,7 +184,7 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="missing",
+                subpaths=("missing",),
             )
             result, errors = discover([source])
 
@@ -182,12 +197,12 @@ class TestGitHubSource(unittest.TestCase):
         with _mock_download(archive, self.tmpdir):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
-                subpath="skills",
+                subpaths=("skills",),
             )
             result, errors = discover([source])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 2)
+        self.assertEqual(set(result), {"guide", "tips"})
 
     def test_discover_service_ssh_url_accepted(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -196,12 +211,12 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="git@github.com:owner/repo.git",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
             result, errors = discover([source])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 2)
+        self.assertEqual(set(result), {"guide", "tips"})
 
     def test_discover_service_single_skill_file(self):
         """A single *.skill.md file selected via subpath is treated as a flat skill."""
@@ -211,14 +226,13 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills/nested/guide.skill.md",
+                subpaths=("skills/nested/guide.skill.md",),
             )
             result, errors = discover([source])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].name, "guide")
-        self.assertEqual(result[0].kind, SkillKind.flat)
+        self.assertEqual(set(result), {"guide"})
+        self.assertEqual(result["guide"].kind, SkillKind.flat)
 
     def test_discover_service_multiple_subpaths(self):
         """Multiple subpaths can be provided as separate GitHubSource instances."""
@@ -229,20 +243,18 @@ class TestGitHubSource(unittest.TestCase):
                 GitHubSource(
                     repo_url="https://github.com/owner/repo",
                     tree="main",
-                    subpath="skills",
+                    subpaths=("skills",),
                 ),
                 GitHubSource(
                     repo_url="https://github.com/owner/repo",
                     tree="main",
-                    subpath="docs",
+                    subpaths=("docs",),
                 ),
             ]
             result, errors = discover(sources)
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 2)
-        names = {r.name for r in result}
-        self.assertEqual(names, {"web", "guide"})
+        self.assertEqual(set(result), {"web", "guide"})
 
     def test_discover_service_mixed_subpaths(self):
         """Both directory and single-file subpaths can be discovered."""
@@ -253,23 +265,20 @@ class TestGitHubSource(unittest.TestCase):
                 GitHubSource(
                     repo_url="https://github.com/owner/repo",
                     tree="main",
-                    subpath="skills",
+                    subpaths=("skills",),
                 ),
                 GitHubSource(
                     repo_url="https://github.com/owner/repo",
                     tree="main",
-                    subpath="docs/quickstart.skill.md",
+                    subpaths=("docs/quickstart.skill.md",),
                 ),
             ]
             result, errors = discover(sources)
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(result), 2)
-        by_name = {r.name: r for r in result}
-        self.assertIn("web", by_name)
-        self.assertEqual(by_name["web"].kind, SkillKind.dir)
-        self.assertIn("quickstart", by_name)
-        self.assertEqual(by_name["quickstart"].kind, SkillKind.flat)
+        self.assertEqual(set(result), {"web", "quickstart"})
+        self.assertEqual(result["web"].kind, SkillKind.dir)
+        self.assertEqual(result["quickstart"].kind, SkillKind.flat)
 
     def test_cleanup_removes_extracted_directory(self):
         archive = _make_archive_from_mock("discover_flat_files", "repo-main")
@@ -278,9 +287,9 @@ class TestGitHubSource(unittest.TestCase):
             source = GitHubSource(
                 repo_url="https://github.com/owner/repo",
                 tree="main",
-                subpath="skills",
+                subpaths=("skills",),
             )
-            loc = source.get_scan_location()
+            loc = source.get_scan_locations()[0]
             extracted = loc.repo_path.parent
 
         self.assertTrue(extracted.exists())
@@ -291,7 +300,7 @@ class TestGitHubSource(unittest.TestCase):
         source = GitHubSource(
             repo_url="https://github.com/owner/repo",
             tree="main",
-            subpath="skills",
+            subpaths=("skills",),
         )
         self.assertEqual(
             source.to_dict(),

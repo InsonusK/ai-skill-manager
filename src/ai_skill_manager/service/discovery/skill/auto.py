@@ -24,17 +24,23 @@ from typing import List, Optional, Tuple
 from ....entities.skill_v2 import Skill
 from ....entities.source import Source
 from ....entities.source.local import LocalSource
+from ....models import Result
 from .templates import AgentTemplate, HumanDirPattern, HumanFlatPattern, absSkillTemplate
-from .abs_discovery_strategy import absDiscoveryStrategy
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
 
 
-class AutoDiscovery(absDiscoveryStrategy):
+class AutoDiscovery:
     """Recursively auto-detect skills of any supported format.
 
     Рекурсивно автоматически обнаруживает навыки любого поддерживаемого формата.
+
+    The only discovery strategy in use, so it is a plain concrete class
+    rather than an implementation of a strategy abstraction.
+
+    Единственная используемая стратегия обнаружения, поэтому это простой
+    конкретный класс, а не реализация абстракции стратегии.
     """
 
     # Flat patterns are applied to files directly inside a scanned directory.
@@ -58,8 +64,15 @@ class AutoDiscovery(absDiscoveryStrategy):
                 используются только для настройки ``skip_folder``; по
                 умолчанию LocalSource для ``source_path``.
         """
-        super().__init__(source_path)
-        source = source if source is not None else LocalSource(self.source_path)
+        if not source_path.exists():
+            # Log missing source but keep the path for downstream handling.
+            # Логируем отсутствующий источник, но сохраняем путь для дальнейшей обработки.
+            logger.error("source_path not found: %s", source_path)
+        # Store the absolute path to avoid ambiguity during scanning.
+        # Сохраняем абсолютный путь, чтобы избежать неоднозначности при сканировании.
+        self.source_path = source_path.resolve()
+
+        source = source if source is not None else LocalSource(scan_paths=(self.source_path,))
         self._skip_folders: Tuple[str, ...] = getattr(source, "skip_folder", ("examples",))
         self._errors: List[str] = []
 
@@ -76,7 +89,7 @@ class AutoDiscovery(absDiscoveryStrategy):
             dir_descs,
         )
 
-    def discover(self) -> Tuple[List[Skill], List[str]]:
+    def discover(self) -> Result[List[Skill]]:
         """Recursively discover all skills at the source path.
 
         Рекурсивно обнаружить все навыки по пути источника.
@@ -93,18 +106,18 @@ class AutoDiscovery(absDiscoveryStrategy):
             # Missing source produces an empty result; the base class logs the error.
             # Отсутствующий источник даёт пустой результат; базовый класс логирует ошибку.
             logger.debug("Source path does not exist: %s", self.source_path)
-            return [], []
+            return Result([], [])
 
         if self.source_path.is_file():
             # A file can only match flat patterns.
             # Файл может соответствовать только плоским паттернам.
             logger.debug("Source path is a file, matching flat patterns only")
-            return self._handle_file(self.source_path), self._errors
+            return Result(self._handle_file(self.source_path), self._errors)
 
         # Directories are scanned recursively for both flat and directory patterns.
         # Директории сканируются рекурсивно на предмет плоских и директориальных паттернов.
         logger.debug("Source path is a directory, scanning recursively")
-        return self._scan_directory(self.source_path), self._errors
+        return Result(self._scan_directory(self.source_path), self._errors)
 
     def _match_flat_patterns(self, path: Path) -> List[Tuple[Skill, absSkillTemplate]]:
         """Return all flat-pattern matches for a file path.

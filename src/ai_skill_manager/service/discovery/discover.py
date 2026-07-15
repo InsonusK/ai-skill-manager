@@ -1,20 +1,22 @@
 """Discovery service.
 
-High-level helper that resolves each configured source to its scan location
-and returns the combined list of skills.
+High-level helper that resolves each configured source to its scan
+locations and returns the combined name-keyed skill dict.
 
 Сервис обнаружения.
 Высокоуровневый помощник, который разрешает каждый настроенный источник
-в его локацию сканирования и возвращает объединённый список навыков.
+в его локации сканирования и возвращает объединённый словарь навыков,
+индексированный по имени.
 """
 
 import logging
-from pathlib import Path
-from typing import Iterator, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence
 
 from .skill import AutoDiscovery
-from ...entities import GitHubSource, LocalSource, Source
+from ...entities import Source
 from ...entities.skill_v2 import Skill
+from ...functions.skill_dict_builder import SkillDictBuilder
+from ...models import Result
 from ...progress import ProgressCallback
 from ...functions.tag_filter import filter_skills_by_tags
 
@@ -22,37 +24,10 @@ from ...functions.tag_filter import filter_skills_by_tags
 logger = logging.getLogger(__name__)
 
 
-def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
-    """Yield sources, splitting GitHub sources with a list subpath.
-
-    Возвращает источники, разбивая GitHub-источники со списком подпутей.
-
-    A single :class:`GitHubSource` always refers to exactly one scan location.
-    If the legacy list form is used, it is expanded into multiple instances
-    so that each subpath is scanned independently.
-
-    Один :class:`GitHubSource` всегда ссылается ровно на одну локацию
-    сканирования. Если используется устаревшая форма списка, она разворачивается
-    в несколько экземпляров, чтобы каждый подпуть сканировался независимо.
-    """
-    for src in sources:
-        if isinstance(src, GitHubSource) and isinstance(src.subpath, list):
-            for sp in src.subpath:
-                yield GitHubSource(
-                    repo_url=src.repo_url,
-                    tree=src.tree,
-                    subpath=sp,
-                    tags=src.tags,
-                    skip_folder=src.skip_folder,
-                )
-        else:
-            yield src
-
-
 def discover(
     sources: Sequence[Source],
     progress: Optional[ProgressCallback] = None,
-) -> Tuple[List[Skill], List[str]]:
+) -> Result[Dict[str, Skill]]:
     """Discover skills from a list of sources.
 
     Discover skills from a list of sources.
@@ -60,18 +35,25 @@ def discover(
     Обнаружить навыки из списка источников.
 
     Args:
-        sources: Skill sources to scan. / Источники навыков для сканирования.
+        sources: Skill sources to scan. Expected to already be fully formed
+            (e.g. built by :class:`SourceFactory`), with any local paths
+            already resolved to absolute form. /
+            Источники навыков для сканирования. Ожидаются уже полностью
+            сформированными (например, построенными :class:`SourceFactory`),
+            с локальными путями, уже разрешёнными в абсолютную форму.
         progress: Optional ``(stage, current, total)`` callback for progress
             reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
-        The discovered ``Skill`` objects and any per-candidate errors (e.g. a
-        missing frontmatter name) collected while scanning. Structural
-        conflicts (e.g. ambiguous pattern matches) still raise. /
-        Обнаруженные объекты ``Skill`` и любые ошибки по кандидатам
-        (например, отсутствующее имя во frontmatter), собранные при
-        сканировании. Структурные конфликты (например, неоднозначные
-        совпадения паттернов) по-прежнему вызывают исключение.
+        The discovered skills keyed by name, and any per-candidate errors
+        (e.g. a missing frontmatter name, or two different skills sharing a
+        name) collected while scanning. Structural conflicts (e.g. ambiguous
+        pattern matches) still raise. /
+        Обнаруженные скиллы, индексированные по имени, и любые ошибки по
+        кандидатам (например, отсутствующее имя во frontmatter, либо два
+        разных скилла с одинаковым именем), собранные при сканировании.
+        Структурные конфликты (например, неоднозначные совпадения паттернов)
+        по-прежнему вызывают исключение.
 
     Raises:
         ValueError: If an unknown source type is encountered, or a structural
@@ -81,49 +63,44 @@ def discover(
     """
     all_skills: List[Skill] = []
     all_errors: List[str] = []
-    normalized_sources = list(_normalize_github_sources(sources))
+    sources = list(sources)
 
-    logger.debug("Discovering skills from %d source(s)", len(normalized_sources))
+    logger.debug("Discovering skills from %d source(s)", len(sources))
 
     if progress is not None:
-        progress("discover", 0, len(normalized_sources))
+        progress("discover", 0, len(sources))
 
-    for index, src in enumerate(normalized_sources, start=1):
-        # Local paths are resolved to absolute form before scanning.
-        # Локальные пути разрешаются в абсолютную форму перед сканированием.
-        if isinstance(src, LocalSource):
-            src = LocalSource(
-                scan_path=Path(src.scan_path).resolve(),
-                repo_path=Path(src.repo_path).resolve() if src.repo_path else None,
-                original_repo_path=Path(src.original_repo_path).resolve()
-                if src.original_repo_path
-                else None,
-                tags=src.tags,
-                skip_folder=src.skip_folder,
-            )
-
-        scan_location = src.get_scan_location()
+    for index, src in enumerate(sources, start=1):
+        scan_locations = src.get_scan_locations()
         logger.debug(
-            "Source %d/%d: %s (type=%s)",
+            "Source %d/%d: %s (type=%s, %d scan location(s))",
             index,
-            len(normalized_sources),
+            len(sources),
             src,
             src.source_type,
+            len(scan_locations),
         )
-        logger.debug(
-            "Resolved scan location: repo_path=%s source_path=%s",
-            scan_location.repo_path,
-            scan_location.source_path,
-        )
-        strategy = AutoDiscovery(
-            source_path=scan_location.source_path,
-            source=src,
-        )
-        source_skills, source_errors = strategy.discover()
+
+        source_skills: List[Skill] = []
+        source_errors: List[str] = []
+        for scan_location in scan_locations:
+            logger.debug(
+                "Resolved scan location: repo_path=%s scan_path=%s",
+                scan_location.repo_path,
+                scan_location.scan_path,
+            )
+            strategy = AutoDiscovery(
+                source_path=scan_location.scan_path,
+                source=src,
+            )
+            location_skills, location_errors = strategy.discover()
+            source_skills.extend(location_skills)
+            source_errors.extend(location_errors)
+
         logger.debug(
             "Source %d/%d discovered %d skill(s)",
             index,
-            len(normalized_sources),
+            len(sources),
             len(source_skills),
         )
 
@@ -132,23 +109,20 @@ def discover(
             logger.debug(
                 "Source %d/%d retained %d skill(s) after tag filter",
                 index,
-                len(normalized_sources),
+                len(sources),
                 len(source_skills),
             )
 
         all_skills.extend(source_skills)
         all_errors.extend(source_errors)
         if progress is not None:
-            progress("discover", index, len(normalized_sources))
+            progress("discover", index, len(sources))
 
-    # EN: Remove duplicate skills discovered from overlapping sources.
-    # RU: Убираем дублирующиеся навыки, обнаруженные из пересекающихся источников.
-    seen: set = set()
-    deduplicated: List[Skill] = []
-    for skill in all_skills:
-        if skill in seen:
-            continue
-        seen.add(skill)
-        deduplicated.append(skill)
+    # EN: Index by name, collecting an error for each name collision instead
+    # of a plain list with duplicates from overlapping sources.
+    # RU: Индексируем по имени, собирая ошибку при каждой коллизии имён вместо
+    # простого списка с дубликатами из пересекающихся источников.
+    skills_by_name, collision_errors = SkillDictBuilder().build(all_skills)
+    all_errors.extend(collision_errors)
 
-    return deduplicated, all_errors
+    return Result(skills_by_name, all_errors)

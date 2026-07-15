@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 
-from typing import List, Sequence, Tuple, TYPE_CHECKING
+from typing import Dict, Sequence, TYPE_CHECKING
 
+from ..models import Result
 from ..service.discovery.discover import discover
 
 if TYPE_CHECKING:
@@ -23,27 +24,30 @@ class SkillDiscovery:
 
     Reuses the existing source-scanning/pattern-matching/tag-filtering
     machinery (``service.discovery.discover.discover``) unchanged - it
-    already builds and returns the new model's ``Skill`` directly, collecting
-    a per-candidate error (e.g. a missing/invalid frontmatter name) instead
-    of stopping at the first one.
+    already builds and returns the new model's ``Skill`` directly, keyed by
+    name, collecting a per-candidate error (e.g. a missing/invalid
+    frontmatter name, or a name collision) instead of stopping at the first
+    one.
 
     Переиспользует существующий механизм сканирования источников/сопоставления
     по паттернам/фильтрации по тегам (``service.discovery.discover.discover``)
-    без изменений - он уже строит и возвращает ``Skill`` новой модели напрямую,
-    собирая ошибку по каждому кандидату (например, отсутствующее/некорректное
-    имя во frontmatter) вместо остановки на первой из них.
+    без изменений - он уже строит и возвращает ``Skill`` новой модели
+    напрямую, индексированные по имени, собирая ошибку по каждому кандидату
+    (например, отсутствующее/некорректное имя во frontmatter, либо коллизия
+    имён) вместо остановки на первой из них.
     """
 
-    def discover(self, sources: Sequence["Source"]) -> Tuple[List["Skill"], List[str]]:
+    def discover(self, sources: Sequence["Source"]) -> Result[Dict[str, "Skill"]]:
         """Discover skills from ``sources``.
 
         Обнаруживает скиллы из ``sources``.
 
         Returns:
-            The discovered skills and any per-candidate errors. Discovery
-            does not stop at the first error - every candidate is attempted.
-                / Обнаруженные скиллы и ошибки по каждому кандидату.
-                Обнаружение не останавливается на первой ошибке - каждый
-                кандидат обрабатывается.
+            The discovered skills keyed by name, and any per-candidate
+            errors. Discovery does not stop at the first error - every
+            candidate is attempted.
+                / Обнаруженные скиллы, индексированные по имени, и любые
+                ошибки по кандидатам. Обнаружение не останавливается на
+                первой ошибке - каждый кандидат обрабатывается.
         """
         return discover(sources)

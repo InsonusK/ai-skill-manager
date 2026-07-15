@@ -137,24 +137,28 @@ class TestFilterSkillsByTags(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_filter_keeps_matching_skills(self):
-        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_paths=(self.source_dir,))])
+        skills = list(skills.values())
         self.assertEqual(len(skills), 3)
 
         filtered = filter_skills_by_tags(skills, ["python"])
         self.assertEqual({s.name for s in filtered}, {"py"})
 
     def test_filter_with_and(self):
-        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_paths=(self.source_dir,))])
+        skills = list(skills.values())
         filtered = filter_skills_by_tags(skills, ["python & cli"])
         self.assertEqual({s.name for s in filtered}, {"py"})
 
     def test_filter_with_not(self):
-        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_paths=(self.source_dir,))])
+        skills = list(skills.values())
         filtered = filter_skills_by_tags(skills, ["!python"])
         self.assertEqual({s.name for s in filtered}, {"web", "notags"})
 
     def test_no_expressions_returns_all(self):
-        skills, _errors = discover([LocalSource(scan_path=self.source_dir)])
+        skills, _errors = discover([LocalSource(scan_paths=(self.source_dir,))])
+        skills = list(skills.values())
         self.assertEqual(len(filter_skills_by_tags(skills, [])), 3)
 
 

@@ -21,30 +21,29 @@ class TestSkillDiscovery(unittest.TestCase):
     def test_discovers_flat_skill(self):
         (self.tmp / "guide.skill.md").write_text("---\nname: guide\n---\n")
 
-        skills, errors = self.discovery.discover([LocalSource(scan_path=self.tmp)])
+        skills, errors = self.discovery.discover([LocalSource(scan_paths=(self.tmp,))])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(skills), 1)
-        self.assertEqual(skills[0].name, "guide")
-        self.assertEqual(skills[0].kind, SkillKind.flat)
+        self.assertEqual(set(skills), {"guide"})
+        self.assertEqual(skills["guide"].kind, SkillKind.flat)
 
     def test_discovers_dir_skill(self):
         folder = self.tmp / "web"
         folder.mkdir()
         (folder / "SKILL.md").write_text("---\nname: web\n---\n")
 
-        skills, errors = self.discovery.discover([LocalSource(scan_path=self.tmp)])
+        skills, errors = self.discovery.discover([LocalSource(scan_paths=(self.tmp,))])
 
         self.assertEqual(errors, [])
-        self.assertEqual(len(skills), 1)
-        self.assertEqual(skills[0].kind, SkillKind.dir)
+        self.assertEqual(set(skills), {"web"})
+        self.assertEqual(skills["web"].kind, SkillKind.dir)
 
     def test_reports_error_for_missing_name(self):
         (self.tmp / "guide.skill.md").write_text("# no frontmatter\n")
 
-        skills, errors = self.discovery.discover([LocalSource(scan_path=self.tmp)])
+        skills, errors = self.discovery.discover([LocalSource(scan_paths=(self.tmp,))])
 
-        self.assertEqual(skills, [])
+        self.assertEqual(skills, {})
         self.assertEqual(len(errors), 1)
 
     def test_discovers_across_multiple_sources(self):
@@ -56,11 +55,11 @@ class TestSkillDiscovery(unittest.TestCase):
         (source_b / "skill-b.skill.md").write_text("---\nname: skill-b\n---\n")
 
         skills, errors = self.discovery.discover(
-            [LocalSource(scan_path=source_a), LocalSource(scan_path=source_b)]
+            [LocalSource(scan_paths=(source_a,)), LocalSource(scan_paths=(source_b,))]
         )
 
         self.assertEqual(errors, [])
-        self.assertEqual({s.name for s in skills}, {"skill-a", "skill-b"})
+        self.assertEqual(set(skills), {"skill-a", "skill-b"})
 
 
 if __name__ == "__main__":

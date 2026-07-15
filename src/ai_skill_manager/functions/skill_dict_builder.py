@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, Iterable, List, Optional, TYPE_CHECKING
+
+from ..models import Result
 
 if TYPE_CHECKING:
     from ..entities.skill_v2 import Skill
@@ -22,7 +24,7 @@ class SkillDictBuilder:
         self,
         skills: Iterable["Skill"],
         existing: Optional[Dict[str, "Skill"]] = None,
-    ) -> Tuple[Dict[str, "Skill"], List[str]]:
+    ) -> Result[Dict[str, "Skill"]]:
         """Insert ``skills`` into ``existing`` (or a new dict) by name.
 
         Вставляет ``skills`` в ``existing`` (или новый словарь) по имени.
@@ -37,13 +39,13 @@ class SkillDictBuilder:
                 скиллом, не вставляется и порождает ошибку; повторное
                 добавление того же самого скилла - тихий no-op.
         """
-        result = dict(existing) if existing else {}
+        skills_by_name = dict(existing) if existing else {}
         errors: List[str] = []
 
         for skill in skills:
-            current = result.get(skill.name)
+            current = skills_by_name.get(skill.name)
             if current is None:
-                result[skill.name] = skill
+                skills_by_name[skill.name] = skill
                 continue
             if current == skill:
                 continue
@@ -52,4 +54,4 @@ class SkillDictBuilder:
                 f"{current.path} and {skill.path}"
             )
 
-        return result, errors
+        return Result(skills_by_name, errors)

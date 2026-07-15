@@ -1,6 +1,12 @@
-"""Public models used by link discovery and its exclude rules.
+"""Public models shared across the codebase.
 
-Открытые модели, используемые обнаружением ссылок и его правилами исключения.
+Открытые модели, используемые в разных частях кодовой базы.
 """
 
 from .link_with_context import LinkWithContext
+from .result import Result
+
+__all__ = [
+    "LinkWithContext",
+    "Result",
+]

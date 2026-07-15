@@ -13,7 +13,6 @@ from typing import List, Optional, Sequence
 from .sync_command import SyncCommand, SyncTarget
 from ..config import (
     TargetSpec,
-    build_sources_from_config,
     load_config,
     parse_target_settings,
 )
@@ -23,6 +22,7 @@ from ..functions.copy_skills import (
     OrphanRemovingCopySkills,
     resolve_copy_skills,
 )
+from ..service.source_factory import SourceFactory
 from ..sync_exception import SyncFailedError
 
 DEFAULT_TARGET = ".agents/skills"
@@ -145,7 +145,7 @@ def run_sync(
             if add_relations is None:
                 add_relations = settings.get("add_relations", False)
 
-            resolved_sources = build_sources_from_config(config_path)
+            resolved_sources = SourceFactory().create_from_config(config_path)
         else:
             resolved_sources = sources
             targets = _single_target(target_dir)

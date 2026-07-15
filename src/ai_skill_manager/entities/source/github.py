@@ -137,24 +137,24 @@ class GitHubSource(Source):
     Attributes:
         repo_url: GitHub repository URL. / URL репозитория GitHub.
         tree: Git tree, branch or tag to use. / Ветка, дерево или тег Git.
-        subpath: Single subpath inside the repository to scan. Use multiple
-            :class:`GitHubSource` instances to scan several subpaths.
-            Один подпуть внутри репозитория для сканирования. Для сканирования
-            нескольких подпутей используйте несколько экземпляров
-            :class:`GitHubSource`.
+        subpaths: Subpaths inside the repository to scan. The repository is
+            downloaded and extracted once and reused for every subpath.
+            Подпути внутри репозитория для сканирования. Репозиторий
+            скачивается и распаковывается один раз и переиспользуется для
+            каждого подпути.
     """
     class Context:
-        scan_cache:Optional[ScanLocation] = None
+        scan_cache: Optional[List[ScanLocation]] = None
         extracted_dirs:List[Path] = []
-        
+
     repo_url: str
     #: GitHub repository URL. / URL репозитория GitHub.
 
     tree: str = "master"
     #: Git tree, branch or tag to use. / Ветка, дерево или тег Git.
 
-    subpath: Optional[str] = None
-    #: Subpath inside the repository to scan. / Подпуть внутри репозитория для сканирования.
+    subpaths: Tuple[Optional[str], ...] = (None,)
+    #: Subpaths inside the repository to scan. / Подпути внутри репозитория для сканирования.
 
     tags: Tuple[str, ...] = ()
     #: Tag filter expressions applied to skills from this source.
@@ -171,8 +171,9 @@ class GitHubSource(Source):
 
     def __str__(self) -> str:
         parts = [self.repo_url, self.tree]
-        if self.subpath:
-            parts.append(self.subpath)
+        named_subpaths = [sp for sp in self.subpaths if sp]
+        if named_subpaths:
+            parts.append(",".join(named_subpaths))
         return " ".join(parts)
 
     @property
@@ -193,34 +194,39 @@ class GitHubSource(Source):
             "repo_url": self.repo_url,
             "tree": self.tree,
         }
-        if self.subpath is not None:
-            result["subpath"] = self.subpath
+        named_subpaths = [sp for sp in self.subpaths if sp is not None]
+        if named_subpaths:
+            result["subpath"] = named_subpaths[0] if len(named_subpaths) == 1 else named_subpaths
         if self.tags:
             result["tags"] = list(self.tags)
         if self.skip_folder:
             result["skip_folder"] = list(self.skip_folder)
         return result
 
-    def get_scan_location(self) -> ScanLocation:
-        """Download, extract and return the repository scan location.
+    def get_scan_locations(self) -> List[ScanLocation]:
+        """Download, extract once and return a scan location per subpath.
 
-        Скачать, распаковать и вернуть локацию сканирования репозитория.
+        Скачать, распаковать один раз и вернуть локацию сканирования для
+        каждого подпути.
 
         The result is cached so repeated calls (for example from
-        :class:`LinkWithContext`) do not download the archive again.
-        The downloaded archive file is removed immediately; the extracted
-        directory stays until :meth:`cleanup` is called.
+        :class:`LinkWithContext`) do not download the archive again. The
+        archive is downloaded and extracted a single time regardless of how
+        many subpaths are configured. The downloaded archive file is removed
+        immediately; the extracted directory stays until :meth:`cleanup` is
+        called.
 
         Результат кешируется, чтобы повторные вызовы (например, из
-        :class:`LinkWithContext`) не скачивали архив заново. Скачанный
-        архив удаляется сразу; распакованная директория остаётся до вызова
-        :meth:`cleanup`.
+        :class:`LinkWithContext`) не скачивали архив заново. Архив
+        скачивается и распаковывается один раз независимо от количества
+        настроенных подпутей. Скачанный архив удаляется сразу; распакованная
+        директория остаётся до вызова :meth:`cleanup`.
         """
         if self.__context.scan_cache is not None:
-            logger.debug("Using cached GitHub scan location for %s", self.repo_url)
+            logger.debug("Using cached GitHub scan locations for %s", self.repo_url)
             return self.__context.scan_cache
 
-        logger.debug("Resolving GitHub source: %s tree=%s subpath=%s", self.repo_url, self.tree, self.subpath)
+        logger.debug("Resolving GitHub source: %s tree=%s subpaths=%s", self.repo_url, self.tree, self.subpaths)
         owner, repo = _parse_github_url(self.repo_url)
         archive_path = _download_archive(owner, repo, self.tree)
         try:
@@ -229,18 +235,17 @@ class GitHubSource(Source):
             self.__context.extracted_dirs.append(extracted_dir)
 
             repo_root = _find_extracted_root(extracted_dir)
-            source_path = repo_root / self.subpath if self.subpath else repo_root
-            logger.debug("GitHub scan location: repo_root=%s source_path=%s", repo_root, source_path)
-            if not source_path.exists():
-                logger.error("subpath not found: %s", source_path)
-                # Return a location that AutoDiscovery will treat as missing.
-                # Возвращаем локацию, которую AutoDiscovery обработает как отсутствующую.
-                loc = ScanLocation(repo_path=repo_root, source_path=source_path)
-                self.__context.scan_cache = loc
-                return loc
-            loc = ScanLocation(repo_path=repo_root, source_path=source_path)
-            self.__context.scan_cache = loc
-            return loc
+            locations: List[ScanLocation] = []
+            for subpath in self.subpaths:
+                source_path = repo_root / subpath if subpath else repo_root
+                logger.debug("GitHub scan location: repo_root=%s source_path=%s", repo_root, source_path)
+                if not source_path.exists():
+                    # AutoDiscovery treats a missing scan path as an empty result.
+                    # AutoDiscovery обрабатывает отсутствующий путь сканирования как пустой результат.
+                    logger.error("subpath not found: %s", source_path)
+                locations.append(ScanLocation(repo_path=repo_root, scan_path=source_path))
+            self.__context.scan_cache = locations
+            return locations
         finally:
             archive_path.unlink(missing_ok=True)
 
