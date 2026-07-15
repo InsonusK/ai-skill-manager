@@ -8,12 +8,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Optional, TYPE_CHECKING
 
-from .link_target import SkillLinkTarget
+from ...entities.link.link_target import SkillLinkTarget
+from ...entities.skill_kind import SkillKind
 from ...tools.path_utils import is_relative_to_resolved, same_path, normalize_path
-from ..skill_kind import SkillKind
 
 if TYPE_CHECKING:
-    from ..skill_v2 import Skill
+    from ...entities.skill_v2 import Skill
 
 
 class LinkTargetResolver:

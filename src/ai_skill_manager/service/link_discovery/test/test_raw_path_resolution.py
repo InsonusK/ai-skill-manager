@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.entities.link.raw_path_resolution import resolve_raw_link_path
+from ai_skill_manager.service.link_discovery.raw_path_resolution import resolve_raw_link_path
 
 
 class TestResolveRawLinkPath(unittest.TestCase):

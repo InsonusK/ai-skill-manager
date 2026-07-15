@@ -1,31 +1,35 @@
 """Abstract base class for link builders.
 
-Provides shared helpers for classifying link paths and splitting fragments.
+Provides the shared image-flag helper used by concrete builders. Raw path
+classification (web vs. file, relative vs. absolute) is not this class's
+concern - it lives in ``tools.link_path`` and is applied later, after
+parsing, not while scanning syntax.
 
 Абстрактный базовый класс для сборщиков ссылок.
-Предоставляет общие вспомогательные методы для классификации путей ссылок
-и разделения фрагментов.
+Предоставляет общий вспомогательный метод для флага изображения,
+используемый конкретными сборщиками. Классификация сырого пути (web или
+файл, относительный или абсолютный) - не забота этого класса - она находится
+в ``tools.link_path`` и применяется позже, после разбора, а не во время
+сканирования синтаксиса.
 """
 
 from abc import ABC
-from typing import List, Tuple
-
-from ....entities.path_kind import PathKind
-
+from typing import List
+from ....entities.link import LinkData
 
 class absLinkBuilder(ABC):
     """Base class for all link builders.
 
-    Subclasses must implement :meth:`search` and may reuse the helpers defined
-    here to classify paths and split fragments.
+    Subclasses must implement :meth:`search`. Only pure syntax concerns
+    (e.g. detecting an image marker) are shared here.
 
     Базовый класс для всех сборщиков ссылок.
-    Подклассы должны реализовать :meth:`search` и могут использовать
-    определённые здесь вспомогательные методы для классификации путей
-    и разделения фрагментов.
+    Подклассы должны реализовать :meth:`search`. Здесь общими являются
+    только чисто синтаксические аспекты (например, обнаружение маркера
+    изображения).
     """
 
-    def search(self, content: str) -> List:
+    def search(self, content: str) -> List[LinkData]:
         """Search ``content`` for links supported by this builder.
 
         Search ``content`` for links supported by this builder.
@@ -39,26 +43,6 @@ class absLinkBuilder(ABC):
             List of matched link objects. / Список найденных объектов ссылок.
         """
         ...
-
-    def _split_fragment(self, path: str) -> Tuple[str, str]:
-        """Split a path into path and ``#fragment`` parts.
-
-        Split a path into path and ``#fragment`` parts.
-
-        Разделить путь на часть пути и часть ``#fragment``.
-
-        Args:
-            path: Raw link path possibly containing ``#``. /
-                Исходный путь ссылки, возможно содержащий ``#``.
-
-        Returns:
-            Tuple of (path_without_fragment, fragment_or_empty_string). /
-            Кортеж (путь_без_фрагмента, фрагмент_или_пустая_строка).
-        """
-        if "#" in path:
-            path_clean, header = path.split("#", 1)
-            return path_clean, f"#{header}"
-        return path, ""
 
     def _is_image(self, raw: str) -> bool:
         """Return ``True`` if the raw link is an image reference.
@@ -76,86 +60,3 @@ class absLinkBuilder(ABC):
             ``True``, когда ссылка начинается с ``!``.
         """
         return raw.startswith("!")
-
-    def _get_kind(self, path: str) -> PathKind:
-        """Classify a local link path into a :class:`PathKind`.
-
-        Classify a local link path into a :class:`PathKind`.
-
-        Классифицировать локальный путь ссылки по значению :class:`PathKind`.
-
-        Args:
-            path: Clean link path without fragment. /
-                Очищенный путь ссылки без фрагмента.
-
-        Returns:
-            The determined path kind. / Определённый вид пути.
-
-        Raises:
-            ValueError: If the path cannot be classified or is a web URI. /
-                Если путь невозможно классифицировать или является веб-URI.
-        """
-        if self._is_relative(path):
-            return PathKind.relative
-        elif self._is_os_absolute(path):
-            return PathKind.os_absolute
-        elif self._is_http_link(path):
-            raise ValueError(f"Web links are represented by WebLink: {path}")
-        else:
-            return PathKind.repo_absolute
-
-    def _is_http_link(self, path: str) -> bool:
-        """Return ``True`` for web/mailto/ftp/file links.
-
-        Return ``True`` for web/mailto/ftp/file links.
-
-        Вернуть ``True`` для web/mailto/ftp/file ссылок.
-
-        Args:
-            path: Link path to check. / Путь ссылки для проверки.
-
-        Returns:
-            ``True`` for links starting with common URI schemes. /
-            ``True`` для ссылок, начинающихся с распространённых URI-схем.
-        """
-        lower = path.lower()
-        return lower.startswith(("http://", "https://", "mailto:", "ftp://", "file://"))
-
-    def _is_relative(self, path: str) -> bool:
-        """Return ``True`` for links starting with ``./`` or ``../``.
-
-        Return ``True`` for links starting with ``./`` or ``../``.
-
-        Вернуть ``True`` для ссылок, начинающихся с ``./`` или ``../``.
-
-        Args:
-            path: Link path to check. / Путь ссылки для проверки.
-
-        Returns:
-            ``True`` when the path is a relative filesystem reference. /
-            ``True``, когда путь является относительной файловой ссылкой.
-        """
-        # Accept both POSIX and Windows relative prefixes.
-        # Принимаем относительные префиксы как POSIX, так и Windows.
-        return path.replace("\\", "/").startswith(("./", "../"))
-
-    def _is_os_absolute(self, path: str) -> bool:
-        """Return ``True`` for OS-absolute paths starting with ``/``.
-
-        Return ``True`` for OS-absolute paths starting with ``/``.
-
-        Вернуть ``True`` для абсолютных путей ОС, начинающихся с ``/``.
-
-        Args:
-            path: Link path to check. / Путь ссылки для проверки.
-
-        Returns:
-            ``True`` when the path is absolute on the local filesystem. /
-            ``True``, когда путь абсолютен в локальной файловой системе.
-        """
-        normalized = path.replace("\\", "/")
-        if normalized.startswith("/"):
-            return True
-        # Windows drive-letter paths such as C:/foo/bar are OS-absolute too.
-        # Пути с буквой диска Windows, например C:/foo/bar, тоже являются абсолютными.
-        return len(normalized) >= 2 and normalized[1] == ":"

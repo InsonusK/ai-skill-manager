@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..path_kind import PathKind
-from .path_link import _classify_raw_path, _existing_file
+from ...entities.path_kind import PathKind
+from ...tools.link_path import classify_raw_path, existing_file
 
 
 def resolve_raw_link_path(raw_path: str, file_absolute_path: Path, repo_path: Path) -> Path:
@@ -44,7 +44,7 @@ def resolve_raw_link_path(raw_path: str, file_absolute_path: Path, repo_path: Pa
         отсутствующая цель.
     """
     normalized_raw_path = raw_path.replace("\\", "/")
-    kind = _classify_raw_path(normalized_raw_path)
+    kind = classify_raw_path(normalized_raw_path)
 
     if kind == PathKind.relative:
         candidate = (file_absolute_path.parent / normalized_raw_path).resolve()
@@ -55,5 +55,5 @@ def resolve_raw_link_path(raw_path: str, file_absolute_path: Path, repo_path: Pa
     else:
         raise ValueError(f"Unknown raw path kind: {kind}")
 
-    existing = _existing_file(candidate)
+    existing = existing_file(candidate)
     return existing if existing is not None else candidate

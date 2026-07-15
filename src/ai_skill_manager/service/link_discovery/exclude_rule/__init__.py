@@ -5,8 +5,9 @@
 
 from typing import List, Optional
 
-from ..validation_settings import ValidationSettings
+from ....validation_settings import ValidationSettings
 from .abs_exclude_rule import absExcludeRule
+from .example_block_exclude_rule import ExampleBlockExcludeRule
 from .inline_code_exclude_rule import InlineCodeExcludeRule
 from .skip_folder_exclude_rule import SkipFolderExcludeRule
 from .web_link_exclude_rule import WebLinkExcludeRule
@@ -29,6 +30,7 @@ def build_link_exclude_rules(
     """
     skip_folders = settings.link_skip_folders if settings is not None else None
     return [
+        ExampleBlockExcludeRule(),
         InlineCodeExcludeRule(),
         WebLinkExcludeRule(),
         SkipFolderExcludeRule(skip_folders=skip_folders),
@@ -38,6 +40,7 @@ def build_link_exclude_rules(
 __all__ = [
     "absExcludeRule",
     "build_link_exclude_rules",
+    "ExampleBlockExcludeRule",
     "InlineCodeExcludeRule",
     "SkipFolderExcludeRule",
     "WebLinkExcludeRule",

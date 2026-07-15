@@ -1,4 +1,4 @@
-"""Tests for FileLinkFactory."""
+"""Tests for FileLinkResolver."""
 
 import shutil
 import tempfile
@@ -6,16 +6,17 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.service.link_discovery import search_links_in_content
-from ai_skill_manager.entities.link.file_link_factory import FileLinkFactory
+from ai_skill_manager.service.link_discovery.file_link_resolver import FileLinkResolver
 from ai_skill_manager.entities.link.link_target import ExternalLinkTarget, SkillLinkTarget
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
+from ai_skill_manager.models.skill_relation_queuer import SkillRelationQueuer
 
 
-class TestFileLinkFactory(unittest.TestCase):
+class TestFileLinkResolver(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.factory = FileLinkFactory()
+        self.resolver = FileLinkResolver()
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -34,9 +35,9 @@ class TestFileLinkFactory(unittest.TestCase):
         skill_a_file.parent.mkdir()
         raw_link = self._parsed_link(skill_a_file, "[b](../skill-b/SKILL.md)\n")
 
-        file_link, error = self.factory.build(
+        file_link, error = self.resolver.build(
             raw_link, file_absolute_path=skill_a_file, repo_path=self.tmp,
-            known_skills={"skill-b": skill_b}, queue=[], add_relations=False,
+            known_skills={"skill-b": skill_b}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertIsNone(error)
@@ -48,9 +49,9 @@ class TestFileLinkFactory(unittest.TestCase):
         (self.tmp / "shared.md").write_text("# Shared\n")
         raw_link = self._parsed_link(skill_a_file, "[shared](../shared.md)\n")
 
-        file_link, error = self.factory.build(
+        file_link, error = self.resolver.build(
             raw_link, file_absolute_path=skill_a_file, repo_path=self.tmp,
-            known_skills={}, queue=[], add_relations=False,
+            known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertIsNone(error)
@@ -65,16 +66,16 @@ class TestFileLinkFactory(unittest.TestCase):
         skill_a_file.parent.mkdir()
         raw_link = self._parsed_link(skill_a_file, "[c](../skill-c/SKILL.md)\n")
 
-        queue = []
-        file_link, error = self.factory.build(
+        queuer = SkillRelationQueuer(add_relations=True)
+        file_link, error = self.resolver.build(
             raw_link, file_absolute_path=skill_a_file, repo_path=self.tmp,
-            known_skills={}, queue=queue, add_relations=True,
+            known_skills={}, skill_relation_queuer=queuer,
         )
 
         self.assertIsNone(error)
         self.assertEqual(file_link.target, SkillLinkTarget(skill_name="skill-c", relative_path=Path("SKILL.md")))
-        self.assertEqual(len(queue), 1)
-        self.assertEqual(queue[0].name, "skill-c")
+        self.assertEqual(len(queuer.queue), 1)
+        self.assertEqual(queuer.queue[0].name, "skill-c")
 
     def test_unknown_skill_errors_when_add_relations_disabled(self):
         skill_c_dir = self.tmp / "skill-c"
@@ -85,9 +86,9 @@ class TestFileLinkFactory(unittest.TestCase):
         skill_a_file.parent.mkdir()
         raw_link = self._parsed_link(skill_a_file, "[c](../skill-c/SKILL.md)\n")
 
-        file_link, error = self.factory.build(
+        file_link, error = self.resolver.build(
             raw_link, file_absolute_path=skill_a_file, repo_path=self.tmp,
-            known_skills={}, queue=[], add_relations=False,
+            known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertIsNone(file_link)
@@ -98,9 +99,9 @@ class TestFileLinkFactory(unittest.TestCase):
         skill_a_file.parent.mkdir()
         raw_link = self._parsed_link(skill_a_file, "[bad](../nowhere.md)\n")
 
-        file_link, error = self.factory.build(
+        file_link, error = self.resolver.build(
             raw_link, file_absolute_path=skill_a_file, repo_path=self.tmp,
-            known_skills={}, queue=[], add_relations=False,
+            known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertIsNone(file_link)

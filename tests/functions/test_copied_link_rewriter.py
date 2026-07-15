@@ -9,8 +9,9 @@ from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.external_file_copier import ExternalFileCopier
-from ai_skill_manager.functions.file_discovery import discover as discover_files
-from ai_skill_manager.functions.link_discovery import LinkDiscovery
+from ai_skill_manager.service.file_discovery import discover as discover_files
+from ai_skill_manager.service.link_discovery.link_discovery import LinkDiscovery
+from ai_skill_manager.models import SkillRelationQueuer
 from ai_skill_manager.functions.copied_link_rewriter import CopiedLinkRewriter
 from ai_skill_manager.functions.skill_file_copier import SkillFileCopier
 
@@ -45,8 +46,7 @@ class TestCopiedLinkRewriter(unittest.TestCase):
                 skill.file_absolute_path(skill_file),
                 repo_path=self.source_repo_path,
                 known_skills=known_skills,
-                queue=[],
-                add_relations=False,
+                skill_relation_queuer=SkillRelationQueuer(add_relations=False),
             )
             skill_file.links.extend(links)
         return self.skill_copier.copy(skill, self.target_dir)

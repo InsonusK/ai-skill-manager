@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.file_discovery import discover as discover_files
+from ai_skill_manager.service.file_discovery import discover as discover_files
 from ai_skill_manager.functions.skill_file_copier import SkillFileCopier
 
 

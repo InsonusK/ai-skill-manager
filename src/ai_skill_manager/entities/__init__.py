@@ -5,5 +5,5 @@
 
 from .path_kind import PathKind
 
-from .link import absLink, PathLink, WebLink
+from .link import absLink, FileLink, LinkData, WebLink
 from .source import GitHubSource, LocalSource, Source

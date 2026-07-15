@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities.link.link_target import SkillLinkTarget
-from ai_skill_manager.entities.link.link_target_resolver import LinkTargetResolver
+from ai_skill_manager.service.link_discovery.link_target_resolver import LinkTargetResolver
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 

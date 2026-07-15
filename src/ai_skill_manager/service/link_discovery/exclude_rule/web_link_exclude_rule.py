@@ -3,8 +3,8 @@
 Правило исключения внешних веб-ссылок.
 """
 
-from ....entities import WebLink
 from ....models import LinkWithContext
+from ....tools.link_path import is_http_link
 from .abs_exclude_rule import absExcludeRule
 
 
@@ -13,4 +13,4 @@ class WebLinkExcludeRule(absExcludeRule):
 
     def should_exclude(self, link: LinkWithContext) -> bool:
         """Return ``True`` for web links."""
-        return isinstance(link.base, WebLink)
+        return is_http_link(link.base.raw_path)

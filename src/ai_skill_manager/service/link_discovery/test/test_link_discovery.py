@@ -8,6 +8,7 @@ from pathlib import Path
 from ai_skill_manager.entities.link.link_target import ExternalLinkTarget, SkillLinkTarget
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
+from ai_skill_manager.models.skill_relation_queuer import SkillRelationQueuer
 from ai_skill_manager.service.link_discovery.link_discovery import LinkDiscovery
 
 
@@ -30,7 +31,7 @@ class TestLinkDiscovery(unittest.TestCase):
         skill_a_file.write_text("---\nname: skill-a\n---\n[b](../skill-b/SKILL.md)\n")
 
         links, errors = self.discovery.discover(
-            skill_a_file, repo_path=self.tmp, known_skills={"skill-b": skill_b}, queue=[], add_relations=False,
+            skill_a_file, repo_path=self.tmp, known_skills={"skill-b": skill_b}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertEqual(errors, [])
@@ -43,7 +44,24 @@ class TestLinkDiscovery(unittest.TestCase):
         skill_a_file.write_text("---\nname: skill-a\n---\n[ext](https://example.com)\n")
 
         links, errors = self.discovery.discover(
-            skill_a_file, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False,
+            skill_a_file, repo_path=self.tmp, known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
+        )
+
+        self.assertEqual(links, [])
+        self.assertEqual(errors, [])
+
+    def test_excludes_links_inside_example_block(self):
+        skill_a_file = self.tmp / "skill-a" / "SKILL.md"
+        skill_a_file.parent.mkdir()
+        skill_a_file.write_text(
+            "---\nname: skill-a\n---\n"
+            "```example\n"
+            "[bad](./nowhere.md)\n"
+            "```\n"
+        )
+
+        links, errors = self.discovery.discover(
+            skill_a_file, repo_path=self.tmp, known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertEqual(links, [])
@@ -55,7 +73,7 @@ class TestLinkDiscovery(unittest.TestCase):
         examples_file.write_text("---\nname: examples\n---\n[bad](../nowhere.md)\n")
 
         links, errors = self.discovery.discover(
-            examples_file, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False,
+            examples_file, repo_path=self.tmp, known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertEqual(links, [])
@@ -68,7 +86,7 @@ class TestLinkDiscovery(unittest.TestCase):
         skill_a_file.write_text("---\nname: skill-a\n---\n[shared](../shared.md)\n")
 
         links, errors = self.discovery.discover(
-            skill_a_file, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False,
+            skill_a_file, repo_path=self.tmp, known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertEqual(errors, [])
@@ -84,7 +102,7 @@ class TestLinkDiscovery(unittest.TestCase):
         )
 
         links, errors = self.discovery.discover(
-            skill_a_file, repo_path=self.tmp, known_skills={}, queue=[], add_relations=False,
+            skill_a_file, repo_path=self.tmp, known_skills={}, skill_relation_queuer=SkillRelationQueuer(add_relations=False),
         )
 
         self.assertEqual(len(errors), 1)

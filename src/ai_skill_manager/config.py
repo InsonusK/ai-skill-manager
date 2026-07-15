@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 from .functions.copy_skills import resolve_copy_skills
 from .functions.copy_skills.abs_copy_skills import CopySkills
-from .service.link_discovery.validation_settings import ValidationSettings
+from .validation_settings import ValidationSettings
 
 #: Default target directory for the reserved "default" target name.
 #: Целевая директория по умолчанию для зарезервированного имени "default".

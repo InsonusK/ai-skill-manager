@@ -3,20 +3,21 @@
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.service.link_discovery.builder.markdown import MarkdownLinkBuilder
-from ai_skill_manager.entities.link import PathLink
+from ai_skill_manager.entities.link import LinkData
 from ai_skill_manager.models.link_with_context import LinkWithContext
 
 
 class TestLinkWithContext(unittest.TestCase):
-    def _link(self) -> PathLink:
-        return PathLink(
+    def _link(self) -> LinkData:
+        return LinkData(
             raw="[text](./file.md)",
             text="text",
-            format=MarkdownLinkBuilder,
+            format="markdown",
             start=0,
             end=1,
             raw_path="./file.md",
+            header=None,
+            is_image=False,
         )
 
     def test_build_stores_file_location_and_link(self):

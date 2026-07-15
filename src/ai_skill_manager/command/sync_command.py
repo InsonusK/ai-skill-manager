@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Callable, List, Optional, Sequence, TYPE_CHECKING
 
 from ..entities.skill_file_v2 import MarkdownSkillFile
-from ..functions.file_discovery import discover as discover_skill_files
-from ..functions.link_discovery import LinkDiscovery
 from ..functions.skill_dict_builder import SkillDictBuilder
 from ..functions.skill_discovery import SkillDiscovery
+from ..models.skill_relation_queuer import SkillRelationQueuer
+from ..service.file_discovery import discover as discover_skill_files
+from ..service.link_discovery.link_discovery import LinkDiscovery
 
 if TYPE_CHECKING:
     from ..entities import Source
@@ -125,7 +126,8 @@ class SyncCommand:
         """
         skills, errors = self._skill_discovery.discover(sources)
 
-        queue: List["Skill"] = list(skills.values())
+        skill_relation_queuer = SkillRelationQueuer(add_relations=add_relations, queue=list(skills.values()))
+        queue = skill_relation_queuer.queue
         processed_names = set()
         merged_count = len(queue)
         index = 0
@@ -151,8 +153,7 @@ class SyncCommand:
                     skill.file_absolute_path(skill_file),
                     repo_path=source_repo_path,
                     known_skills=skills,
-                    queue=queue,
-                    add_relations=add_relations,
+                    skill_relation_queuer=skill_relation_queuer,
                 )
                 skill_file.links.extend(links)
                 errors.extend(link_errors)

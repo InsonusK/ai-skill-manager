@@ -5,8 +5,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, InitVar
-from typing import Optional
+from dataclasses import dataclass
 
 from .abs_link import absLink
 

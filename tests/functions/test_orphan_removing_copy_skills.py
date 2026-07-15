@@ -10,8 +10,9 @@ from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 from ai_skill_manager.functions.copy_skills.default_copy_skills import DefaultCopySkills
 from ai_skill_manager.functions.copy_skills.orphan_removing_copy_skills import OrphanRemovingCopySkills
-from ai_skill_manager.functions.file_discovery import discover as discover_files
-from ai_skill_manager.functions.link_discovery import LinkDiscovery
+from ai_skill_manager.service.file_discovery import discover as discover_files
+from ai_skill_manager.service.link_discovery.link_discovery import LinkDiscovery
+from ai_skill_manager.models import SkillRelationQueuer
 from ai_skill_manager.functions.managed_state import tag_managed
 
 
@@ -38,8 +39,7 @@ class TestOrphanRemovingCopySkills(unittest.TestCase):
                 skill.file_absolute_path(skill_file),
                 repo_path=self.tmp,
                 known_skills={},
-                queue=[],
-                add_relations=False,
+                skill_relation_queuer=SkillRelationQueuer(add_relations=False),
             )
             skill_file.links.extend(links)
         return skill

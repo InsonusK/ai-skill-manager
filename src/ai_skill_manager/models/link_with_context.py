@@ -8,33 +8,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..entities.link import absLink
+from ..entities.link import LinkData
 
 
 @dataclass(frozen=True)
 class LinkWithContext:
-    """Wraps a storage-level :class:`absLink` with its owning file's location.
+    """Wraps raw :class:`LinkData` with its owning file's location.
 
     Used only by link exclude rules (inline-code/web-link/skip-folder), which
     need the containing file's path and content to decide whether a link
-    should be skipped - not the resolved target.
+    should be skipped - not the resolved target. Exclude rules run before
+    classification, so this always wraps the raw parse result, never a
+    classified :class:`~ai_skill_manager.entities.link.abs_link.absLink`.
 
-    Оборачивает :class:`absLink` уровня хранения с расположением его
-    владеющего файла. Используется только правилами исключения ссылок
+    Оборачивает сырой :class:`LinkData` с расположением его владеющего
+    файла. Используется только правилами исключения ссылок
     (инлайн-код/веб-ссылка/пропускаемая директория), которым для решения,
     пропустить ли ссылку, нужны путь и содержимое содержащего файла, а не
-    разрешённая цель.
+    разрешённая цель. Правила исключения выполняются до классификации,
+    поэтому здесь всегда оборачивается сырой результат разбора, а не
+    классифицированный :class:`~ai_skill_manager.entities.link.abs_link.absLink`.
 
     Attributes:
-        base: Storage-level link data.
-            Данные ссылки уровня хранения.
+        base: Raw link data. / Сырые данные ссылки.
         file_path: Absolute path of the file containing the link.
             Абсолютный путь файла, содержащего ссылку.
         content: Full text content of the file containing the link.
             Полное текстовое содержимое файла, содержащего ссылку.
     """
 
-    base: absLink
+    base: LinkData
     file_path: Path
     content: str
 
@@ -46,7 +49,7 @@ class LinkWithContext:
         return getattr(self.base, name)
 
     @staticmethod
-    def build(file_path: Path, content: str, link: absLink) -> "LinkWithContext":
+    def build(file_path: Path, content: str, link: LinkData) -> "LinkWithContext":
         """Create a :class:`LinkWithContext` from a file location and a link.
 
         Создаёт :class:`LinkWithContext` из расположения файла и ссылки.

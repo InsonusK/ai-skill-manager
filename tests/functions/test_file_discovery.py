@@ -8,7 +8,7 @@ from pathlib import Path
 from ai_skill_manager.entities.skill_file_v2 import MarkdownSkillFile, SkillFile
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.file_discovery import discover
+from ai_skill_manager.service.file_discovery import discover
 
 
 class TestFileDiscovery(unittest.TestCase):
