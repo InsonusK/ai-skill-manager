@@ -21,8 +21,9 @@ depends_on:
   - src/ai_skill_manager/entities/skill_file_v2.py
   - src/ai_skill_manager/entities/skill_name.py
   - src/ai_skill_manager/entities/skill_kind.py
-  - src/ai_skill_manager/entities/skill_conversion.py
   - src/ai_skill_manager/entities/skill_at_path_finder.py
+  - src/ai_skill_manager/service/discovery/discover.py
+  - src/ai_skill_manager/service/discovery/skill/auto.py
   - src/ai_skill_manager/entities/link/link_target.py
   - src/ai_skill_manager/entities/link/link_target_resolver.py
   - src/ai_skill_manager/entities/link/file_link.py
@@ -68,7 +69,6 @@ replays the already-resolved target, it never re-resolves.
 | Validate/represent a skill's identity, kind and kebab-case name | Skill | Class |
 | Represent one file (optionally markdown, with links) owned by a skill | SkillFile / MarkdownSkillFile | Class |
 | Find a already-loaded-or-discoverable skill that owns a given path | SkillAtPathFinder | Function |
-| Convert a legacy `Skill`/`SkillFile` into the new model | convert_legacy_skill | Function |
 
 ## Units
 
@@ -83,9 +83,9 @@ replays the already-resolved target, it never re-resolves.
   - test cases: [tests/test_sync_command.py](../../tests/test_sync_command.py), [tests/commands/test_sync_cli.py](../../tests/commands/test_sync_cli.py)
 
 - **SkillDiscovery** (Function) — discover skills from a list of configured sources.
-  - depends on: legacy `AutoDiscovery` service (reused unchanged), `convert_legacy_skill`
-  - usage scenario: called once at the start of a sync run with the resolved `Source` list; returns the initial skill list plus any discovery errors.
-  - test cases: [tests/functions/test_skill_discovery.py](../../tests/functions/test_skill_discovery.py)
+  - depends on: `service.discovery.discover` (pattern-matching scan + tag filtering, builds `Skill` directly)
+  - usage scenario: called once at the start of a sync run with the resolved `Source` list; returns the discovered skills plus any per-candidate errors (e.g. a missing frontmatter name) - structural conflicts (ambiguous pattern matches) still raise.
+  - test cases: [tests/functions/test_skill_discovery.py](../../tests/functions/test_skill_discovery.py), [tests/service/discovery/skill/test_auto.py](../../tests/service/discovery/skill/test_auto.py)
 
 - **SkillDictBuilder** (Function) — merge a batch of skills into the working `name -> Skill` dict, reporting a duplicate name as an error instead of silently overwriting.
   - depends on: nothing beyond the `Skill` entities passed in
@@ -98,7 +98,7 @@ replays the already-resolved target, it never re-resolves.
   - test cases: [tests/functions/test_file_discovery.py](../../tests/functions/test_file_discovery.py)
 
 - **LinkDiscovery** (Function) — find every link in a markdown file's content, drop excluded links (inline code, web links, skip-folders), and resolve each remaining link's target via `FileLinkFactory`.
-  - depends on: legacy link-builder/parser (reused unchanged), link exclude rules, `FileLinkFactory`
+  - depends on: `discovery.link.search_links_in_content` (regex-based markdown/wiki parser, content-only), link exclude rules, `FileLinkFactory`
   - usage scenario: called once per markdown file by `FileDiscovery`; returns the resolved `FileLink` list plus errors for links that could not be resolved.
   - test cases: [tests/functions/test_link_discovery.py](../../tests/functions/test_link_discovery.py)
 
@@ -159,8 +159,8 @@ replays the already-resolved target, it never re-resolves.
 
 - **Skill** (Class) — identity and structure of one discovered skill: name (validated kebab-case), path, kind, main file, and enriched file list.
   - depends on: `is_kebab_case`
-  - usage scenario: constructed by `convert_legacy_skill` at discovery time, then mutated in place by `FileDiscovery` as files/links are enriched.
-  - test cases: [tests/entities/test_skill_v2.py](../../tests/entities/test_skill_v2.py), [tests/entities/test_kebab_case_name.py](../../tests/entities/test_kebab_case_name.py)
+  - usage scenario: built directly by the `AutoDiscovery` pattern templates (reading the name from frontmatter) at discovery time, then mutated in place by `FileDiscovery` as files/links are enriched.
+  - test cases: [tests/entities/test_skill_v2.py](../../tests/entities/test_skill_v2.py), [tests/entities/test_kebab_case_name.py](../../tests/entities/test_kebab_case_name.py), [tests/service/discovery/skill/test_auto.py](../../tests/service/discovery/skill/test_auto.py)
 
 - **SkillFile / MarkdownSkillFile** (Class) — one file owned by a skill; the markdown subclass adds the file's resolved `links`.
   - depends on: nothing
@@ -168,14 +168,9 @@ replays the already-resolved target, it never re-resolves.
   - test cases: [tests/entities/test_skill_file_v2.py](../../tests/entities/test_skill_file_v2.py)
 
 - **SkillAtPathFinder** (Function) — find a skill (already loaded or freshly discoverable) that owns a given filesystem path.
-  - depends on: legacy `AutoDiscovery` service (reused, scoped to a candidate path)
+  - depends on: `AutoDiscovery` (scoped to a candidate path)
   - usage scenario: called by `FileLinkFactory` when a link's resolved path isn't under the source repo path but might still belong to a not-yet-loaded skill.
   - test cases: [tests/entities/test_skill_at_path_finder.py](../../tests/entities/test_skill_at_path_finder.py)
-
-- **convert_legacy_skill** (Function) — convert a legacy `entities.skill.Skill` into the new `entities.skill_v2.Skill`.
-  - depends on: nothing beyond the legacy skill passed in
-  - usage scenario: called once per skill returned by the reused legacy `AutoDiscovery`/`discover` service, at the seam between old and new models.
-  - test cases: [tests/entities/test_skill_conversion.py](../../tests/entities/test_skill_conversion.py)
 
 ## Diagram
 
