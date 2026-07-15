@@ -8,7 +8,7 @@ from pathlib import Path
 from ai_skill_manager.entities.link.link_target import ExternalLinkTarget, SkillLinkTarget
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
-from ai_skill_manager.functions.link_discovery import LinkDiscovery
+from ai_skill_manager.service.link_discovery.link_discovery import LinkDiscovery
 
 
 class TestLinkDiscovery(unittest.TestCase):

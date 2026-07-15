@@ -8,7 +8,7 @@ Exports the skill-discovery function reused by the new pipeline's
 ``SkillDiscovery``/``SkillAtPathFinder`` новой архитектуры.
 """
 
-from .discovery import discover
+from .skill_discovery import discover
 
 __all__ = [
     "discover",

@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
+from ai_skill_manager.service.link_discovery.builder.markdown import MarkdownLinkBuilder
 from ai_skill_manager.entities.link import PathLink
 from ai_skill_manager.models.link_with_context import LinkWithContext
 

@@ -2,7 +2,7 @@
 
 import unittest
 
-from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
+from ai_skill_manager.service.link_discovery.builder.markdown import MarkdownLinkBuilder
 from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink, WebLink
 

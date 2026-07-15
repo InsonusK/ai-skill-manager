@@ -1,6 +1,6 @@
 import unittest
 
-from ai_skill_manager.discovery.link.builder.wikilink import WikilinkBuilder
+from ai_skill_manager.service.link_discovery.builder.wikilink import WikilinkBuilder
 from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink
 

@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.discovery.link import search_links_in_content
+from ai_skill_manager.service.link_discovery import search_links_in_content
 from ai_skill_manager.models import LinkWithContext
 from ai_skill_manager.validators.rules.link.exclude_rule import SkipFolderExcludeRule
 

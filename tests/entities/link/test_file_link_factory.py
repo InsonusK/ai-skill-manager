@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.discovery.link import search_links_in_content
+from ai_skill_manager.service.link_discovery import search_links_in_content
 from ai_skill_manager.entities.link.file_link_factory import FileLinkFactory
 from ai_skill_manager.entities.link.link_target import ExternalLinkTarget, SkillLinkTarget
 from ai_skill_manager.entities.skill_kind import SkillKind

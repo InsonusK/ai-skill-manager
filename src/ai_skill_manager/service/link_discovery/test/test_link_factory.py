@@ -1,8 +1,8 @@
 import unittest
 
-from ai_skill_manager.discovery.link.builder.markdown import MarkdownLinkBuilder
-from ai_skill_manager.discovery.link.builder.wikilink import WikilinkBuilder
-from ai_skill_manager.discovery.link.link_factory import search_links_in_content
+from ai_skill_manager.service.link_discovery.builder.markdown import MarkdownLinkBuilder
+from ai_skill_manager.service.link_discovery.builder.wikilink import WikilinkBuilder
+from ai_skill_manager.service.link_discovery.link_factory import search_links_in_content
 from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink, WebLink
 

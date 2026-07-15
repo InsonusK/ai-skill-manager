@@ -5,7 +5,7 @@
 
 from typing import List, Optional
 
-from ....validation_settings import ValidationSettings
+from ..validation_settings import ValidationSettings
 from .abs_exclude_rule import absExcludeRule
 from .inline_code_exclude_rule import InlineCodeExcludeRule
 from .skip_folder_exclude_rule import SkipFolderExcludeRule

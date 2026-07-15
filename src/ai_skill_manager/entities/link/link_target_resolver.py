@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Iterable, Optional, TYPE_CHECKING
 
 from .link_target import SkillLinkTarget
-from .path_utils import is_relative_to_resolved, same_path, normalize_path
+from ...tools.path_utils import is_relative_to_resolved, same_path, normalize_path
 from ..skill_kind import SkillKind
 
 if TYPE_CHECKING:

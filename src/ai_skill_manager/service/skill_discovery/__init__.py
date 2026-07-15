@@ -10,7 +10,7 @@ Groups everything related to finding skills for configured sources: the
 использует (``skill``).
 """
 
-from .discover import discover
+from .skill_discover import discover
 
 __all__ = [
     "discover",

@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Dict, Match
 
-from .....models import LinkWithContext
+from ....models import LinkWithContext
 from .abs_exclude_rule import absExcludeRule
 
 

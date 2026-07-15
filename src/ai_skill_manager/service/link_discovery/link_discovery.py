@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 
-from ...discovery.link import search_links_in_content
+from .link_factory import search_links_in_content
 from ...entities.link.file_link_factory import FileLinkFactory
 from ...models import LinkWithContext, Result
 from ...validation_settings import ValidationSettings

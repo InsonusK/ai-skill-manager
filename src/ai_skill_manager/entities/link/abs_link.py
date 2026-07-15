@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Type
 
 if TYPE_CHECKING:
-    from ...discovery.link.builder.abs_link_builder import absLinkBuilder
+    from ...service.link_discovery.builder.abs_link_builder import absLinkBuilder
 
 
 @dataclass(frozen=True)

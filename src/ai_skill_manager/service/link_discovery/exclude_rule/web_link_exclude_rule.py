@@ -3,8 +3,8 @@
 Правило исключения внешних веб-ссылок.
 """
 
-from .....entities import WebLink
-from .....models import LinkWithContext
+from ....entities import WebLink
+from ....models import LinkWithContext
 from .abs_exclude_rule import absExcludeRule
 
 
