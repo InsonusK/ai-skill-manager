@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from ....entities import Skill, SkillFormat
+from .....entities import Skill, SkillFormat
 from .SkillPattern import absSkillTemplate
 
 # Module logger / Логгер модуля.

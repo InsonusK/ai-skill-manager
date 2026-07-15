@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List
 
-from ...entities import Skill
+from ....entities import Skill
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)

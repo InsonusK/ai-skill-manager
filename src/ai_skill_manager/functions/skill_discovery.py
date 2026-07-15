@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import List, Sequence, Tuple, TYPE_CHECKING
 
 from ..entities.skill_conversion import convert_legacy_skill
-from ..service.discover import discover as legacy_discover
+from ..service.discovery.discover import discover as legacy_discover
 
 if TYPE_CHECKING:
     from ..entities import Source
@@ -23,14 +23,14 @@ class SkillDiscovery:
     реализует шаг 1.
 
     Reuses the existing source-scanning/pattern-matching/tag-filtering
-    machinery (``service.discover.discover``) unchanged, since nested-skill
-    detection and per-source-type scanning are not part of what this
-    refactor redesigns - only the resulting skills are converted to the new
-    model.
+    machinery (``service.discovery.discover.discover``) unchanged, since
+    nested-skill detection and per-source-type scanning are not part of what
+    this refactor redesigns - only the resulting skills are converted to the
+    new model.
 
     Переиспользует существующий механизм сканирования источников/сопоставления
-    по паттернам/фильтрации по тегам (``service.discover.discover``) без
-    изменений, поскольку обнаружение вложенных скиллов и сканирование по
+    по паттернам/фильтрации по тегам (``service.discovery.discover.discover``)
+    без изменений, поскольку обнаружение вложенных скиллов и сканирование по
     типу источника не входят в то, что редизайнит этот рефакторинг -
     преобразуются в новую модель только итоговые скиллы.
     """

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities.source import LocalSource
-from ai_skill_manager.service.discover import discover
+from ai_skill_manager.service.discovery.discover import discover
 
 
 class TestDiscover(unittest.TestCase):

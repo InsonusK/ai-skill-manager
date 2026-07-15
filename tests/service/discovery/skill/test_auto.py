@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.service.discovery.skill.auto import AutoDiscovery
 from ai_skill_manager.entities.skill_format import SkillFormat
 from ai_skill_manager.entities.source import LocalSource
 

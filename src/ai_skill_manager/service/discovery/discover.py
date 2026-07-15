@@ -12,10 +12,10 @@ import logging
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-from ..discovery.skill import AutoDiscovery
-from ..entities import GitHubSource, LocalSource, Skill, Source
-from ..progress import ProgressCallback
-from ..functions.tag_filter import filter_skills_by_tags
+from .skill import AutoDiscovery
+from ...entities import GitHubSource, LocalSource, Skill, Source
+from ...progress import ProgressCallback
+from ...functions.tag_filter import filter_skills_by_tags
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)

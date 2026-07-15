@@ -1,4 +1,4 @@
-from ai_skill_manager.discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.service.discovery.skill.auto import AutoDiscovery
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
 from ai_skill_manager.entities.source import LocalSource as LocalSourceCls
 from .test_skill_name import MOCK_DIR

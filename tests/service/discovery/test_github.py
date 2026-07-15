@@ -15,7 +15,7 @@ from ai_skill_manager.entities.source.github import (
     _find_extracted_root,
     _parse_github_url,
 )
-from ai_skill_manager.service.discover import discover
+from ai_skill_manager.service.discovery.discover import discover
 
 
 MOCK_DIR = Path(__file__).parent / "mock" / "test_github"

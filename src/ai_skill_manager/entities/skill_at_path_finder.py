@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from ..discovery.skill.auto import AutoDiscovery
+from ..service.discovery.skill.auto import AutoDiscovery
 from .link.path_utils import same_path
 from .skill_conversion import convert_legacy_skill
 from .skill_v2 import Skill

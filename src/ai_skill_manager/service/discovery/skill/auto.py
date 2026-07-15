@@ -21,8 +21,8 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from ...entities import Skill, Source
-from ...entities.source import LocalSource
+from ....entities import Skill, Source
+from ....entities.source import LocalSource
 from .templates import AgentTemplate, HumanDirPattern, HumanFlatPattern, absSkillTemplate
 from .abs_discovery_strategy import absDiscoveryStrategy
 
