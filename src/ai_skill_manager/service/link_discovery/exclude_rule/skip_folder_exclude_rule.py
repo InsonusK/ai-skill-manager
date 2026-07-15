@@ -5,7 +5,7 @@
 
 from typing import List
 
-from .....models import LinkWithContext
+from ....models import LinkWithContext
 from .abs_exclude_rule import absExcludeRule
 
 

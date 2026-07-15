@@ -5,7 +5,7 @@
 
 from abc import ABC, abstractmethod
 
-from .....models import LinkWithContext
+from ....models import LinkWithContext
 
 
 class absExcludeRule(ABC):

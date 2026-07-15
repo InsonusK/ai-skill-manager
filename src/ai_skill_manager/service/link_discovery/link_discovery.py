@@ -8,15 +8,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from ..discovery.link import search_links_in_content
-from ..entities.link.file_link_factory import FileLinkFactory
-from ..models import LinkWithContext
-from ..validation_settings import ValidationSettings
-from ..validators.rules.link import build_link_exclude_rules
+from ...discovery.link import search_links_in_content
+from ...entities.link.file_link_factory import FileLinkFactory
+from ...models import LinkWithContext
+from ...validation_settings import ValidationSettings
+from .exclude_rule import build_link_exclude_rules
 
 if TYPE_CHECKING:
-    from ..entities.link.file_link import FileLink
-    from ..entities.skill_v2 import Skill
+    from ...entities.link.file_link import FileLink
+    from ...entities.skill_v2 import Skill
 
 
 class LinkDiscovery:
