@@ -9,9 +9,9 @@ Defines the interface that all discovery strategies must implement.
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
-from ....entities import Skill
+from ....entities.skill_v2 import Skill
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
@@ -21,11 +21,20 @@ class absDiscoveryStrategy(ABC):
     """Abstract base for skill discovery strategies.
 
     Concrete strategies receive a source path (file or directory) and must
-    return a list of discovered :class:`Skill` objects.
+    return the discovered :class:`Skill` objects plus any per-candidate
+    errors (e.g. a missing frontmatter name) collected along the way.
+    Structural conflicts (e.g. ambiguous pattern matches) are not collected -
+    they still raise, since there is no single reasonable skill to fall back
+    to for that path.
 
     Абстрактный базовый класс для стратегий обнаружения навыков.
-    Конкретные стратегии получают путь к источнику (файл или директорию)
-    и должны вернуть список обнаруженных объектов :class:`Skill`.
+    Конкретные стратегии получают путь к источнику (файл или директорию) и
+    должны вернуть обнаруженные объекты :class:`Skill` плюс любые ошибки по
+    отдельным кандидатам (например, отсутствующее имя во frontmatter),
+    собранные по пути. Структурные конфликты (например, неоднозначные
+    совпадения паттернов) не собираются - они по-прежнему вызывают
+    исключение, так как для такого пути нет одного разумного скилла, на
+    который можно было бы откатиться.
     """
 
     def __init__(self, source_path: Path):
@@ -47,14 +56,15 @@ class absDiscoveryStrategy(ABC):
         self.source_path = source_path.resolve()
 
     @abstractmethod
-    def discover(self) -> List[Skill]:
-        """Discover skills and return a list of Skill objects.
+    def discover(self) -> Tuple[List[Skill], List[str]]:
+        """Discover skills and return them plus any collected errors.
 
-        Discover skills and return a list of Skill objects.
+        Discover skills and return them plus any collected errors.
 
-        Обнаружить навыки и вернуть список объектов Skill.
+        Обнаружить навыки и вернуть их вместе с собранными ошибками.
 
         Returns:
-            List of discovered skills. / Список обнаруженных навыков.
+            The discovered skills and per-candidate error messages. /
+            Обнаруженные скиллы и сообщения об ошибках по кандидатам.
         """
         pass

@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from typing import List, Sequence, Tuple, TYPE_CHECKING
 
-from ..entities.skill_conversion import convert_legacy_skill
-from ..service.discovery.discover import discover as legacy_discover
+from ..service.discovery.discover import discover
 
 if TYPE_CHECKING:
     from ..entities import Source
@@ -23,16 +22,16 @@ class SkillDiscovery:
     реализует шаг 1.
 
     Reuses the existing source-scanning/pattern-matching/tag-filtering
-    machinery (``service.discovery.discover.discover``) unchanged, since
-    nested-skill detection and per-source-type scanning are not part of what
-    this refactor redesigns - only the resulting skills are converted to the
-    new model.
+    machinery (``service.discovery.discover.discover``) unchanged - it
+    already builds and returns the new model's ``Skill`` directly, collecting
+    a per-candidate error (e.g. a missing/invalid frontmatter name) instead
+    of stopping at the first one.
 
     Переиспользует существующий механизм сканирования источников/сопоставления
     по паттернам/фильтрации по тегам (``service.discovery.discover.discover``)
-    без изменений, поскольку обнаружение вложенных скиллов и сканирование по
-    типу источника не входят в то, что редизайнит этот рефакторинг -
-    преобразуются в новую модель только итоговые скиллы.
+    без изменений - он уже строит и возвращает ``Skill`` новой модели напрямую,
+    собирая ошибку по каждому кандидату (например, отсутствующее/некорректное
+    имя во frontmatter) вместо остановки на первой из них.
     """
 
     def discover(self, sources: Sequence["Source"]) -> Tuple[List["Skill"], List[str]]:
@@ -41,22 +40,10 @@ class SkillDiscovery:
         Обнаруживает скиллы из ``sources``.
 
         Returns:
-            The successfully-converted skills and any per-skill conversion
-            errors (e.g. a missing/invalid name). Discovery does not stop
-            at the first error - every candidate is attempted.
-                / Успешно преобразованные скиллы и ошибки преобразования по
-                каждому скиллу (например, отсутствующее/некорректное имя).
+            The discovered skills and any per-candidate errors. Discovery
+            does not stop at the first error - every candidate is attempted.
+                / Обнаруженные скиллы и ошибки по каждому кандидату.
                 Обнаружение не останавливается на первой ошибке - каждый
                 кандидат обрабатывается.
         """
-        legacy_skills = legacy_discover(sources)
-
-        skills: List["Skill"] = []
-        errors: List[str] = []
-        for legacy in legacy_skills:
-            try:
-                skills.append(convert_legacy_skill(legacy))
-            except ValueError as exc:
-                errors.append(str(exc))
-
-        return skills, errors
+        return discover(sources)

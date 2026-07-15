@@ -44,10 +44,11 @@ class TestDiscover(unittest.TestCase):
             "---\nname: web\ntags:\n  - web\n---\n"
         )
 
-        skills = discover(
+        skills, errors = discover(
             [LocalSource(scan_path=self.source_dir, tags=("python",))]
         )
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(skills), 1)
         self.assertEqual(skills[0].name, "py")
 
@@ -60,17 +61,18 @@ class TestDiscover(unittest.TestCase):
         )
 
         # Query "a/b/c" expands to "a", "b", "c", "a/b", "b/c" and "a/b/c".
-        skills = discover(
+        skills, errors = discover(
             [LocalSource(scan_path=self.source_dir, tags=("a/b/c",))]
         )
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(skills), 1)
         self.assertEqual(skills[0].name, "a")
 
     def test_deduplicates_skills_from_overlapping_sources(self):
         (self.source_dir / "a.skill.md").write_text("---\nname: a\n---\n")
 
-        skills = discover(
+        skills, errors = discover(
             [
                 LocalSource(scan_path=self.source_dir),
                 LocalSource(scan_path=self.source_dir),
@@ -78,6 +80,7 @@ class TestDiscover(unittest.TestCase):
         )
 
         # The same skill discovered twice must be returned only once.
+        self.assertEqual(errors, [])
         self.assertEqual(len(skills), 1)
 
 

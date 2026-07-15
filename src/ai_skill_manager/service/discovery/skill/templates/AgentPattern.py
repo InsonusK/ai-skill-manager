@@ -7,7 +7,9 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from .....entities import Skill, SkillFormat
+from .....entities.skill_v2 import Skill
+from .....entities.skill_kind import SkillKind
+from .....entities.skill_propetry import SkillProperty
 from .SkillPattern import absSkillTemplate
 
 # Module logger / Логгер модуля.
@@ -20,31 +22,12 @@ class AgentTemplate(absSkillTemplate):
     Обнаруживает навыки в агентском формате: файл ``SKILL.md`` внутри директории.
     """
 
-    def __init__(self, source, source_path):
-        """Initialize the Agent pattern.
-
-        Initialize the Agent pattern.
-
-        Инициализировать паттерн Agent.
-
-        Args:
-            source: Source metadata for matched skills. /
-                Метаданные источника для совпавших навыков.
-            source_path: Base source path. / Базовый путь источника.
-        """
-        super().__init__(source, source_path)
-
-    # Format produced by this pattern. / Формат, производимый этим паттерном.
-    skill_format = SkillFormat.Agent
-
     @property
     def pattern_description(self) -> str:
         """Return the pattern example for an agent skill directory."""
         return "{name}/SKILL.md"
 
-    def match(
-        self, path: Path
-    ) -> Optional[Skill]:
+    def match(self, path: Path) -> Optional[Skill]:
         """Match a directory containing ``SKILL.md``.
 
         Match a directory containing ``SKILL.md``.
@@ -57,6 +40,12 @@ class AgentTemplate(absSkillTemplate):
         Returns:
             Directory :class:`Skill` if matched, otherwise ``None``. /
             Директориальный :class:`Skill` при совпадении, иначе ``None``.
+
+        Raises:
+            ValueError: If the directory matches but ``SKILL.md``'s
+                frontmatter is missing a valid ``name``. / Если директория
+                совпадает, но во frontmatter ``SKILL.md`` нет корректного
+                ``name``.
         """
         if not path.is_dir():
             # This pattern only applies to directories.
@@ -69,12 +58,14 @@ class AgentTemplate(absSkillTemplate):
         skill_md = path / "SKILL.md"
         if skill_md.is_file():
             logger.debug("Agent pattern matched: %s -> %s", path, skill_md)
+            name = SkillProperty(skill_md).name
+            if name is None:
+                raise ValueError(f"Skill {skill_md} has no 'name' in frontmatter")
             return Skill(
-                file_path=skill_md,
-                folder_path=path,
-                format=self.skill_format,
-                source=self._source,
-                source_path=self._source_path
+                name=name,
+                path=path,
+                kind=SkillKind.dir,
+                main_file_relative_path=skill_md.relative_to(path),
             )
         logger.debug("Agent pattern did not match (missing %s): %s", skill_md, path)
         return None

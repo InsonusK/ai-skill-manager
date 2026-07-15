@@ -10,7 +10,7 @@ from typing import Optional
 
 from ..service.discovery.skill.auto import AutoDiscovery
 from .link.path_utils import same_path
-from .skill_conversion import convert_legacy_skill
+from .skill_kind import SkillKind
 from .skill_v2 import Skill
 from .source import LocalSource
 
@@ -48,11 +48,13 @@ class SkillAtPathFinder:
 
         scan_root = path if path.is_dir() else path.parent
         source = LocalSource(scan_path=scan_root)
-        legacy_skills = AutoDiscovery(source_path=scan_root, source=source).discover()
+        skills, _errors = AutoDiscovery(source_path=scan_root, source=source).discover()
 
-        for legacy in legacy_skills:
-            root = legacy.folder_path if legacy.folder_path is not None else legacy.file_path
-            if same_path(root, path) or same_path(legacy.file_path, path):
-                return convert_legacy_skill(legacy)
+        for skill in skills:
+            main_file = (
+                skill.path if skill.kind is SkillKind.flat else skill.path / skill.main_file_relative_path
+            )
+            if same_path(skill.path, path) or same_path(main_file, path):
+                return skill
 
         return None

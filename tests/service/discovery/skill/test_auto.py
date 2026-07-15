@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.service.discovery.skill.auto import AutoDiscovery
-from ai_skill_manager.entities.skill_format import SkillFormat
+from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.source import LocalSource
 
 
@@ -40,53 +40,57 @@ class TestAutoDiscovery(unittest.TestCase):
         empty = self._copy_mock("empty_directory") / "empty"
 
         strategy = self._discover(empty)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
         self.assertEqual(len(result), 0)
+        self.assertEqual(errors, [])
 
     def test_single_skill_file(self):
         md = self._copy_mock("single_skill_file") / "guide.skill.md"
 
         strategy = self._discover(md)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "guide")
-        self.assertTrue(result[0].is_flat())
-        self.assertEqual(result[0].format, SkillFormat.HumanFlat)
-        self.assertEqual(result[0].file_path, md.resolve())
+        self.assertEqual(result[0].kind, SkillKind.flat)
+        self.assertEqual(result[0].path, md.resolve())
 
     def test_non_skill_file_ignored(self):
         txt = self._copy_mock("non_skill_file_ignored") / "readme.txt"
 
         strategy = self._discover(txt)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
         self.assertEqual(len(result), 0)
+        self.assertEqual(errors, [])
 
     def test_directory_skill(self):
         skill_dir = self._copy_mock("directory_skill") / "web.skill"
 
         strategy = self._discover(skill_dir)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "web")
-        self.assertFalse(result[0].is_flat())
-        self.assertEqual(result[0].format, SkillFormat.HumanDir)
-        self.assertEqual(result[0].folder_path, skill_dir.resolve())
+        self.assertEqual(result[0].kind, SkillKind.dir)
+        self.assertEqual(result[0].path, skill_dir.resolve())
+        self.assertEqual(result[0].main_file_relative_path, Path("web.skill.md"))
 
     def test_agent_skill(self):
         skill_dir = self._copy_mock("agent_skill") / "agent"
 
         strategy = self._discover(skill_dir)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "agent")
-        self.assertFalse(result[0].is_flat())
-        self.assertEqual(result[0].format, SkillFormat.Agent)
-        self.assertEqual(result[0].file_path, (skill_dir / "SKILL.md").resolve())
+        self.assertEqual(result[0].kind, SkillKind.dir)
+        self.assertEqual(result[0].path, skill_dir.resolve())
+        self.assertEqual(result[0].main_file_relative_path, Path("SKILL.md"))
 
     def test_conflicting_skill_markers_raises(self):
         skill_dir = self._copy_mock("conflicting_skill_markers_raises") / "conflict"
@@ -99,47 +103,51 @@ class TestAutoDiscovery(unittest.TestCase):
         flat = self._copy_mock("flat_directory") / "guides"
 
         strategy = self._discover(flat)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 2)
         names = {r.name for r in result}
         self.assertEqual(names, {"a", "b"})
         for skill in result:
-            self.assertTrue(skill.is_flat())
+            self.assertEqual(skill.kind, SkillKind.flat)
 
     def test_nested_directory_skill(self):
         root = self._copy_mock("nested_directory_skill") / "skills"
 
         strategy = self._discover(root)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "backend")
-        self.assertFalse(result[0].is_flat())
+        self.assertEqual(result[0].kind, SkillKind.dir)
 
     def test_mixed_flat_and_directory(self):
         root = self._copy_mock("mixed")
 
         strategy = self._discover(root)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         names = {r.name for r in result}
         self.assertEqual(names, {"guide", "web", "a"})
 
         by_name = {r.name: r for r in result}
-        self.assertTrue(by_name["guide"].is_flat())
-        self.assertFalse(by_name["web"].is_flat())
-        self.assertTrue(by_name["a"].is_flat())
+        self.assertEqual(by_name["guide"].kind, SkillKind.flat)
+        self.assertEqual(by_name["web"].kind, SkillKind.dir)
+        self.assertEqual(by_name["a"].kind, SkillKind.flat)
 
     def test_nested_flat_in_subdir(self):
         root = self._copy_mock("nested_flat_in_subdir") / "skills"
 
         strategy = self._discover(root)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "react")
-        self.assertTrue(result[0].is_flat())
+        self.assertEqual(result[0].kind, SkillKind.flat)
 
     def test_directory_skill_with_extra_skill_md_raises(self):
         skill_dir = self._copy_mock("directory_with_extra_skill_md_raises") / "web.skill"
@@ -153,12 +161,12 @@ class TestAutoDiscovery(unittest.TestCase):
         skill_dir = self._copy_mock("human_dir_and_matching_flat_file_takes_directory") / "web.skill"
 
         strategy = self._discover(skill_dir)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "web")
-        self.assertFalse(result[0].is_flat())
-        self.assertEqual(result[0].format, SkillFormat.HumanDir)
+        self.assertEqual(result[0].kind, SkillKind.dir)
 
     def test_agent_with_extra_flat_file_raises_conflict(self):
         """Agent SKILL.md + unrelated *.skill.md is ambiguous."""
@@ -189,9 +197,10 @@ class TestAutoDiscovery(unittest.TestCase):
         source = LocalSource(scan_path=missing.resolve())
         strategy = AutoDiscovery(source_path=missing.resolve(), source=source)
 
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
         self.assertEqual(len(result), 0)
+        self.assertEqual(errors, [])
 
     def _build_dir_skill_with_nested(self, skill_dir: Path, nested_dir_name: str) -> None:
         skill_dir.mkdir(parents=True, exist_ok=True)
@@ -206,8 +215,9 @@ class TestAutoDiscovery(unittest.TestCase):
 
         source = LocalSource(scan_path=skill_dir)
         strategy = AutoDiscovery(source_path=skill_dir, source=source)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "skill")
 
@@ -217,8 +227,9 @@ class TestAutoDiscovery(unittest.TestCase):
 
         source = LocalSource(scan_path=skill_dir, skip_folder=("abc",))
         strategy = AutoDiscovery(source_path=skill_dir, source=source)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "skill")
 
@@ -244,10 +255,43 @@ class TestAutoDiscovery(unittest.TestCase):
 
         source = LocalSource(scan_path=skill_dir)
         strategy = AutoDiscovery(source_path=skill_dir, source=source)
-        result = strategy.discover()
+        result, errors = strategy.discover()
 
+        self.assertEqual(errors, [])
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "skill")
+
+    def test_flat_file_missing_name_is_collected_not_raised(self):
+        """A *.skill.md file with no frontmatter name is a collected error,
+        not a fatal exception - the rest of the scan still proceeds."""
+        root = self.tmpdir / "skills"
+        root.mkdir()
+        (root / "noname.skill.md").write_text("# No name\n")
+        (root / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide\n")
+
+        source = LocalSource(scan_path=root)
+        strategy = AutoDiscovery(source_path=root, source=source)
+        result, errors = strategy.discover()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].name, "guide")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("noname.skill.md", errors[0])
+
+    def test_directory_skill_missing_name_is_collected_not_raised(self):
+        """An Agent/HumanDir main file with no frontmatter name is a
+        collected error, not a fatal exception."""
+        skill_dir = self.tmpdir / "agent"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("# No name\n")
+
+        source = LocalSource(scan_path=skill_dir)
+        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        result, errors = strategy.discover()
+
+        self.assertEqual(result, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("SKILL.md", errors[0])
 
 
 if __name__ == "__main__":

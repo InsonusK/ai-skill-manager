@@ -234,6 +234,23 @@ def matches_tag_expressions(skill_tags: Sequence[str], expressions: Sequence[str
     return all(matcher(tag_set) for matcher in matchers)
 
 
+def _skill_frontmatter_tags(skill: Any) -> Sequence[str]:
+    """Return a discovered skill's own frontmatter ``tags``.
+
+    Возвращает собственные frontmatter ``tags`` обнаруженного скилла.
+    """
+    # Import here to avoid a circular import at module load time.
+    # EN: Lazy import because entities may import this module in the future.
+    # RU: Ленивый импорт, потому что entities могут импортировать этот модуль.
+    from ..entities.skill_kind import SkillKind
+    from ..entities.skill_propetry import SkillProperty
+
+    main_file = (
+        skill.path if skill.kind is SkillKind.flat else skill.path / skill.main_file_relative_path
+    )
+    return SkillProperty(main_file).tags
+
+
 def filter_skills_by_tags(skills: Sequence[Any], expressions: Sequence[str]) -> List[Any]:
     """Return only skills that match all tag expressions.
 
@@ -242,18 +259,10 @@ def filter_skills_by_tags(skills: Sequence[Any], expressions: Sequence[str]) -> 
     if not expressions:
         return list(skills)
 
-    # Import here to avoid a circular import at module load time.
-    # EN: Lazy import because entities may import this module in the future.
-    # RU: Ленивый импорт, потому что entities могут импортировать этот модуль.
-    from ..entities import Skill
-
     matchers = [compile_tag_expression(expr) for expr in expressions]
     result: List[Any] = []
     for skill in skills:
-        if isinstance(skill, Skill):
-            tag_set = _normalize_tag_set(skill.properties.tags)
-        else:
-            tag_set = _normalize_tag_set(getattr(skill, "tags", ()))
+        tag_set = _normalize_tag_set(_skill_frontmatter_tags(skill))
         if all(matcher(tag_set) for matcher in matchers):
             result.append(skill)
     return result

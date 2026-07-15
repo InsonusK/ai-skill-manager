@@ -1,6 +1,4 @@
-from ai_skill_manager.service.discovery.skill.auto import AutoDiscovery
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
-from ai_skill_manager.entities.source import LocalSource as LocalSourceCls
 from .test_skill_name import MOCK_DIR
 
 
@@ -53,17 +51,6 @@ class TestSkillSourceLink(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             Skill(file_path=md, folder_path=None, source=source, source_path=md.parent)
-
-    def test_autodiscovery_attaches_local_source(self):
-        root = self._copy_mock("autodiscovery")
-        source = LocalSource(scan_path=root)
-
-        strategy = AutoDiscovery(source_path=root, source=source)
-        skills = strategy.discover()
-
-        self.assertEqual(len(skills), 1)
-        self.assertIsInstance(skills[0].source, LocalSourceCls)
-        self.assertEqual(skills[0].source.scan_path, root)
 
 if __name__ == "__main__":
     unittest.main()

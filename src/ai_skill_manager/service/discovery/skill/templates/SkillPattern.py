@@ -7,58 +7,23 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from .....entities import Skill, SkillFormat, Source
+from .....entities.skill_v2 import Skill
 
 
 class absSkillTemplate(ABC):
-    """Tempaltes that can match a filesystem path to a skill format.
+    """Templates that can match a filesystem path to a skill.
 
-    Subclasses implement matching rules for a single skill format, such as
-    ``*.skill.md`` files or directories containing ``SKILL.md``.
+    Subclasses implement matching rules for a single skill layout, such as
+    ``*.skill.md`` files or directories containing ``SKILL.md``, and build a
+    :class:`Skill` directly (reading its name from frontmatter) when a path
+    matches.
 
-    Шаблон, который может сопоставить путь файловой системы с форматом навыка.
-    Подклассы реализуют правила сопоставления для одного формата навыка,
-    например файлы ``*.skill.md`` или директории, содержащие ``SKILL.md``.
+    Шаблон, который может сопоставить путь файловой системы со скиллом.
+    Подклассы реализуют правила сопоставления для одного расположения
+    навыка, например файлы ``*.skill.md`` или директории, содержащие
+    ``SKILL.md``, и строят :class:`Skill` напрямую (читая его имя из
+    frontmatter), когда путь совпадает.
     """
-
-    def __init__(self, source: Source, source_path: Path):
-        """Initialize the pattern with source metadata.
-
-        Initialize the pattern with source metadata.
-
-        Инициализировать паттерн метаданными источника.
-
-        Args:
-            source: Source metadata to attach to matched skills. /
-                Метаданные источника для прикрепления к совпавшим навыкам.
-            source_path: Base path of the source being scanned. If it points
-                to a single file, the parent directory is used instead. /
-                Базовый путь сканируемого источника. Если он указывает на
-                отдельный файл, используется родительская директория.
-        """
-        self._source = source
-        # Skills always store a directory as their source_path. If a file path
-        # is passed (e.g. GitHub subpath pointing to a single skill file), use
-        # the containing directory.
-        # Навыки всегда хранят директорию как source_path. Если передан путь к файлу
-        # (например, подпуть GitHub, указывающий на один файл навыка),
-        # используем содержащую директорию.
-        self._source_path = source_path.parent if source_path.is_file() else source_path
-
-    @property
-    @abstractmethod
-    def skill_format(self) -> SkillFormat:
-        """Skill format produced by this pattern.
-
-        Skill format produced by this pattern.
-
-        Формат навыка, который производит этот паттерн.
-
-        Returns:
-            The :class:`SkillFormat` enum value for matches. /
-            Значение перечисления :class:`SkillFormat` для совпадений.
-        """
-        ...
 
     @property
     @abstractmethod
@@ -72,9 +37,7 @@ class absSkillTemplate(ABC):
         ...
 
     @abstractmethod
-    def match(
-        self, path: Path
-    ) -> Optional[Skill]:
+    def match(self, path: Path) -> Optional[Skill]:
         """Return a Skill if the path matches this pattern.
 
         Return a Skill if the path matches this pattern.
@@ -87,5 +50,11 @@ class absSkillTemplate(ABC):
         Returns:
             A :class:`Skill` instance if matched, otherwise ``None``. /
             Экземпляр :class:`Skill` при совпадении, иначе ``None``.
+
+        Raises:
+            ValueError: If the path matches this pattern's shape but its
+                frontmatter is missing a valid ``name``. /
+                Если путь соответствует форме этого паттерна, но в его
+                frontmatter отсутствует корректное ``name``.
         """
         ...

@@ -7,7 +7,9 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from .....entities import Skill, SkillFormat
+from .....entities.skill_v2 import Skill
+from .....entities.skill_kind import SkillKind
+from .....entities.skill_propetry import SkillProperty
 from .SkillPattern import absSkillTemplate
 
 # Module logger / Логгер модуля.
@@ -19,23 +21,6 @@ class HumanFlatPattern(absSkillTemplate):
 
     Обнаруживает плоские скилы в человеко ориентрованном формате: один файл ``*.skill.md``.
     """
-
-    def __init__(self, source, source_path):
-        """Initialize the HumanFlat pattern.
-
-        Initialize the HumanFlat pattern.
-
-        Инициализировать паттерн HumanFlat.
-
-        Args:
-            source: Source metadata for matched skills. /
-                Метаданные источника для совпавших навыков.
-            source_path: Base source path. / Базовый путь источника.
-        """
-        super().__init__(source, source_path)
-
-    # Format produced by this pattern. / Формат, производимый этим паттерном.
-    skill_format = SkillFormat.HumanFlat
 
     @property
     def pattern_description(self) -> str:
@@ -55,17 +40,19 @@ class HumanFlatPattern(absSkillTemplate):
         Returns:
             Flat :class:`Skill` if matched, otherwise ``None``. /
             Плоский :class:`Skill` при совпадении, иначе ``None``.
+
+        Raises:
+            ValueError: If the file matches but has no valid frontmatter
+                ``name``. / Если файл совпадает, но в его frontmatter нет
+                корректного ``name``.
         """
         if path.is_file() and path.name.endswith(".skill.md"):
             logger.debug("HumanFlat pattern matched: %s", path)
+            name = SkillProperty(path).name
+            if name is None:
+                raise ValueError(f"Skill {path} has no 'name' in frontmatter")
             # Flat skills have no associated folder.
             # У плоских навыков нет связанной директории.
-            return Skill(
-                file_path=path,
-                folder_path=None,
-                format=self.skill_format,
-                source=self._source,
-                source_path=self._source_path
-            )
+            return Skill(name=name, path=path, kind=SkillKind.flat)
         logger.debug("HumanFlat pattern did not match: %s", path)
         return None

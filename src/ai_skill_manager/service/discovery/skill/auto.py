@@ -19,10 +19,11 @@ Directory patterns (detected on directories):
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from ....entities import Skill, Source
-from ....entities.source import LocalSource
+from ....entities.skill_v2 import Skill
+from ....entities.source import Source
+from ....entities.source.local import LocalSource
 from .templates import AgentTemplate, HumanDirPattern, HumanFlatPattern, absSkillTemplate
 from .abs_discovery_strategy import absDiscoveryStrategy
 
@@ -38,110 +39,136 @@ class AutoDiscovery(absDiscoveryStrategy):
 
     # Flat patterns are applied to files directly inside a scanned directory.
     # Плоские паттерны применяются к файлам непосредственно внутри сканируемой директории.
-    _FLAT_PATTERNS: List[absSkillTemplate] = [HumanFlatPattern]
+    _FLAT_PATTERNS: List[absSkillTemplate] = [HumanFlatPattern()]
 
     # Directory patterns are applied to the directory itself.
     # Директориальные паттерны применяются к самой директории.
-    _DIR_PATTERNS: List[absSkillTemplate] = [AgentTemplate, HumanDirPattern]
+    _DIR_PATTERNS: List[absSkillTemplate] = [AgentTemplate(), HumanDirPattern()]
 
-    def __init__(
-        self, source_path: Path, source: Source
-    ):
+    def __init__(self, source_path: Path, source: Optional[Source] = None):
         """Initialize auto-discovery.
 
         Инициализировать автообнаружение.
 
         Args:
             source_path: Path to scan. / Путь для сканирования.
-            source: Optional source metadata; defaults to a LocalSource for
-                ``source_path``. / Опциональные метаданные источника; по
+            source: Optional source metadata, used only for its
+                ``skip_folder`` setting; defaults to a plain LocalSource for
+                ``source_path``. / Опциональные метаданные источника,
+                используются только для настройки ``skip_folder``; по
                 умолчанию LocalSource для ``source_path``.
         """
         super().__init__(source_path)
-        self._source = source if source is not None else LocalSource(
-            self.source_path)
+        source = source if source is not None else LocalSource(self.source_path)
         self._skip_folders: Tuple[str, ...] = getattr(source, "skip_folder", ("examples",))
+        self._errors: List[str] = []
 
-        self._flat_patterns: List[absSkillTemplate] = [pattern(source, source_path)
-                                                       for pattern in self._FLAT_PATTERNS]
-        self._dir_patterns: List[absSkillTemplate] = [pattern(source, source_path)
-                                                      for pattern in self._DIR_PATTERNS]
-
-        flat_descs = "\n".join(f"- {p.pattern_description}" for p in self._flat_patterns)
-        dir_descs = "\n".join(f"- {p.pattern_description}" for p in self._dir_patterns)
+        flat_descs = "\n".join(f"- {p.pattern_description}" for p in self._FLAT_PATTERNS)
+        dir_descs = "\n".join(f"- {p.pattern_description}" for p in self._DIR_PATTERNS)
         logger.debug(
             "AutoDiscovery initialized for %s with %d flat and %d directory pattern(s)\n"
             "flat:\n%s\n"
             "directory:\n%s",
             self.source_path,
-            len(self._flat_patterns),
-            len(self._dir_patterns),
+            len(self._FLAT_PATTERNS),
+            len(self._DIR_PATTERNS),
             flat_descs,
             dir_descs,
         )
 
-    def discover(self) -> List[Skill]:
+    def discover(self) -> Tuple[List[Skill], List[str]]:
         """Recursively discover all skills at the source path.
 
         Рекурсивно обнаружить все навыки по пути источника.
 
         Returns:
-            List of discovered skills. / Список обнаруженных навыков.
+            The discovered skills and any per-candidate errors (e.g. a
+            missing frontmatter name) collected while scanning. /
+            Обнаруженные скиллы и любые ошибки по кандидатам (например,
+            отсутствующее имя во frontmatter), собранные при сканировании.
         """
         logger.debug("Starting discovery at %s", self.source_path)
+        self._errors = []
         if not self.source_path.exists():
             # Missing source produces an empty result; the base class logs the error.
             # Отсутствующий источник даёт пустой результат; базовый класс логирует ошибку.
             logger.debug("Source path does not exist: %s", self.source_path)
-            return []
+            return [], []
 
         if self.source_path.is_file():
             # A file can only match flat patterns.
             # Файл может соответствовать только плоским паттернам.
             logger.debug("Source path is a file, matching flat patterns only")
-            return self._handle_file(self.source_path)
+            return self._handle_file(self.source_path), self._errors
 
         # Directories are scanned recursively for both flat and directory patterns.
         # Директории сканируются рекурсивно на предмет плоских и директориальных паттернов.
         logger.debug("Source path is a directory, scanning recursively")
-        return self._scan_directory(self.source_path)
+        return self._scan_directory(self.source_path), self._errors
 
-    def _match_flat_patterns(self, path: Path) -> List[Skill]:
+    def _match_flat_patterns(self, path: Path) -> List[Tuple[Skill, absSkillTemplate]]:
         """Return all flat-pattern matches for a file path.
 
         Вернуть все совпадения по плоским паттернам для пути к файлу.
+
+        A pattern that raises (e.g. a missing frontmatter name) is collected
+        as an error and treated as not matching, rather than aborting the
+        whole scan.
+
+        Паттерн, вызвавший исключение (например, отсутствующее имя во
+        frontmatter), собирается как ошибка и считается несовпавшим, вместо
+        прерывания всего сканирования.
 
         Args:
             path: File path to check. / Путь к файлу для проверки.
 
         Returns:
-            List of matching flat skills. / Список подходящих плоских навыков.
+            List of (matching flat skill, pattern) pairs. / Список пар
+            (совпавший плоский скилл, паттерн).
         """
-        return [
-            skill
-            for pattern in self._flat_patterns
-            if (skill := pattern.match(path)) is not None
-        ]
+        matches: List[Tuple[Skill, absSkillTemplate]] = []
+        for pattern in self._FLAT_PATTERNS:
+            try:
+                skill = pattern.match(path)
+            except ValueError as exc:
+                self._errors.append(str(exc))
+                continue
+            if skill is not None:
+                matches.append((skill, pattern))
+        return matches
 
-    def _match_directory_patterns(self, path: Path) -> List[Skill]:
+    def _match_directory_patterns(self, path: Path) -> List[Tuple[Skill, absSkillTemplate]]:
         """Return all directory-pattern matches for a directory path.
 
         Вернуть все совпадения по директориальным паттернам для пути к директории.
+
+        A pattern that raises (e.g. a missing frontmatter name) is collected
+        as an error and treated as not matching, rather than aborting the
+        whole scan.
+
+        Паттерн, вызвавший исключение (например, отсутствующее имя во
+        frontmatter), собирается как ошибка и считается несовпавшим, вместо
+        прерывания всего сканирования.
 
         Args:
             path: Directory path to check. / Путь к директории для проверки.
 
         Returns:
-            List of matching directory skills. / Список подходящих директориальных навыков.
+            List of (matching directory skill, pattern) pairs. / Список пар
+            (совпавший директориальный скилл, паттерн).
         """
-        return [
-            skill
-            for pattern in self._dir_patterns
-            if (skill := pattern.match(path)) is not None
-        ]
+        matches: List[Tuple[Skill, absSkillTemplate]] = []
+        for pattern in self._DIR_PATTERNS:
+            try:
+                skill = pattern.match(path)
+            except ValueError as exc:
+                self._errors.append(str(exc))
+                continue
+            if skill is not None:
+                matches.append((skill, pattern))
+        return matches
 
     def _handle_file(self, filepath: Path) -> List[Skill]:
-        logger.debug("Checking file for flat patterns: %s", filepath)
         """Handle a single file path.
 
         Обработать один путь к файлу.
@@ -157,23 +184,23 @@ class AutoDiscovery(absDiscoveryStrategy):
             ValueError: If the file matches more than one flat pattern.
             ValueError: Если файл соответствует более чем одному плоскому паттерну.
         """
+        logger.debug("Checking file for flat patterns: %s", filepath)
         matches = self._match_flat_patterns(filepath)
         logger.debug("Flat pattern matches for %s: %d", filepath, len(matches))
 
         if not matches:
             return []
         if len(matches) == 1:
-            return matches
+            return [matches[0][0]]
 
         # More than one flat pattern matched: the file's format is ambiguous.
         # Совпало более одного плоского паттерна: формат файла неоднозначен.
         raise ValueError(
             f"Skill definition conflict inFile {filepath}.\n"
-            f"Candidates: {[s.format.value for s in matches]}"
+            f"Candidates: {[pattern.pattern_description for _, pattern in matches]}"
         )
 
     def _scan_directory(self, directory: Path) -> List[Skill]:
-        logger.debug("Scanning directory: %s", directory)
         """Recursively scan a directory for skills.
 
         Рекурсивно просканировать директорию на наличие навыков.
@@ -188,6 +215,7 @@ class AutoDiscovery(absDiscoveryStrategy):
             ValueError: On ambiguous or conflicting skill definitions.
             ValueError: При неоднозначных или конфликтующих определениях навыков.
         """
+        logger.debug("Scanning directory: %s", directory)
         # Collect flat skills from files directly inside this directory.
         # Собираем плоские навыки из файлов непосредственно в этой директории.
         flat_matches: List[Skill] = []
@@ -218,35 +246,36 @@ class AutoDiscovery(absDiscoveryStrategy):
             # Совпало несколько директориальных паттернов (например, SKILL.md + {dir}.skill.md).
             raise ValueError(
                 f"Skill definition conflict in directory: {directory}.\n"
-                f"Candidates: {[s.format.value for s in dir_matches]}"
+                f"Candidates: {[pattern.pattern_description for _, pattern in dir_matches]}"
             )
 
         # Exactly one directory pattern matched.
         # Совпал ровно один директориальный паттерн.
-        dir_skill = dir_matches[0]
-        logger.debug("Directory skill matched at %s: %s", directory, dir_skill.file_path)
+        dir_skill, _ = dir_matches[0]
+        dir_main_file = dir_skill.path / dir_skill.main_file_relative_path
+        logger.debug("Directory skill matched at %s: %s", directory, dir_main_file)
 
         if not flat_matches:
             # Directory skill with no flat files: ensure it has no nested skills.
             # Директориальный навык без плоских файлов: убедиться, что нет вложенных навыков.
-            self._ensure_no_nested_skills(directory, dir_skill.file_path)
+            self._ensure_no_nested_skills(directory, dir_main_file)
             return [dir_skill]
 
         if len(flat_matches) == 1:
             flat_skill = flat_matches[0]
-            if dir_skill.file_path.resolve() == flat_skill.file_path.resolve():
+            if dir_main_file.resolve() == flat_skill.path.resolve():
                 # The single flat file is the same as the directory skill marker
                 # (e.g. {dir}.skill.md for HumanDir). Treat it as a directory skill.
                 # Единственный плоский файл совпадает с маркером директориального навыка
                 # (например, {dir}.skill.md для HumanDir). Считаем директориальным навыком.
-                self._ensure_no_nested_skills(directory, dir_skill.file_path)
+                self._ensure_no_nested_skills(directory, dir_main_file)
                 return [dir_skill]
 
             # One directory pattern and a different flat file: ambiguous.
             # Один директориальный паттерн и другой плоский файл: неоднозначность.
             raise ValueError(
                 f"Cannot unambiguously determine skill in directory: {directory}\n"
-                f".Candidates\n1. {dir_skill.file_path}\n2. {flat_skill.file_path}"
+                f".Candidates\n1. {dir_main_file}\n2. {flat_skill.path}"
             )
 
         # One directory pattern plus multiple flat files: conflict.
@@ -285,7 +314,6 @@ class AutoDiscovery(absDiscoveryStrategy):
         return first_part in self._skip_folders
 
     def _ensure_no_nested_skills(self, directory: Path, main_file: Path) -> None:
-        logger.debug("Checking for nested skills inside %s", directory)
         """Ensure a directory skill does not contain nested skills.
 
         Убедиться, что директориальный навык не содержит вложенных навыков.
@@ -299,6 +327,7 @@ class AutoDiscovery(absDiscoveryStrategy):
             ValueError: If any nested skill pattern is found inside.
             ValueError: Если внутри найден какой-либо паттерн вложенного навыка.
         """
+        logger.debug("Checking for nested skills inside %s", directory)
         main_file_resolved = main_file.resolve()
         for path in directory.rglob("*"):
             if path == directory:

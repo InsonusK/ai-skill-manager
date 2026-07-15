@@ -10,10 +10,11 @@ and returns the combined list of skills.
 
 import logging
 from pathlib import Path
-from typing import Iterator, List, Optional, Sequence
+from typing import Iterator, List, Optional, Sequence, Tuple
 
 from .skill import AutoDiscovery
-from ...entities import GitHubSource, LocalSource, Skill, Source
+from ...entities import GitHubSource, LocalSource, Source
+from ...entities.skill_v2 import Skill
 from ...progress import ProgressCallback
 from ...functions.tag_filter import filter_skills_by_tags
 
@@ -51,7 +52,7 @@ def _normalize_github_sources(sources: Sequence[Source]) -> Iterator[Source]:
 def discover(
     sources: Sequence[Source],
     progress: Optional[ProgressCallback] = None,
-) -> List[Skill]:
+) -> Tuple[List[Skill], List[str]]:
     """Discover skills from a list of sources.
 
     Discover skills from a list of sources.
@@ -64,13 +65,22 @@ def discover(
             reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
-        List of discovered ``Skill`` objects. / Список обнаруженных объектов ``Skill``.
+        The discovered ``Skill`` objects and any per-candidate errors (e.g. a
+        missing frontmatter name) collected while scanning. Structural
+        conflicts (e.g. ambiguous pattern matches) still raise. /
+        Обнаруженные объекты ``Skill`` и любые ошибки по кандидатам
+        (например, отсутствующее имя во frontmatter), собранные при
+        сканировании. Структурные конфликты (например, неоднозначные
+        совпадения паттернов) по-прежнему вызывают исключение.
 
     Raises:
-        ValueError: If an unknown source type is encountered.
-        ValueError: Если встречен неизвестный тип источника.
+        ValueError: If an unknown source type is encountered, or a structural
+            skill definition conflict is found.
+        ValueError: Если встречен неизвестный тип источника, либо найден
+            структурный конфликт определения скилла.
     """
     all_skills: List[Skill] = []
+    all_errors: List[str] = []
     normalized_sources = list(_normalize_github_sources(sources))
 
     logger.debug("Discovering skills from %d source(s)", len(normalized_sources))
@@ -109,7 +119,7 @@ def discover(
             source_path=scan_location.source_path,
             source=src,
         )
-        source_skills = strategy.discover()
+        source_skills, source_errors = strategy.discover()
         logger.debug(
             "Source %d/%d discovered %d skill(s)",
             index,
@@ -127,17 +137,18 @@ def discover(
             )
 
         all_skills.extend(source_skills)
+        all_errors.extend(source_errors)
         if progress is not None:
             progress("discover", index, len(normalized_sources))
 
     # EN: Remove duplicate skills discovered from overlapping sources.
     # RU: Убираем дублирующиеся навыки, обнаруженные из пересекающихся источников.
-    seen: set[Path] = set()
+    seen: set = set()
     deduplicated: List[Skill] = []
     for skill in all_skills:
-        if skill.file_path in seen:
+        if skill in seen:
             continue
-        seen.add(skill.file_path)
+        seen.add(skill)
         deduplicated.append(skill)
 
-    return deduplicated
+    return deduplicated, all_errors
