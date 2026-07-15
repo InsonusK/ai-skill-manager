@@ -1,4 +1,4 @@
-"""Tests for sync command CLI."""
+"""Tests for the sync command CLI (``ai_skill_manager.cli.sync.run``)."""
 
 import shutil
 import tempfile
@@ -8,10 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ai_skill_manager.cli.sync import run as sync_run
-from . import MOCK_DIR
 
-
-TESTCASE_MOCK_DIR = MOCK_DIR / "test_sync_cli"
+MOCK_DIR = Path(__file__).parent / "mock"
 
 
 class TestSyncCLI(unittest.TestCase):
@@ -22,7 +20,7 @@ class TestSyncCLI(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def _copy_mock(self, name: str) -> Path:
-        src = TESTCASE_MOCK_DIR / name
+        src = MOCK_DIR / name
         dst = self.tmpdir / name
         shutil.copytree(src, dst)
         return dst
@@ -89,6 +87,20 @@ class TestSyncCLI(unittest.TestCase):
         args = self._args(config=str(self.tmpdir / "missing.yaml"))
         exit_code = sync_run(args)
         self.assertEqual(exit_code, 1)
+
+    def test_sync_command_direct_source(self):
+        src = self.tmpdir / "skills"
+        src.mkdir()
+        (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
+
+        args = self._args(type="auto", path=str(src), target=str(self.tmpdir / "target"))
+        with patch("sys.stdout", new_callable=StringIO) as stdout:
+            exit_code = sync_run(args)
+            output = stdout.getvalue()
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Synced: 1 skills", output)
+        self.assertTrue((self.tmpdir / "target" / "guide" / "SKILL.md").exists())
 
 
 if __name__ == "__main__":

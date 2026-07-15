@@ -1,4 +1,4 @@
-"""Tests for ai_skill_manager entities/models."""
+"""Tests for SkillProperty."""
 
 import shutil
 import tempfile
@@ -6,10 +6,11 @@ import unittest
 from pathlib import Path
 
 from ai_skill_manager.entities.skill_propetry import SkillProperty
-from . import MOCK_DIR
+
+MOCK_DIR = Path(__file__).parent / "mock"
 
 
-class TestSkillName(unittest.TestCase):
+class TestSkillProperty(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
 

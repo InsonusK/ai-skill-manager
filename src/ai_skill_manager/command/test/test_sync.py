@@ -1,16 +1,12 @@
-"""Tests for the sync command integration."""
+"""Tests for the sync command API (``ai_skill_manager.command.sync.run_sync``)."""
 
 import json
 import shutil
 import tempfile
 import unittest
-from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
 
-from ai_skill_manager.cli import main
-from ai_skill_manager.command.sync import DEFAULT_TARGET, run_sync
-from ai_skill_manager.cli.sync import run as sync_run
+from ai_skill_manager.command.sync import run_sync
 from ai_skill_manager.sync_exception import SyncFailedError
 
 
@@ -133,7 +129,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertIn("[link to b](agents/skills/skill-b/SKILL.md)", synced_a)
 
 
-class TestSyncCLI(unittest.TestCase):
+class TestMultiTargetSync(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
 
@@ -143,76 +139,56 @@ class TestSyncCLI(unittest.TestCase):
     def _make_source_dir(self):
         src = self.tmp / "skills"
         src.mkdir()
-        (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
+        (src / "guide.skill.md").write_text(
+            "---\nname: guide\nwhenToUse: use for onboarding\ntags:\n  - workflow\n---\n"
+            "# Guide\n"
+        )
         return src
 
-    def _args(self, **overrides):
-        defaults = {
-            "config": None,
-            "type": None,
-            "path": None,
-            "subpath": None,
-            "target": None,
-            "remove_orphans": False,
-            "keep_orphans": False,
-            "dry_run": False,
-            "force": False,
-            "add_relations": None,
+    def _write_config(self, target_settings):
+        config = self.tmp / "ai-skills.yaml"
+        data = {
+            "sources": [{"path": "./skills", "type": "local"}],
+            "settings": {"target": target_settings},
         }
-        defaults.update(overrides)
-        return type("Args", (), defaults)()
+        config.write_text(json.dumps(data))
+        return config
 
-    def test_sync_command_runs(self):
+    def test_two_targets_with_different_adapters(self):
         self._make_source_dir()
-        config = self.tmp / "ai-skills.yaml"
-        config.write_text(json.dumps({
-            "sources": [{"path": "./skills", "type": "local"}],
-            "settings": {"target": "./target"}
-        }))
+        config = self._write_config({
+            "default": {"path": "./agents"},
+            "claude": {"path": "./claude-target", "adapters": ["claude-property-adapter"]},
+        })
 
-        args = self._args(config=str(config))
+        result = run_sync(config_path=config)
 
-        with patch("sys.stdout", new_callable=StringIO) as stdout:
-            sync_run(args)
-            output = stdout.getvalue()
+        self.assertEqual(result["skills_count"], 1)
+        self.assertEqual(set(result["targets"]), {"default", "claude"})
 
-        self.assertIn("Synced: 1 skills", output)
-        self.assertTrue((self.tmp / "target" / "guide" / "SKILL.md").exists())
+        default_skill = (self.tmp / "agents" / "guide" / "SKILL.md").read_text()
+        claude_skill = (self.tmp / "claude-target" / "guide" / "SKILL.md").read_text()
 
-    def test_sync_command_dry_run(self):
+        # The default target keeps whenToUse/tags untouched (link-adapter fallback only).
+        self.assertIn("whenToUse: use for onboarding", default_skill)
+        self.assertIn("tags:", default_skill)
+        self.assertNotIn("## Metadata", default_skill)
+
+        # The claude target reshapes frontmatter via claude-property-adapter.
+        self.assertIn("when_to_use: use for onboarding", claude_skill)
+        self.assertNotIn("whenToUse", claude_skill)
+        self.assertIn("## Metadata", claude_skill)
+        self.assertIn("tags:", claude_skill)
+
+    def test_flat_string_target_still_works(self):
         self._make_source_dir()
-        config = self.tmp / "ai-skills.yaml"
-        config.write_text(json.dumps({
-            "sources": [{"path": "./skills", "type": "local"}],
-            "settings": {"target": "./target"}
-        }))
+        config = self._write_config("./target")
 
-        args = self._args(config=str(config), dry_run=True)
+        result = run_sync(config_path=config)
 
-        with patch("sys.stdout", new_callable=StringIO) as stdout:
-            sync_run(args)
-            output = stdout.getvalue()
-
-        self.assertIn("Dry run - no changes", output)
-        self.assertFalse((self.tmp / "target").exists())
-
-    def test_sync_command_direct_source(self):
-        src = self._make_source_dir()
-
-        args = self._args(type="auto", path=str(src), target=str(self.tmp / "target"))
-
-        with patch("sys.stdout", new_callable=StringIO) as stdout:
-            sync_run(args)
-            output = stdout.getvalue()
-
-        self.assertIn("Synced: 1 skills", output)
+        self.assertEqual(result["skills_count"], 1)
+        self.assertEqual(set(result["targets"]), {"default"})
         self.assertTrue((self.tmp / "target" / "guide" / "SKILL.md").exists())
-
-    def test_sync_help(self):
-        with patch("sys.argv", ["ai-skill-manager", "sync", "--help"]):
-            with self.assertRaises(SystemExit) as cm:
-                main()
-            self.assertEqual(cm.exception.code, 0)
 
 
 if __name__ == "__main__":
