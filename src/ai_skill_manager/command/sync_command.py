@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Sequence, TYPE_CHECKING
+from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from ..functions.file_discovery import FileDiscovery
 from ..functions.skill_dict_builder import SkillDictBuilder
@@ -82,11 +82,25 @@ class SyncCommand:
         source_repo_path: Path,
         dry_run: bool,
         add_relations: bool,
+        output_repo_path: Optional[Path] = None,
     ) -> SyncResult:
         """Run one sync: discover, enrich, and (unless errors or dry_run) copy.
 
         Запускает одну синхронизацию: обнаруживает, обогащает и (если нет
         ошибок и это не dry_run) копирует.
+
+        Args:
+            output_repo_path: Repository root that rewritten link text is
+                expressed relative to, shared by every target. Defaults to
+                each target's own path (so a skill's links read as plain
+                names like ``skill-b/SKILL.md``); pass an ancestor of every
+                target to include their relative prefix instead.
+                / Корень репозитория, относительно которого выражается
+                текст переписанных ссылок, общий для всех target'ов. По
+                умолчанию - собственный путь каждого target'а (тогда ссылки
+                скилла выглядят как простые имена вроде
+                ``skill-b/SKILL.md``); передайте предка всех target'ов,
+                чтобы включить их относительный префикс.
         """
         discovered, errors = self._skill_discovery.discover(sources)
         skills, dict_errors = self._skill_dict_builder.build(discovered)
@@ -120,7 +134,10 @@ class SyncCommand:
         if not dry_run:
             for target in targets:
                 target.copy_skills.copy(
-                    skills, target.path, source_repo_path=source_repo_path, output_repo_path=target.path,
+                    skills,
+                    target.path,
+                    source_repo_path=source_repo_path,
+                    output_repo_path=output_repo_path if output_repo_path is not None else target.path,
                 )
 
         return SyncResult(skills=list(skills.values()), errors=[])

@@ -1,33 +1,21 @@
-"""Built-in validation rules.
+"""Link exclusion rule builder.
 
-Exports the default list of rules applied by ``Validator`` and the
-abstract base class for implementing custom rules.
+Structural checks (name format, duplicate names) now live on ``Skill`` and
+``SkillDictBuilder`` directly instead of a separate validation rule engine -
+this package only still holds the link-exclude rules ``LinkDiscovery``
+reuses (inline-code/web/skip-folder).
 
-Встроенные правила валидации.
+Построитель правил исключения ссылок.
 
-Экспортирует список правил по умолчанию, применяемых ``Validator``,
-и абстрактный базовый класс для реализации собственных правил.
+Структурные проверки (формат имени, дубликаты имён) теперь находятся прямо
+в ``Skill`` и ``SkillDictBuilder``, а не в отдельном движке правил
+валидации - этот пакет всё ещё содержит только правила исключения ссылок,
+переиспользуемые ``LinkDiscovery`` (инлайн-код/веб-ссылка/пропускаемая
+директория).
 """
 
-from typing import List
-
-from .abs_validation_rule import absValidationRule
-from .conflict_validation_rule import ConflictValidationRule
 from .link import build_link_exclude_rules
-from .name_validator import NameValidationRule
-
-# Default rule set used by Validator when no custom rules are supplied.
-# Link resolution is checked as part of sync's materialization pass, not
-# here - see validators/rules/link/__init__.py.
-# Набор правил по умолчанию, используемый Validator, если не переданы
-# кастомные правила. Резолюция ссылок проверяется в рамках прохода
-# материализации sync, а не здесь - см. validators/rules/link/__init__.py.
-DEFAULT_RULES: List[absValidationRule] = [NameValidationRule(), ConflictValidationRule()]
 
 __all__ = [
-    "absValidationRule",
     "build_link_exclude_rules",
-    "ConflictValidationRule",
-    "DEFAULT_RULES",
-    "NameValidationRule",
 ]

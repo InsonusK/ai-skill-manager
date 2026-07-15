@@ -108,7 +108,6 @@ class TestSyncAPI(unittest.TestCase):
             run_sync(config_path=config)
 
         self.assertTrue(ctx.exception.errors)
-        shutil.rmtree(ctx.exception.staging_dir, ignore_errors=True)
         self.assertFalse((self.tmp / "target").exists())
 
     def test_sync_link_includes_target_dir_relative_to_config_base(self):
@@ -158,6 +157,7 @@ class TestSyncCLI(unittest.TestCase):
             "keep_orphans": False,
             "dry_run": False,
             "force": False,
+            "add_relations": None,
         }
         defaults.update(overrides)
         return type("Args", (), defaults)()

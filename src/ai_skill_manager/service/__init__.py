@@ -1,18 +1,15 @@
 """High-level services package.
 
-Exports orchestration functions that combine discovery and synchronization
-of skills.
+Exports the skill-discovery function reused by the new pipeline's
+``SkillDiscovery``/``SkillAtPathFinder``.
 
 Пакет высокоуровневых сервисов.
-Экспортирует функции оркестрации, объединяющие обнаружение и синхронизацию
-навыков.
+Экспортирует функцию обнаружения скиллов, переиспользуемую
+``SkillDiscovery``/``SkillAtPathFinder`` новой архитектуры.
 """
 
 from .discover import discover
-from .sync import remove_orphans, run_sync
 
 __all__ = [
     "discover",
-    "remove_orphans",
-    "run_sync",
 ]

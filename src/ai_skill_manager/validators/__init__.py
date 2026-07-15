@@ -1,20 +1,14 @@
-"""Public API for skill validation.
+"""Link exclusion rules package.
 
-Exports the main ``Validator`` class and the ``ValidationReport`` model
-that aggregates all validation results.
+Structural validation (``Validator``/``ValidationReport``) was removed:
+name-format and duplicate-name checks now live on ``Skill`` and
+``SkillDictBuilder`` in the new pipeline. Only the link-exclude rules under
+``validators.rules.link`` remain, reused by ``LinkDiscovery``.
 
-Публичный API для валидации навыков.
+Пакет правил исключения ссылок.
 
-Экспортирует основной класс ``Validator`` и модель ``ValidationReport``,
-которая агрегирует все результаты валидации.
+Структурная валидация (``Validator``/``ValidationReport``) удалена: проверки
+формата имени и дубликатов имён теперь находятся в ``Skill`` и
+``SkillDictBuilder`` новой архитектуры. Остались только правила исключения
+ссылок в ``validators.rules.link``, переиспользуемые ``LinkDiscovery``.
 """
-
-# Import the main validator entry point.
-# Импортируем основную точку входа валидатора.
-from .validator import Validator
-
-# Import the model that contains per-skill validation results.
-# Импортируем модель, содержащую результаты валидации по каждому навыку.
-from .models import ValidationReport
-
-__all__ = ["Validator", "ValidationReport"]

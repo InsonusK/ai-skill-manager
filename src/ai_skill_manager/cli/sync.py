@@ -68,6 +68,14 @@ def add_parser(subparsers):
         help="Force copy all skills, skip hash and version checks / "
              "Принудительно скопировать все навыки, пропустив проверку хеша и версии",
     )
+    parser.add_argument(
+        "--add-relations",
+        action="store_true",
+        default=None,
+        help="Auto-discover a skill outside the configured sources when a "
+             "link points to it / Автоматически обнаруживать скилл вне "
+             "настроенных источников, если на него указывает ссылка",
+    )
     parser.set_defaults(func=run)
     return parser
 
@@ -106,6 +114,7 @@ def run(args) -> int:
                     remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
+                    add_relations=args.add_relations,
                     progress=progress,
                 )
             else:
@@ -115,6 +124,7 @@ def run(args) -> int:
                     remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
+                    add_relations=args.add_relations,
                     progress=progress,
                 )
 
