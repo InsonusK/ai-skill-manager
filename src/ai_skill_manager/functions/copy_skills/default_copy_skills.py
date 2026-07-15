@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, TYPE_CHECKING
+from typing import AbstractSet, Dict, TYPE_CHECKING
 
 from .abs_copy_skills import CopySkills
 from ..copied_link_rewriter import CopiedLinkRewriter
@@ -37,17 +37,23 @@ class DefaultCopySkills(CopySkills):
         target_dir: Path,
         source_repo_path: Path,
         output_repo_path: Path,
+        skip_names: AbstractSet[str] = frozenset(),
     ) -> Dict[str, Path]:
-        """Copy every skill's files, then rewrite links across all of them.
+        """Copy every non-skipped skill's files, then rewrite links across all of them.
 
-        Копирует файлы каждого скилла, затем переписывает ссылки во всех
-        из них.
+        Копирует файлы каждого непропущенного скилла, затем переписывает
+        ссылки во всех из них.
         """
-        copied_dirs: Dict[str, Path] = {
-            name: self._skill_file_copier.copy(skill, target_dir) for name, skill in skills.items()
-        }
+        copied_dirs: Dict[str, Path] = {}
+        for name, skill in skills.items():
+            if name in skip_names:
+                copied_dirs[name] = target_dir / name
+            else:
+                copied_dirs[name] = self._skill_file_copier.copy(skill, target_dir)
 
         for name, skill in skills.items():
+            if name in skip_names:
+                continue
             self._link_rewriter.rewrite(
                 skill, copied_dirs[name], target_dir, source_repo_path, output_repo_path, copied_dirs, skills,
             )

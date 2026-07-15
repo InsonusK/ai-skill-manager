@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, TYPE_CHECKING
+from typing import AbstractSet, Dict, TYPE_CHECKING
 
 import yaml
 
@@ -67,10 +67,13 @@ class ClaudePropertyCopySkills(CopySkills):
         target_dir: Path,
         source_repo_path: Path,
         output_repo_path: Path,
+        skip_names: AbstractSet[str] = frozenset(),
     ) -> Dict[str, Path]:
-        """Copy via the wrapped implementation, then reshape frontmatter."""
-        copied_dirs = self._wrapped.copy(skills, target_dir, source_repo_path, output_repo_path)
-        for copied_dir in copied_dirs.values():
+        """Copy via the wrapped implementation, then reshape non-skipped frontmatter."""
+        copied_dirs = self._wrapped.copy(skills, target_dir, source_repo_path, output_repo_path, skip_names)
+        for name, copied_dir in copied_dirs.items():
+            if name in skip_names:
+                continue
             self._reshape_frontmatter(copied_dir / "SKILL.md")
         return copied_dirs
 

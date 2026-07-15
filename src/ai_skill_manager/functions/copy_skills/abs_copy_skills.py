@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, TYPE_CHECKING
+from typing import AbstractSet, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...entities.skill_v2 import Skill
@@ -36,10 +36,27 @@ class CopySkills(ABC):
         target_dir: Path,
         source_repo_path: Path,
         output_repo_path: Path,
+        skip_names: AbstractSet[str] = frozenset(),
     ) -> Dict[str, Path]:
         """Copy every skill and return its name mapped to its copied directory.
 
         Копирует каждый скилл и возвращает отображение его имени на
         скопированную директорию.
+
+        Args:
+            skills: The *full* set of skills, including any named in
+                ``skip_names`` - needed so links to a skipped skill still
+                resolve correctly, even though that skill's own files are
+                not touched.
+                / *Полный* набор скиллов, включая перечисленные в
+                ``skip_names`` - нужен, чтобы ссылки на пропущенный скилл
+                всё равно корректно резолвились, даже если файлы этого
+                скилла не трогаются.
+            skip_names: Names of skills already correctly in place at
+                ``target_dir / name`` - their files must not be copied or
+                rewritten again.
+                / Имена скиллов, уже корректно находящихся в
+                ``target_dir / name`` - их файлы не должны копироваться или
+                переписываться повторно.
         """
         ...
