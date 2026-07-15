@@ -72,7 +72,7 @@ class SkillFile:
             # Локальный импорт позволяет избежать циклической зависимости между entities и discovery.
             from ..discovery.link import search_links_in_content
 
-            self.__context.links = tuple(search_links_in_content(self.content, self))
+            self.__context.links = tuple(search_links_in_content(self.content))
         return self.__context.links
 
     @property

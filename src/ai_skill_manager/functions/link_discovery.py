@@ -8,11 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from ..entities import LocalSource
+from ..discovery.link import search_links_in_content
 from ..entities.link.file_link_factory import FileLinkFactory
-from ..entities.skill import Skill as LegacySkill
-from ..entities.skill_file import SkillFile as LegacySkillFile
-from ..entities.skill_format import SkillFormat
 from ..models import LinkWithContext
 from ..validation_settings import ValidationSettings
 from ..validators.rules.link import build_link_exclude_rules
@@ -29,16 +26,14 @@ class LinkDiscovery:
 
     Reuses the existing raw-link parser (regex-based, handles markdown and
     wiki syntax, ````example``` block masking) and the existing exclude
-    rules (inline-code, web link, skip-folder) unchanged, via a throwaway
-    legacy ``Skill``/``SkillFile`` wrapper - only target *resolution*
-    (:class:`FileLinkFactory`) is new.
+    rules (inline-code, web link, skip-folder) unchanged - only target
+    *resolution* (:class:`FileLinkFactory`) is new.
 
     Переиспользует существующий парсер сырых ссылок (на основе regex,
     поддерживает markdown и wiki синтаксис, маскирование блоков
     ````example```) и существующие правила исключения (инлайн-код,
-    веб-ссылка, пропускаемая директория) без изменений, через одноразовую
-    обёртку легаси ``Skill``/``SkillFile`` - новой является только
-    *резолюция* цели (:class:`FileLinkFactory`).
+    веб-ссылка, пропускаемая директория) без изменений - новой является
+    только *резолюция* цели (:class:`FileLinkFactory`).
     """
 
     def __init__(self, validation_settings: Optional[ValidationSettings] = None) -> None:
@@ -65,21 +60,15 @@ class LinkDiscovery:
                 Обнаружение не останавливается на первой ошибке - каждая
                 ссылка обрабатывается.
         """
-        legacy_skill = LegacySkill(
-            file_path=file_absolute_path,
-            folder_path=None,
-            source_path=file_absolute_path.parent,
-            source=LocalSource(scan_path=file_absolute_path.parent, repo_path=repo_path),
-            format=SkillFormat.HumanFlat,
-        )
-        legacy_file = LegacySkillFile(path=file_absolute_path, skill=legacy_skill)
+        content = file_absolute_path.read_text(encoding="utf-8")
+        raw_links = search_links_in_content(content)
 
         file_links: List["FileLink"] = []
         errors: List[str] = []
 
-        for raw_link in legacy_file.links:
-            link_context = LinkWithContext.build(legacy_skill, legacy_file, raw_link)
-            if any(rule.should_exclude(link_context, []) for rule in self._exclude_rules):
+        for raw_link in raw_links:
+            link_context = LinkWithContext.build(file_absolute_path, content, raw_link)
+            if any(rule.should_exclude(link_context) for rule in self._exclude_rules):
                 continue
 
             file_link, error = self._factory.build(

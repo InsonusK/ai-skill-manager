@@ -5,7 +5,6 @@
 
 from typing import List
 
-from .....entities import Skill
 from .....models import LinkWithContext
 from .abs_exclude_rule import absExcludeRule
 
@@ -35,6 +34,6 @@ class SkipFolderExcludeRule(absExcludeRule):
             skip_folders = list(self.DEFAULT_SKIP_FOLDERS)
         self._skip_folders = set(skip_folders)
 
-    def should_exclude(self, link: LinkWithContext, skills: List[Skill]) -> bool:
+    def should_exclude(self, link: LinkWithContext) -> bool:
         """Return ``True`` if the link's file is inside one of the skip folders."""
-        return any(part in self._skip_folders for part in link.context.file.path.parts)
+        return any(part in self._skip_folders for part in link.file_path.parts)

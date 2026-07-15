@@ -10,13 +10,10 @@ Builds :class:`absLink` objects from wiki-style references such as
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, List
+from typing import List
 
 from ....entities.link import PathLink, WebLink, absLink
 from .abs_link_builder import absLinkBuilder
-
-if TYPE_CHECKING:
-    from ....entities.skill_file import SkillFile
 
 # Regex for wiki links: optional "!", content inside double brackets.
 # Регулярное выражение для wiki-ссылок: необязательный "!", содержимое внутри двойных скобок.
@@ -31,7 +28,7 @@ class WikilinkBuilder(absLinkBuilder):
     Создаёт объекты :class:`absLink` из ссылок в стиле wiki.
     """
 
-    def search(self, content: str, skill_file: "SkillFile") -> List[absLink]:
+    def search(self, content: str) -> List[absLink]:
         """Parse all wiki-style links from ``content``.
 
         Parse all wiki-style links from ``content``.
@@ -40,8 +37,6 @@ class WikilinkBuilder(absLinkBuilder):
 
         Args:
             content: Markdown text to scan. / Markdown-текст для сканирования.
-            skill_file: Skill file that contains the content.
-                Файл скилла, содержащий содержимое.
 
         Returns:
             List of parsed link objects. / Список разобранных объектов ссылок.
@@ -50,14 +45,10 @@ class WikilinkBuilder(absLinkBuilder):
         # Iterate over every wiki link match in the content.
         # Перебираем каждое совпадение wiki-ссылки в содержимом.
         for match in WIKI_LINK_RE.finditer(content):
-            links.append(self._build_wiki_link(match, skill_file))
+            links.append(self._build_wiki_link(match))
         return links
 
-    def _build_wiki_link(
-        self,
-        match: re.Match,
-        skill_file: "SkillFile",
-    ) -> absLink:
+    def _build_wiki_link(self, match: re.Match) -> absLink:
         """Convert a regex match into a link object.
 
         Convert a regex match into a link object.
@@ -67,8 +58,6 @@ class WikilinkBuilder(absLinkBuilder):
         Args:
             match: Regex match object for a wiki link. /
                 Объект совпадения регулярного выражения для wiki-ссылки.
-            skill_file: Skill file that contains the link. /
-                Файл скилла, содержащий ссылку.
 
         Returns:
             A populated link instance. / Заполненный экземпляр ссылки.
@@ -102,7 +91,6 @@ class WikilinkBuilder(absLinkBuilder):
                 format=WikilinkBuilder,
                 start=start,
                 end=end,
-                skill_file_value=skill_file,
                 header_value=fragment or None,
                 is_image_value=self._is_image(raw),
             )
@@ -113,7 +101,6 @@ class WikilinkBuilder(absLinkBuilder):
             format=WikilinkBuilder,
             start=start,
             end=end,
-            skill_file_value=skill_file,
             raw_path=path_clean,
             header_value=fragment or None,
             is_image_value=self._is_image(raw),

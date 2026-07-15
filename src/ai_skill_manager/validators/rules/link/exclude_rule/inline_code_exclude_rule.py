@@ -5,9 +5,8 @@
 
 import re
 from pathlib import Path
-from typing import Dict, List, Match
+from typing import Dict, Match
 
-from .....entities import Skill
 from .....models import LinkWithContext
 from .abs_exclude_rule import absExcludeRule
 
@@ -27,12 +26,12 @@ class InlineCodeExcludeRule(absExcludeRule):
         """Initialize the rule with an empty mask cache."""
         self.__masked_cache: Dict[Path, str] = {}
 
-    def should_exclude(self, link: LinkWithContext, skills: List[Skill]) -> bool:
+    def should_exclude(self, link: LinkWithContext) -> bool:
         """Return ``True`` if the link lies inside inline code."""
-        file_path = link.context.file.path
+        file_path = link.file_path
         masked = self.__masked_cache.get(file_path)
         if masked is None:
-            masked = _mask_fenced_blocks_for_inline_code(link.context.file.content)
+            masked = _mask_fenced_blocks_for_inline_code(link.content)
             self.__masked_cache[file_path] = masked
         return _is_inside_inline_code(masked, link.base.start, link.base.end)
 

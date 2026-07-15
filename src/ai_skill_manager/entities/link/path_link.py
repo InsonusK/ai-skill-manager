@@ -6,22 +6,13 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field, InitVar
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-
-from .link_path import LinkPath
-from .path_utils import is_relative_to_resolved, same_path
+from typing import Optional
 
 from ..path_kind import PathKind
 
-from .link_kind import LinkKind
 from .abs_link import absLink
-
-if TYPE_CHECKING:
-    from ..skill import Skill
-    from ..skill_file import SkillFile
 
 # Module logger / Логгер модуля.
 logger = logging.getLogger(__name__)
@@ -51,11 +42,13 @@ class PathLink(absLink):
     Ссылка, указывающая на файл внутри сканируемого источника или в файловой
     системе.
 
-    The constructor requires a :class:`SkillFile` because resolving a path link
-    needs the owning skill, the file path and the repository root.
+    Only the raw path and its shallow classification are stored here - actual
+    target resolution is done later, against ``path_raw.path``, by
+    ``entities.link.file_link_factory.FileLinkFactory``.
 
-    Конструктору требуется :class:`SkillFile`, потому что для разрешения
-    путевой ссылки нужен владеющий скилл, путь к файлу и корень репозитория.
+    Здесь хранится только сырой путь и его поверхностная классификация -
+    настоящая резолюция цели выполняется позже, над ``path_raw.path``, в
+    ``entities.link.file_link_factory.FileLinkFactory``.
 
     Attributes:
         path_raw: Raw path and its original classification.
@@ -64,47 +57,25 @@ class PathLink(absLink):
 
     path_raw: PathRaw = field(init=False)
 
-    skill_file_value: InitVar["SkillFile"]
     raw_path: InitVar[str]
     header_value: InitVar[Optional[str]] = None
     is_image_value: InitVar[bool] = False
 
     def __post_init__(
         self,
-        skill_file_value: "SkillFile",
         raw_path: str,
         header_value: Optional[str],
         is_image_value: bool,
     ) -> None:
-        """Resolve the raw path against the skill and repository.
+        """Classify and store the raw path.
 
-        Разрешить сырой путь относительно скилла и репозитория.
+        Классифицировать и сохранить сырой путь.
         """
         object.__setattr__(self, "header", header_value)
         object.__setattr__(self, "is_image", is_image_value)
-        object.__setattr__(self, "skill_file", skill_file_value)
 
         raw_kind = _classify_raw_path(raw_path)
-        path_info = _resolve_path(skill_file_value, raw_path, raw_kind)
-
         object.__setattr__(self, "path_raw", PathRaw(path=raw_path, kind=raw_kind))
-        object.__setattr__(self, "path", path_info)
-
-    @property
-    def exists(self) -> bool:
-        """Return whether the link target file exists on disk.
-
-        Вернуть, существует ли целевой файл ссылки на диске.
-        """
-        return self.path.exists
-
-    @property
-    def has_explicit_md_suffix(self) -> bool:
-        """Return whether the raw link had an explicit ``.md`` suffix.
-
-        Вернуть, заканчивался ли исходный путь явным суффиксом ``.md``.
-        """
-        return self.path.has_explicit_md_suffix
 
 
 def _classify_raw_path(path: str) -> PathKind:
@@ -145,14 +116,6 @@ def _classify_raw_path(path: str) -> PathKind:
     return PathKind.repo_absolute
 
 
-def _has_explicit_md_suffix(path: str) -> bool:
-    """Return ``True`` if the raw path ends with an explicit ``.md`` suffix.
-
-    Вернуть ``True``, если исходный путь заканчивается явным суффиксом ``.md``.
-    """
-    return path.lower().endswith(".md")
-
-
 def _existing_file(path: Path) -> Optional[Path]:
     """Return ``path`` if it exists, otherwise try the ``.md`` fallback.
 
@@ -178,130 +141,3 @@ def _existing_file(path: Path) -> Optional[Path]:
     if md_candidate.exists():
         return md_candidate
     return None
-
-
-def _resolve_path(
-    skill_file: "SkillFile",
-    raw_path: str,
-    raw_kind: PathKind,
-) -> LinkPath:
-    """Resolve a raw path to a :class:`LinkPath`.
-
-    Разрешить сырой путь в :class:`LinkPath`.
-
-    The resolution order matches the user specification: a raw link first
-    attempts to become ``skill`` (inside the skill folder), otherwise it is
-    treated as ``source`` (inside the repository but outside the skill).
-    OS-absolute raw paths are resolved as real filesystem paths; when they fall
-    inside the repository root they are classified like repo-absolute paths,
-    otherwise they become ``LinkKind.os``.
-
-    Порядок разрешения соответствует спецификации: сырая ссылка сначала
-    пытается стать ``skill`` (внутри папки скилла), иначе считается
-    ``source`` (внутри репозитория, но вне скилла). Абсолютные пути ОС
-    разрешаются как реальные пути файловой системы; если они попадают внутрь
-    корня репозитория, классифицируются как repo-absolute, иначе становятся
-    ``LinkKind.os``.
-    """
-    skill = skill_file.skill
-    file_path = skill_file.path
-    repo_path = skill.source.get_scan_location().repo_path
-    explicit_md = _has_explicit_md_suffix(raw_path)
-
-    # A fragment-only link (e.g. [[#header]]) points to the containing skill file.
-    # Ссылка только на фрагмент (например, [[#заголовок]]) указывает на файл скилла.
-    if raw_path == "":
-        resolved = file_path.resolve()
-        repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
-        return LinkPath(
-            kind=LinkKind.skill,
-            formatted="./" + file_path.name,
-            repo_path=repo_relative,
-            os_path=resolved,
-            exists=resolved.exists(),
-            has_explicit_md_suffix=explicit_md,
-            is_inside_repo=True,
-        )
-
-    # Normalize path separators so the same link works on Linux and Windows.
-    # Нормализуем разделители, чтобы одна и та же ссылка работала на Linux и Windows.
-    normalized_raw_path = raw_path.replace("\\", "/")
-    if raw_kind == PathKind.relative:
-        candidate = (file_path.parent / normalized_raw_path).resolve()
-    elif raw_kind == PathKind.repo_absolute:
-        candidate = (repo_path / normalized_raw_path).resolve()
-    elif raw_kind == PathKind.os_absolute:
-        # Resolve as a real OS path, not relative to the repository root.
-        # Разрешаем как реальный путь ОС, а не относительно корня репозитория.
-        candidate = Path(raw_path).resolve()
-    else:
-        raise ValueError(f"Unknown raw path kind: {raw_kind}")
-
-    logger.debug(
-        "Resolving link: raw_kind=%s repo_path=%s candidate=%s",
-        raw_kind,
-        repo_path,
-        candidate,
-    )
-
-    target = _existing_file(candidate)
-    resolved = target if target is not None else candidate
-    exists = target is not None
-
-    is_inside_repo = resolved.is_relative_to(repo_path)
-    logger.debug(
-        "Link resolved: resolved=%s exists=%s is_inside_repo=%s",
-        resolved,
-        exists,
-        is_inside_repo,
-    )
-
-    if not is_inside_repo:
-        # Relative paths must stay inside the repository; OS-absolute paths may
-        # leave it and become OS links.
-        # Относительные пути должны оставаться внутри репозитория;
-        # абсолютные пути ОС могут выходить за его пределы и становиться OS-ссылками.
-        if raw_kind == PathKind.relative:
-            raise ValueError(
-                f"Relative link target {resolved.as_posix()!r} is outside the repository root "
-                f"{repo_path.as_posix()!r}"
-            )
-        # Target is outside the repository root -> OS link.
-        # Цель за пределами корня репозитория -> OS-ссылка.
-        return LinkPath(
-            kind=LinkKind.os,
-            formatted=resolved.as_posix(),
-            repo_path=None,
-            os_path=resolved,
-            exists=exists,
-            has_explicit_md_suffix=explicit_md,
-            is_inside_repo=False,
-        )
-
-    folder = skill.folder_path
-    is_self_link = same_path(resolved, skill.file_path)
-    is_inside_skill_folder = folder is not None and is_relative_to_resolved(resolved, folder)
-
-    repo_relative = Path(os.path.relpath(resolved, repo_path)).as_posix()
-    logger.debug("Repo-relative link path: %s", repo_relative)
-
-    if is_self_link or is_inside_skill_folder:
-        kind = LinkKind.skill
-        if is_self_link:
-            formatted = "./" + skill.file_path.name
-        else:
-            formatted = "./" + resolved.relative_to(folder).as_posix()
-    else:
-        kind = LinkKind.source
-        formatted = repo_relative
-
-    logger.debug("Final link: kind=%s formatted=%s", kind, formatted)
-    return LinkPath(
-        kind=kind,
-        formatted=formatted,
-        repo_path=repo_relative,
-        os_path=resolved,
-        exists=exists,
-        has_explicit_md_suffix=explicit_md,
-        is_inside_repo=True,
-    )

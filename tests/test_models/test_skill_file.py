@@ -8,7 +8,6 @@ from pathlib import Path
 from ai_skill_manager.entities import LocalSource, Skill, SkillFormat
 from ai_skill_manager.entities.path_kind import PathKind
 from ai_skill_manager.entities.link import PathLink, WebLink
-from ai_skill_manager.entities.link.link_kind import LinkKind
 from ai_skill_manager.entities.skill_file import SkillFile
 
 
@@ -59,8 +58,6 @@ class TestSkillFile(unittest.TestCase):
         self.assertIsInstance(link, PathLink)
         self.assertEqual(link.path_raw.path, "./file.md")
         self.assertEqual(link.path_raw.kind, PathKind.relative)
-        self.assertEqual(link.path.kind, LinkKind.source)
-        self.assertEqual(link.path.formatted, "file.md")
 
 
 class TestSkillFiles(unittest.TestCase):

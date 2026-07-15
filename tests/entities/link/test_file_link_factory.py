@@ -5,12 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ai_skill_manager.entities import LocalSource
+from ai_skill_manager.discovery.link import search_links_in_content
 from ai_skill_manager.entities.link.file_link_factory import FileLinkFactory
 from ai_skill_manager.entities.link.link_target import ExternalLinkTarget, SkillLinkTarget
-from ai_skill_manager.entities.skill import Skill as LegacySkill
-from ai_skill_manager.entities.skill_file import SkillFile as LegacySkillFile
-from ai_skill_manager.entities.skill_format import SkillFormat
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.entities.skill_v2 import Skill
 
@@ -25,13 +22,7 @@ class TestFileLinkFactory(unittest.TestCase):
 
     def _parsed_link(self, file_path: Path, content: str):
         file_path.write_text(content, encoding="utf-8")
-        legacy_skill = LegacySkill(
-            file_path=file_path, folder_path=None, source_path=file_path.parent,
-            source=LocalSource(scan_path=file_path.parent, repo_path=self.tmp),
-            format=SkillFormat.HumanFlat,
-        )
-        legacy_file = LegacySkillFile(path=file_path, skill=legacy_skill)
-        return legacy_file.links[0]
+        return search_links_in_content(content)[0]
 
     def test_resolves_to_already_known_skill(self):
         skill_b_dir = self.tmp / "skill-b"

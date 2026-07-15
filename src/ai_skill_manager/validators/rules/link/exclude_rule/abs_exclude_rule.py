@@ -4,10 +4,8 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List
 
 from .....models import LinkWithContext
-from .....entities import Skill
 
 
 class absExcludeRule(ABC):
@@ -17,7 +15,7 @@ class absExcludeRule(ABC):
     """
 
     @abstractmethod
-    def should_exclude(self, link: LinkWithContext, skills: List[Skill]) -> bool:
+    def should_exclude(self, link: LinkWithContext) -> bool:
         """Return ``True`` if the link must be skipped.
 
         Возвращает ``True``, если ссылку необходимо пропустить.
@@ -25,8 +23,6 @@ class absExcludeRule(ABC):
         Args:
             link: Link context to inspect.
                 / Контекст ссылки для проверки.
-            skills: All known skills, when needed for resolution.
-                / Все известные навыки, если требуются для разрешения.
 
         Returns:
             Whether the link should be excluded from further checks.

@@ -1,7 +1,6 @@
-"""Public models used by adapters and higher-level workflows.
+"""Public models used by link discovery and its exclude rules.
 
-Открытые модели, используемые адаптерами и высокоуровневыми сценариями.
+Открытые модели, используемые обнаружением ссылок и его правилами исключения.
 """
 
 from .link_with_context import LinkWithContext
-from .link_location import LinkLocation
