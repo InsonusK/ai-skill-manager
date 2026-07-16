@@ -90,7 +90,7 @@ def discover(
                 scan_location.scan_path,
             )
             strategy = AutoDiscovery(
-                source_path=scan_location.scan_path,
+                scan_path=scan_location.scan_path,
                 source=src,
             )
             location_skills, location_errors = strategy.discover()

@@ -34,7 +34,7 @@ class TestAutoDiscovery(unittest.TestCase):
         resolved = path.resolve()
         source_path = resolved.parent if resolved.is_file() else resolved
         source = LocalSource(scan_paths=(source_path,))
-        return AutoDiscovery(source_path=source_path, source=source)
+        return AutoDiscovery(scan_path=source_path, source=source)
 
     def test_empty_directory(self):
         empty = self._copy_mock("empty_directory") / "empty"
@@ -195,7 +195,7 @@ class TestAutoDiscovery(unittest.TestCase):
         """A missing source path produces an empty result."""
         missing = self.tmpdir / "missing"
         source = LocalSource(scan_paths=(missing.resolve(),))
-        strategy = AutoDiscovery(source_path=missing.resolve(), source=source)
+        strategy = AutoDiscovery(scan_path=missing.resolve(), source=source)
 
         result, errors = strategy.discover()
 
@@ -214,7 +214,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self._build_dir_skill_with_nested(skill_dir, "examples")
 
         source = LocalSource(scan_paths=(skill_dir,))
-        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        strategy = AutoDiscovery(scan_path=skill_dir, source=source)
         result, errors = strategy.discover()
 
         self.assertEqual(errors, [])
@@ -226,7 +226,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self._build_dir_skill_with_nested(skill_dir, "abc")
 
         source = LocalSource(scan_paths=(skill_dir,), skip_folder=("abc",))
-        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        strategy = AutoDiscovery(scan_path=skill_dir, source=source)
         result, errors = strategy.discover()
 
         self.assertEqual(errors, [])
@@ -238,7 +238,7 @@ class TestAutoDiscovery(unittest.TestCase):
         self._build_dir_skill_with_nested(skill_dir, "examples")
 
         source = LocalSource(scan_paths=(skill_dir,), skip_folder=())
-        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        strategy = AutoDiscovery(scan_path=skill_dir, source=source)
 
         with self.assertRaises(ValueError):
             strategy.discover()
@@ -254,7 +254,7 @@ class TestAutoDiscovery(unittest.TestCase):
         (nested / "SKILL.md").write_text("---\nname: nested\n---\n# Nested\n")
 
         source = LocalSource(scan_paths=(skill_dir,))
-        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        strategy = AutoDiscovery(scan_path=skill_dir, source=source)
         result, errors = strategy.discover()
 
         self.assertEqual(errors, [])
@@ -270,7 +270,7 @@ class TestAutoDiscovery(unittest.TestCase):
         (root / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide\n")
 
         source = LocalSource(scan_paths=(root,))
-        strategy = AutoDiscovery(source_path=root, source=source)
+        strategy = AutoDiscovery(scan_path=root, source=source)
         result, errors = strategy.discover()
 
         self.assertEqual(len(result), 1)
@@ -286,7 +286,7 @@ class TestAutoDiscovery(unittest.TestCase):
         (skill_dir / "SKILL.md").write_text("# No name\n")
 
         source = LocalSource(scan_paths=(skill_dir,))
-        strategy = AutoDiscovery(source_path=skill_dir, source=source)
+        strategy = AutoDiscovery(scan_path=skill_dir, source=source)
         result, errors = strategy.discover()
 
         self.assertEqual(result, [])
