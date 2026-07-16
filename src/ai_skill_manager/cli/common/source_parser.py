@@ -14,18 +14,14 @@ import argparse
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from ...config import build_sources_from_config
-from ...entities import GitHubSource, LocalSource, Source
+from ...entities import Source
+from ...service.source_factory import SourceFactory
 
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
 
 _SOURCE_TYPES = ["auto", "github"]
 #: Source types supported by the CLI. / Типы источников, поддерживаемые CLI.
-
-_DEFAULT_GITHUB_SUBPATHS = ["skills"]
-#: Default subpath for GitHub sources when no --subpath is given.
-#: Подпуть GitHub по умолчанию, если --subpath не указан.
 
 
 def add_source_arguments(
@@ -142,11 +138,13 @@ def build_sources_from_args(args) -> Tuple[List[Source], Optional[Path]]:
     path = getattr(args, "path", None)
     subpaths = getattr(args, "subpath", None)
 
+    factory = SourceFactory()
+
     if config:
         config_path = Path(config).resolve()
         if not config_path.exists():
             raise FileNotFoundError(f"Config not found: {config_path}")
-        return build_sources_from_config(config_path), config_path
+        return factory.create_from_config(config_path), config_path
 
     if source_type:
         if not path:
@@ -154,16 +152,11 @@ def build_sources_from_args(args) -> Tuple[List[Source], Optional[Path]]:
 
         if source_type == "github":
             repo_url, tree = _parse_github_path(path)
-            if subpaths is None:
-                subpaths = _DEFAULT_GITHUB_SUBPATHS
-            sources: List[Source] = [
-                GitHubSource(repo_url=repo_url, tree=tree, subpath=sp)
-                for sp in subpaths
-            ]
-        elif source_type in ("auto", "local"):
-            sources = [LocalSource(scan_path=Path(path))]
+            sources = factory.create_from_params(
+                source_type=source_type, path=repo_url, subpath=subpaths, tree=tree,
+            )
         else:
-            raise ValueError(f"Unknown source type: {source_type}")
+            sources = factory.create_from_params(source_type=source_type, path=path)
 
         return sources, None
 
@@ -171,6 +164,6 @@ def build_sources_from_args(args) -> Tuple[List[Source], Optional[Path]]:
     # По умолчанию пробуем файл конфигурации в текущей директории.
     config_path = Path(DEFAULT_CONFIG).resolve()
     if config_path.exists():
-        return build_sources_from_config(config_path), config_path
+        return factory.create_from_config(config_path), config_path
 
     raise FileNotFoundError(f"Config not found: {config_path}")

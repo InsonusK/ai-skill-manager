@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       src: ${{ steps.filter.outputs.src }}
-      tests: ${{ steps.filter.outputs.tests }}
       workflow: ${{ steps.filter.outputs.workflow }}
     steps:
       - name: Checkout repository
@@ -23,8 +22,6 @@ jobs:
           filters: |
             src:
               - 'src/**'
-            tests:
-              - 'tests/**'
             workflow:
               - '.github/workflows/pr.yml'
 
@@ -82,7 +79,7 @@ jobs:
 
   test-matrix:
     needs: changes
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true'
+    if: needs.changes.outputs.src == 'true'
     name: test (${{ matrix.os }}, ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     strategy:

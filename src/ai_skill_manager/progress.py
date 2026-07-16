@@ -29,6 +29,7 @@ ProgressCallback = Callable[[str, int, int], None]
 
 _STAGE_DESCRIPTIONS = {
     "discover": "Discovering skills",
+    "process": "Processing skills",
     "validate": "Validating skills",
     "link_validation": "Validating links",
     "copy": "Copying skills",

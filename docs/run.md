@@ -9,8 +9,8 @@ metadata:
     - commands
     - bilingual
   responsibilities:
-    - document sync and check commands
-    - list options and examples for each command
+    - document the sync command
+    - list options and examples for the command
 ---
 
 # Running / Запуск
@@ -73,51 +73,16 @@ ai-skill-manager sync --target ./my-skills
 ai-skill-manager sync -f
 ```
 
----
+Use `--dry-run` to validate a source without writing anything: it fully
+materializes every skill into a scratch directory (catching structural and
+link errors the same way a real sync would) and reports the result, but
+never touches the target directory or leaves anything behind.
 
-## `check`
-
-Discover skills, validate them, and print the result without copying anything.
-Обнаруживает навыки, проверяет их и выводит результат без копирования.
-
-### Usage / Использование
-
-```bash
-ai-skill-manager check [options]
-```
-
-### Options / Опции
-
-| Option / Опция | Description / Описание |
-|----------------|------------------------|
-| `-c, --config <path>` | Check from config file. / Проверить из файла конфигурации. |
-| `-t, --type <auto\|github>` | Source type for a single source. / Тип источника для одного источника. |
-| `-p, --path <path>` | Source path or GitHub URL (with optional branch: `url branch`). / Путь к источнику или URL GitHub (с опциональной веткой: `url branch`). |
-| `--subpath <path>` | GitHub subpath (can be repeated; default: `skills`). / Подпуть в GitHub (можно повторять; по умолчанию: `skills`). |
-| `-v, --verbose` | Enable debug logging. / Включить подробное логирование. |
-
-### Examples / Примеры
-
-```bash
-# Check from default config
-# Проверить из конфига по умолчанию
-ai-skill-manager check
-
-# Check a single local source
-# Проверить один локальный источник
-ai-skill-manager check -t auto -p ./my-skills
-
-# Check from GitHub
-# Проверить из GitHub
-ai-skill-manager check -t github -p https://github.com/owner/skills-repo.git
-
-# Check a specific subpath and branch in a GitHub repo
-# Проверить конкретный подпуть и ветку в репозитории GitHub
-ai-skill-manager check -t github \
-  -p "https://github.com/owner/skills-repo.git main" \
-  --subpath skills \
-  --subpath docs/guides.skill.md
-```
+Используйте `--dry-run`, чтобы проверить источник, ничего не записывая: он
+полностью материализует каждый навык во временной директории (обнаруживая
+структурные ошибки и ошибки ссылок так же, как это сделала бы настоящая
+синхронизация) и выводит результат, но никогда не трогает целевую
+директорию и не оставляет после себя файлов.
 
 ---
 
@@ -139,9 +104,9 @@ Profiling can also be enabled without the flag by setting the environment variab
 # Профилировать запуск синхронизации
 ai-skill-manager --profile sync
 
-# Profile check and save raw stats for external tools
-# Профилировать проверку и сохранить сырые данные для внешних инструментов
-ai-skill-manager --profile --profile-output check.prof check
+# Profile a dry-run and save raw stats for external tools
+# Профилировать dry-run и сохранить сырые данные для внешних инструментов
+ai-skill-manager --profile --profile-output sync.prof sync --dry-run
 
 # Enable profiling via environment variable
 # Включить профилирование через переменную окружения
