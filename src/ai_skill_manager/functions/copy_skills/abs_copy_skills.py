@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import AbstractSet, Dict, TYPE_CHECKING
+from typing import AbstractSet, Dict, Optional, TYPE_CHECKING
+
+from ...progress import ProgressCallback
 
 if TYPE_CHECKING:
     from ...entities.skill_v2 import Skill
@@ -37,6 +39,7 @@ class CopySkills(ABC):
         source_repo_path: Path,
         output_repo_path: Path,
         skip_names: AbstractSet[str] = frozenset(),
+        progress: Optional[ProgressCallback] = None,
     ) -> Dict[str, Path]:
         """Copy every skill and return its name mapped to its copied directory.
 
@@ -58,5 +61,8 @@ class CopySkills(ABC):
                 / Имена скиллов, уже корректно находящихся в
                 ``target_dir / name`` - их файлы не должны копироваться или
                 переписываться повторно.
+            progress: Optional ``(stage, current, total)`` callback for
+                progress reporting. / Опциональный callback для отчёта о
+                прогрессе.
         """
         ...

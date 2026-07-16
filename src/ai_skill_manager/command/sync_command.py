@@ -14,6 +14,7 @@ from ..entities.skill_file_v2 import MarkdownSkillFile
 from ..functions.skill_dict_builder import SkillDictBuilder
 from ..functions.skill_discovery import SkillDiscovery
 from ..models.skill_relation_queuer import SkillRelationQueuer
+from ..progress import ProgressCallback
 from ..service.file_discovery import discover as discover_skill_files
 from ..service.link_discovery.link_discovery import LinkDiscovery
 
@@ -105,6 +106,7 @@ class SyncCommand:
         dry_run: bool,
         add_relations: bool,
         output_repo_path: Optional[Path] = None,
+        progress: Optional[ProgressCallback] = None,
     ) -> SyncResult:
         """Run one sync: discover, enrich, and (unless errors or dry_run) copy.
 
@@ -118,13 +120,16 @@ class SyncCommand:
                 names like ``skill-b/SKILL.md``); pass an ancestor of every
                 target to include their relative prefix instead.
                 / Корень репозитория, относительно которого выражается
-                текст переписанных ссылок, общий для всех target'ов. По
+                текст переписанной ссылки, общий для всех target'ов. По
                 умолчанию - собственный путь каждого target'а (тогда ссылки
                 скилла выглядят как простые имена вроде
                 ``skill-b/SKILL.md``); передайте предка всех target'ов,
                 чтобы включить их относительный префикс.
+            progress: Optional ``(stage, current, total)`` callback for
+                progress reporting. / Опциональный callback для отчёта о
+                прогрессе.
         """
-        skills, errors = self._skill_discovery.discover(sources)
+        skills, errors = self._skill_discovery.discover(sources, progress=progress)
 
         skill_relation_queuer = SkillRelationQueuer(add_relations=add_relations, queue=list(skills.values()))
         queue = skill_relation_queuer.queue
@@ -135,6 +140,8 @@ class SyncCommand:
         while index < len(queue):
             skill = queue[index]
             index += 1
+            if progress is not None:
+                progress("process", index, len(queue))
             if skill.name in processed_names:
                 continue
             processed_names.add(skill.name)
@@ -151,7 +158,7 @@ class SyncCommand:
                     continue
                 links, link_errors = self._link_discovery.discover(
                     skill.file_absolute_path(skill_file),
-                    repo_path=source_repo_path,
+                    repo_path=skill.repo_path if skill.repo_path is not None else source_repo_path,
                     known_skills=skills,
                     skill_relation_queuer=skill_relation_queuer,
                 )
@@ -168,6 +175,7 @@ class SyncCommand:
                     target.path,
                     source_repo_path=source_repo_path,
                     output_repo_path=output_repo_path if output_repo_path is not None else target.path,
+                    progress=progress,
                 )
 
         return SyncResult(skills=list(skills.values()), errors=[])

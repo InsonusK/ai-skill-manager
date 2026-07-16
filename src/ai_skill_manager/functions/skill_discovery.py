@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from typing import Dict, Sequence, TYPE_CHECKING
+from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from ..models import Result
+from ..progress import ProgressCallback
 from ..service.skill_discovery.skill_discover import discover
 
 if TYPE_CHECKING:
@@ -37,7 +38,9 @@ class SkillDiscovery:
     имён) вместо остановки на первой из них.
     """
 
-    def discover(self, sources: Sequence["Source"]) -> Result[Dict[str, "Skill"]]:
+    def discover(
+        self, sources: Sequence["Source"], progress: Optional[ProgressCallback] = None
+    ) -> Result[Dict[str, "Skill"]]:
         """Discover skills from ``sources``.
 
         Обнаруживает скиллы из ``sources``.
@@ -50,4 +53,4 @@ class SkillDiscovery:
                 ошибки по кандидатам. Обнаружение не останавливается на
                 первой ошибке - каждый кандидат обрабатывается.
         """
-        return discover(sources)
+        return discover(sources, progress=progress)

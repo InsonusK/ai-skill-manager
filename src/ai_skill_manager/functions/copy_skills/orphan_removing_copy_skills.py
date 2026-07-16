@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import AbstractSet, Dict, TYPE_CHECKING
+from typing import AbstractSet, Dict, Optional, TYPE_CHECKING
 
 from .abs_copy_skills import CopySkills
 from ..managed_state import is_managed
+from ...progress import ProgressCallback
 
 if TYPE_CHECKING:
     from ...entities.skill_v2 import Skill
@@ -42,9 +43,12 @@ class OrphanRemovingCopySkills(CopySkills):
         source_repo_path: Path,
         output_repo_path: Path,
         skip_names: AbstractSet[str] = frozenset(),
+        progress: Optional[ProgressCallback] = None,
     ) -> Dict[str, Path]:
         """Copy via the wrapped implementation, then remove orphaned directories."""
-        copied_dirs = self._wrapped.copy(skills, target_dir, source_repo_path, output_repo_path, skip_names)
+        copied_dirs = self._wrapped.copy(
+            skills, target_dir, source_repo_path, output_repo_path, skip_names, progress=progress
+        )
 
         if target_dir.is_dir():
             current_dirs = {path.resolve() for path in copied_dirs.values()}

@@ -58,6 +58,7 @@ dev = [
     "pytest>=7.0",
     "build",
     "twine",
+    "snakeviz",
 ]
 
 [tool.setuptools.packages.find]

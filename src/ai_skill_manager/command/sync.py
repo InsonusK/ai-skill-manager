@@ -22,6 +22,7 @@ from ..functions.copy_skills import (
     OrphanRemovingCopySkills,
     resolve_copy_skills,
 )
+from ..progress import ProgressCallback
 from ..service.source_factory import SourceFactory
 from ..sync_exception import SyncFailedError
 
@@ -52,7 +53,7 @@ def run_sync(
     dry_run: bool = False,
     force: bool = False,
     add_relations: Optional[bool] = None,
-    progress=None,
+    progress: Optional[ProgressCallback] = None,
 ) -> dict:
     """Run synchronization and return the result dictionary.
 
@@ -90,8 +91,8 @@ def run_sync(
             обнаружение. По умолчанию берётся из
             ``settings.add_relations`` конфигурации (``False``, если не
             задано).
-        progress: Unused; kept for CLI call-site compatibility.
-            / Не используется; сохранён для совместимости вызова из CLI.
+        progress: Optional ``(stage, current, total)`` callback for progress
+            reporting. / Опциональный callback для отчёта о прогрессе.
 
     Returns:
         Result dictionary with the discovered/synced skills.
@@ -183,6 +184,7 @@ def run_sync(
             dry_run=dry_run,
             add_relations=add_relations,
             output_repo_path=base,
+            progress=progress,
         )
     finally:
         for src in resolved_sources:

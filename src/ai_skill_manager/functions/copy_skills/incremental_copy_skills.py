@@ -7,11 +7,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import AbstractSet, Dict, Set, TYPE_CHECKING
+from typing import AbstractSet, Dict, Optional, Set, TYPE_CHECKING
 
 from .abs_copy_skills import CopySkills
 from ..managed_state import is_managed, read_managed_state, write_managed_state
 from ..skill_hash import compute_skill_hash
+from ...progress import ProgressCallback
 
 if TYPE_CHECKING:
     from ...entities.skill_v2 import Skill
@@ -50,6 +51,7 @@ class IncrementalCopySkills(CopySkills):
         source_repo_path: Path,
         output_repo_path: Path,
         skip_names: AbstractSet[str] = frozenset(),
+        progress: Optional[ProgressCallback] = None,
     ) -> Dict[str, Path]:
         """Copy only the skills that are missing or out of date."""
         up_to_date: Set[str] = set(skip_names)
@@ -59,7 +61,9 @@ class IncrementalCopySkills(CopySkills):
             if not self._force and self._is_up_to_date(skill, target_dir / name):
                 up_to_date.add(name)
 
-        copied_dirs = self._wrapped.copy(skills, target_dir, source_repo_path, output_repo_path, up_to_date)
+        copied_dirs = self._wrapped.copy(
+            skills, target_dir, source_repo_path, output_repo_path, up_to_date, progress=progress
+        )
 
         for name, skill in skills.items():
             if name in skip_names or name in (up_to_date - set(skip_names)):

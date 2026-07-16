@@ -94,6 +94,8 @@ def discover(
                 source=src,
             )
             location_skills, location_errors = strategy.discover()
+            for skill in location_skills:
+                skill.repo_path = scan_location.repo_path
             source_skills.extend(location_skills)
             source_errors.extend(location_errors)
 

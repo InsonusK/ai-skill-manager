@@ -55,6 +55,7 @@ class SkillAtPathFinder:
                 skill.path if skill.kind is SkillKind.flat else skill.path / skill.main_file_relative_path
             )
             if same_path(skill.path, path) or same_path(main_file, path):
+                skill.repo_path = scan_root
                 return skill
 
         return None

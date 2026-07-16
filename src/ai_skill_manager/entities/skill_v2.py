@@ -53,6 +53,20 @@ class Skill:
     относительно ``path`` (например, ``web.skill.md``). ``None`` для
     плоского скилла, где ``path`` уже прямо называет файл."""
 
+    repo_path: Optional[Path] = field(default=None, compare=False, hash=False)
+    """Absolute path to the root of the repository this skill was
+    discovered from (its source's own ``ScanLocation.repo_path``), used to
+    resolve repo-absolute links authored inside it. Set by discovery, not at
+    construction time - patterns that build a bare ``Skill`` don't know
+    their source's repo root. ``None`` until discovery fills it in.
+
+    Абсолютный путь к корню репозитория, из которого был обнаружен этот
+    скилл (собственный ``ScanLocation.repo_path`` его источника),
+    используется для разрешения repo-absolute ссылок внутри него.
+    Устанавливается обнаружением, а не при создании - паттерны, строящие
+    голый ``Skill``, не знают корень репозитория своего источника. ``None``,
+    пока обнаружение его не заполнит."""
+
     files: List["SkillFile"] = field(default_factory=list, compare=False, hash=False)
     """Files belonging to the skill, filled in by file discovery.
     Файлы, принадлежащие скиллу, заполняются обнаружением файлов."""
