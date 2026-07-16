@@ -79,7 +79,7 @@ class FileLinkResolver:
         """
         os_path = resolve_raw_link_path(raw_link.raw_path, file_absolute_path, repo_path)
 
-        target = self._resolver.resolve(os_path, known_skills.values())
+        target = self._resolver.resolve(os_path, known_skills)
 
         if target is None:
             logger.debug(
@@ -95,7 +95,7 @@ class FileLinkResolver:
                 decision = skill_relation_queuer.handle(candidate)
                 if decision.error is not None:
                     return None, decision.error
-                target = self._resolver.resolve(os_path, [candidate])
+                target = self._resolver.resolve_one(os_path, candidate)
             else:
                 logger.debug(
                     "No skill owns %s up to repo root %s, treating link %r as external",
