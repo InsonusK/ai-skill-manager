@@ -124,7 +124,7 @@ class SourceFactory:
             return [GitHubSource(repo_url=path, tree=tree, subpaths=subpaths)]
 
         if source_type in ("auto", "local"):
-            return [LocalSource(scan_paths=(Path(path).resolve(),))]
+            return [LocalSource(scan_paths=(Path(path).absolute(),))]
 
         raise ValueError(f"Unknown source type: {source_type}")
 
@@ -170,14 +170,14 @@ class SourceFactory:
                 )
             elif src_type == "local":
                 repo_root = Path(src_path)
-                repo_path = (repo_root if repo_root.is_absolute() else config_dir / repo_root).resolve()
+                repo_path = (repo_root if repo_root.is_absolute() else config_dir / repo_root).absolute()
                 scan_paths: List[Path] = []
                 for sp in _normalize_subpaths(src.get("subpath")):
                     if sp is None:
                         scan_paths.append(repo_path)
                     else:
                         sp_path = Path(sp)
-                        scan_paths.append((sp_path if sp_path.is_absolute() else repo_path / sp_path).resolve())
+                        scan_paths.append((sp_path if sp_path.is_absolute() else repo_path / sp_path).absolute())
                 sources.append(
                     LocalSource(
                         scan_paths=tuple(scan_paths),

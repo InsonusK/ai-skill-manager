@@ -15,6 +15,7 @@ from .raw_path_resolution import resolve_raw_link_path
 from ...entities.link.file_link import FileLink
 from ...entities.link.link_target import ExternalLinkTarget
 from ...entities.skill_at_path_finder import SkillAtPathFinder
+from ...tools.path_utils import normalize_path
 
 if TYPE_CHECKING:
     from ...entities.link.link_data import LinkData
@@ -107,7 +108,7 @@ class FileLinkResolver:
                 return None, f"Link {raw_link.raw!r} points to a target that does not exist: {os_path}"
             target = ExternalLinkTarget(
                 file_name=os_path.name,
-                repo_absolute_path=Path(os.path.relpath(os_path, repo_path)),
+                repo_absolute_path=Path(os.path.relpath(os_path, normalize_path(repo_path))),
             )
 
         file_link = FileLink(data=raw_link, target=target)
