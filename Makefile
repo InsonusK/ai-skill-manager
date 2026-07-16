@@ -28,10 +28,12 @@ run-sync:
 	$(PYTHON) -m ai_skill_manager.cli sync
 
 profile-sync:
-	$(PYTHON) -m ai_skill_manager.cli --profile --profile-output profiling/ai-skill-manager.prof sync
+	cd ./profiling && rm -rf ./tmp && rm -rf ./ai-skill-manager.prof && \
+	$(PYTHON) -m ai_skill_manager.cli --profile --profile-output ai-skill-manager.prof sync
 
 profile-check:
-	$(PYTHON) -m ai_skill_manager.cli --profile --profile-output profiling/ai-skill-manager.prof check
+	cd ./profiling && rm -rf ./tmp && rm -rf ./ai-skill-manager.prof && \
+	$(PYTHON) -m ai_skill_manager.cli --profile --profile-output ai-skill-manager.prof check
 
 profile-view:
 	$(SNAKEVIZ) profiling/ai-skill-manager.prof
