@@ -5,11 +5,14 @@ sources:
     subpath:
       - skills/python/architecture/solutions/solution-default-cli.skill
       - skills/common-workflow/develop/logging-principle.skill.md
-      - skills/common-workflow/test/code-coverage.skill.md
+      - skills/common-workflow/test
       - skills/common-workflow/work-in-git-tree.skill.md
-      - skills/devops/devops-github-wf-pr-validation.skill
-      - skills/common-workflow/documentation-for-ai-agents.skill.md
+      - skills/common-workflow/documentation-for-ai-agents.skill
+      - skills/common-workflow/documentation-for-human.skill
       - skills/common-workflow/skill-design.skill
+      - skills/common-workflow/architecture/design/solid-decomposition.skill
+      - skills/common-workflow/architecture/design/plateau-update-by-solutions.skill
+      - skills/devops/devops-github-wf-pr-validation.skill
       
 settings:
   target: 

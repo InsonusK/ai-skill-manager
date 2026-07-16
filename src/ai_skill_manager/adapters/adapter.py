@@ -15,7 +15,7 @@ from ..entities import Skill
 
 from .rules import Type, absAdapter, DEFAULT_RULES, List
 from .models.adapter_message import AdapterMessage
-from ..validation_settings import ValidationSettings
+from ..service.link_discovery.validation_settings import ValidationSettings
 from typing import Dict, Optional, Tuple
 
 

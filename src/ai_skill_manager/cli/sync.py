@@ -14,9 +14,9 @@ from typing import Optional
 
 from ..command.sync import run_sync
 from ..progress import progress_context
-from ..validators import ValidationFailedError
+from ..sync_exception import SyncFailedError
 
-from .common.formatters import format_sync_result, print_skills, print_validation_report
+from .common.formatters import format_sync_result, print_skills, print_sync_errors
 from .common.source_parser import add_source_arguments, build_sources_from_args
 
 # Module logger / Логгер модуля.
@@ -68,6 +68,14 @@ def add_parser(subparsers):
         help="Force copy all skills, skip hash and version checks / "
              "Принудительно скопировать все навыки, пропустив проверку хеша и версии",
     )
+    parser.add_argument(
+        "--add-relations",
+        action="store_true",
+        default=None,
+        help="Auto-discover a skill outside the configured sources when a "
+             "link points to it / Автоматически обнаруживать скилл вне "
+             "настроенных источников, если на него указывает ссылка",
+    )
     parser.set_defaults(func=run)
     return parser
 
@@ -106,6 +114,7 @@ def run(args) -> int:
                     remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
+                    add_relations=args.add_relations,
                     progress=progress,
                 )
             else:
@@ -115,6 +124,7 @@ def run(args) -> int:
                     remove_orphans=remove,
                     dry_run=args.dry_run,
                     force=args.force,
+                    add_relations=args.add_relations,
                     progress=progress,
                 )
 
@@ -127,12 +137,9 @@ def run(args) -> int:
     except ValueError as e:
         logger.error("%s", e)
         return 1
-    except ValidationFailedError as e:
-        if e.skills:
-            print_skills(e.skills)
-            print()
-        print_validation_report(e.report)
-        logger.error("Validation errors: %s", e)
+    except SyncFailedError as e:
+        print_sync_errors(e)
+        logger.error("Sync errors: %s", e)
         return 1
     except Exception as e:
         logger.error("Error: %s", e)

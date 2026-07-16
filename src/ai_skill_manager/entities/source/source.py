@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 @dataclass(frozen=True)
@@ -20,14 +20,14 @@ class ScanLocation:
             ``repo_absolute`` link resolution.
             Абсолютный путь к корню репозитория. Используется для
             разрешения ссылок ``repo_absolute``.
-        source_path: Absolute path to the directory that should be scanned
-            for skills. This becomes ``Skill.source_path``.
+        scan_path: Absolute path to the directory that should be scanned
+            for skills. This becomes ``Skill.scan_path``.
             Абсолютный путь к директории, которую следует сканировать
-            на наличие навыков. Становится ``Skill.source_path``.
+            на наличие навыков. Становится ``Skill.scan_path``.
     """
 
     repo_path: Path
-    source_path: Path
+    scan_path: Path
 
 
 @dataclass(frozen=True)
@@ -72,22 +72,24 @@ class Source(ABC):
         ...
 
     @abstractmethod
-    def get_scan_location(self) -> ScanLocation:
-        """Return the filesystem location this source refers to.
+    def get_scan_locations(self) -> List[ScanLocation]:
+        """Return the filesystem locations this source refers to.
 
-        Вернуть файловую локацию, на которую ссылается этот источник.
+        Вернуть файловые локации, на которые ссылается этот источник.
 
-        For local sources this is a direct filesystem path. For remote sources
-        such as GitHub this method may download and extract the repository
-        before returning the resulting paths.
+        A source may hold several scan paths (e.g. several GitHub subpaths).
+        For remote sources such as GitHub this method may download and
+        extract the repository once before returning all resulting paths.
 
-        Для локальных источников это прямой путь файловой системы. Для удалённых
-        источников, таких как GitHub, этот метод может скачать и распаковать
-        репозиторий перед возвратом получившихся путей.
+        Источник может содержать несколько путей сканирования (например,
+        несколько подпутей GitHub). Для удалённых источников, таких как
+        GitHub, этот метод может один раз скачать и распаковать репозиторий
+        перед возвратом всех получившихся путей.
 
         Returns:
-            A :class:`ScanLocation` with ``repo_path`` and ``source_path``.
-            :class:`ScanLocation` с полями ``repo_path`` и ``source_path``.
+            A list of :class:`ScanLocation`, each with ``repo_path`` and
+            ``scan_path``. / Список :class:`ScanLocation`, каждый с полями
+            ``repo_path`` и ``scan_path``.
         """
         ...
 
