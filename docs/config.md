@@ -268,6 +268,27 @@ Global settings that apply to the synchronization.
 | `remove_orphans` | boolean / булево | `true` | Remove skills in the target that are no longer defined in the config. / Удалить навыки в целевой директории, которые больше не определены в конфиге. |
 | `on_conflict` | string / строка | `error` | How to handle duplicate skill names: `error` or `last_wins`. / Как обрабатывать дублирующиеся имена навыков: `error` или `last_wins`. |
 | `dry_run` | boolean / булево | `false` | When `true`, preview changes without writing anything. / При значении `true` показывать изменения без записи. |
+| `add_relations` | boolean / булево | `false` | When `true`, a link that points to a skill outside the configured sources auto-discovers and queues that skill instead of raising an error. / При значении `true` ссылка на скилл вне настроенных источников автоматически обнаруживает и ставит в очередь этот скилл вместо выдачи ошибки. |
+
+### `add_relations` / `add_relations`
+
+Controls what happens when a link inside a skill points to another skill that
+was not found by any configured source.
+Управляет тем, что происходит, когда ссылка внутри скилла указывает на другой
+скилл, не найденный ни одним настроенным источником.
+
+- `false` (default) — the link is reported as a sync error and nothing is copied.
+  `false` (по умолчанию) — ссылка сообщается как ошибка синхронизации, и ничего не копируется.
+- `true` — the linked-to skill is discovered on disk, queued, and synced together with the configured sources.
+  `true` — скилл, на который указывает ссылка, обнаруживается на диске, ставится в очередь и синхронизируется вместе с настроенными источниками.
+
+```yaml
+settings:
+  add_relations: true
+```
+
+The CLI flag `--add-relations` overrides this setting for a single run.
+Флаг CLI `--add-relations` переопределяет эту настройку для одного запуска.
 
 ### Validation settings / Настройки валидации
 
@@ -345,8 +366,8 @@ settings:
 - `last_wins` — the last source in the list wins.
   `last_wins` — побеждает последний источник в списке.
 
-CLI flags (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`) override the config file values.
-Флаги CLI (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`) переопределяют значения из файла конфигурации.
+CLI flags (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`, `--add-relations`) override the config file values.
+Флаги CLI (`--target`, `--on-conflict`, `--remove-orphans`, `--keep-orphans`, `--dry-run`, `--add-relations`) переопределяют значения из файла конфигурации.
 
 ### Example with dry-run enabled / Пример с включённым сухим прогоном
 
