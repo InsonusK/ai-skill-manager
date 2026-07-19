@@ -9,6 +9,7 @@ from unittest.mock import patch
 from ai_skill_manager.entities.skill_at_path_finder import SkillAtPathFinder
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.service.skill_discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.tools.path_utils import same_path
 
 
 class TestSkillAtPathFinder(unittest.TestCase):
@@ -166,7 +167,14 @@ class TestSkillAtPathFinder(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.name, "plateau-create-by-solutions")
         self.assertEqual(result.kind, SkillKind.dir)
-        self.assertEqual(result.path, skill_dir)
+        # same_path(), not a raw Path ==: on Windows, os.path.resolve() can
+        # normalize to the short 8.3 form (e.g. RUNNER~1) while skill_dir
+        # here still uses the long form, and the two must still compare equal.
+        # same_path(), а не сравнение Path напрямую: на Windows
+        # os.path.resolve() может привести путь к короткой 8.3-форме
+        # (например, RUNNER~1), тогда как skill_dir здесь остаётся в
+        # длинной форме, и оба варианта должны считаться равными.
+        self.assertTrue(same_path(result.path, skill_dir))
 
     def test_sibling_subtree_with_a_skill_does_not_affect_resolution(self):
         folder1 = self.tmp / "folder1"
