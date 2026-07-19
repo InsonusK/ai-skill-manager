@@ -28,3 +28,4 @@ settings:
   remove_orphans: true
   on_conflict: error
   dry_run: false
+  add_relations: true
