@@ -6,17 +6,20 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, TYPE_CHECKING
+from typing import Callable, List, Optional, Sequence, TYPE_CHECKING, Union
 
 from ..entities.skill_file_v2 import MarkdownSkillFile
 from ..functions.skill_dict_builder import SkillDictBuilder
 from ..functions.skill_discovery import SkillDiscovery
+from ..models.link_validation_error import LinkValidationError
 from ..models.skill_relation_queuer import SkillRelationQueuer
 from ..progress import ProgressCallback
 from ..service.file_discovery import discover as discover_skill_files
 from ..service.link_discovery.link_discovery import LinkDiscovery
+from ..tools.path_utils import normalize_path
 
 if TYPE_CHECKING:
     from ..entities import Source
@@ -45,7 +48,7 @@ class SyncResult:
     """
 
     skills: List["Skill"]
-    errors: List[str] = field(default_factory=list)
+    errors: List[Union[str, LinkValidationError]] = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
@@ -153,17 +156,28 @@ class SyncCommand:
 
             skill.files.extend(self._file_discovery(skill))
 
+            skill_repo_path = skill.repo_path if skill.repo_path is not None else source_repo_path
+
             for skill_file in skill.files:
                 if not isinstance(skill_file, MarkdownSkillFile):
                     continue
                 links, link_errors = self._link_discovery.discover(
                     skill.file_absolute_path(skill_file),
-                    repo_path=skill.repo_path if skill.repo_path is not None else source_repo_path,
+                    repo_path=skill_repo_path,
                     known_skills=skills,
                     skill_relation_queuer=skill_relation_queuer,
                 )
                 skill_file.links.extend(links)
-                errors.extend(link_errors)
+                for link_error in link_errors:
+                    errors.append(
+                        LinkValidationError(
+                            skill_name=skill.name,
+                            skill_path=Path(os.path.relpath(skill.path, normalize_path(skill_repo_path))),
+                            file_relative_path=skill_file.path,
+                            link_raw=link_error.raw,
+                            message=link_error.message,
+                        )
+                    )
 
         if errors:
             return SyncResult(skills=list(skills.values()), errors=errors)

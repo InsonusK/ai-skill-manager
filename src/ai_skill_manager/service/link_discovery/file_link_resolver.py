@@ -105,7 +105,7 @@ class FileLinkResolver:
 
         if target is None:
             if not os_path.exists():
-                return None, f"Link {raw_link.raw!r} points to a target that does not exist: {os_path}"
+                return None, f"points to a target that does not exist: {os_path}"
             target = ExternalLinkTarget(
                 file_name=os_path.name,
                 repo_absolute_path=Path(os.path.relpath(os_path, normalize_path(repo_path))),

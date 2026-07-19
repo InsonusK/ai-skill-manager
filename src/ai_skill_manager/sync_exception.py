@@ -5,7 +5,9 @@
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Union
+
+from .models.link_validation_error import LinkValidationError
 
 
 class SyncFailedError(Exception):
@@ -26,7 +28,7 @@ class SyncFailedError(Exception):
 
     __slots__ = ("errors", "target_dir")
 
-    def __init__(self, errors: List[str], target_dir: Path):
+    def __init__(self, errors: List[Union[str, LinkValidationError]], target_dir: Path):
         """Initialize the exception with the collected errors and target path.
 
         Args:
