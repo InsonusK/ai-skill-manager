@@ -98,9 +98,9 @@ class SkillRelationQueuer:
                 return QueueDecision(
                     queued=False,
                     error=(
-                        f"Cannot queue skill {candidate.name!r} at {candidate.path}: "
-                        f"a different skill with the same name is already queued "
-                        f"({queued_skill.path})"
+                        f"resolves to skill {candidate.name!r} at {candidate.path}, but a "
+                        f"different skill named {candidate.name!r} is already queued at "
+                        f"{queued_skill.path}"
                     ),
                 )
 
@@ -108,8 +108,8 @@ class SkillRelationQueuer:
             return QueueDecision(
                 queued=False,
                 error=(
-                    f"Link points to skill {candidate.name!r} at {candidate.path}, "
-                    f"which is not part of the configured sources (add_relations is disabled)"
+                    f"resolves to skill {candidate.name!r} at {candidate.path}, which is not "
+                    f"part of the configured sources (add_relations is disabled)"
                 ),
             )
 

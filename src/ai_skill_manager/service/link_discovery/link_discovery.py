@@ -6,11 +6,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from .link_factory import search_links_in_content
 from .file_link_resolver import FileLinkResolver
-from ...models import LinkWithContext, Result
+from .link_error import LinkError
+from ...models import LinkWithContext
 from ...validation_settings import ValidationSettings
 from .exclude_rule import build_link_exclude_rules
 
@@ -49,7 +50,7 @@ class LinkDiscovery:
         repo_path: Path,
         known_skills: Dict[str, "Skill"],
         skill_relation_queuer: "SkillRelationQueuer",
-    ) -> Result[List["FileLink"]]:
+    ) -> Tuple[List["FileLink"], List[LinkError]]:
         """Discover and resolve the links in ``file_absolute_path``.
 
         Обнаруживает и разрешает ссылки в ``file_absolute_path``.
@@ -61,17 +62,21 @@ class LinkDiscovery:
                 ``add_relations`` для скиллов, обнаруженных через ссылки.
 
         Returns:
-            Resolved links and any per-link resolution errors. Discovery
+            Resolved links and any per-link resolution errors, each paired
+            with the raw link text so the caller (which knows the
+            surrounding skill and file) can report it in context. Discovery
             does not stop at the first error - every link is attempted.
-                / Разрешённые ссылки и ошибки резолюции по каждой ссылке.
-                Обнаружение не останавливается на первой ошибке - каждая
-                ссылка обрабатывается.
+                / Разрешённые ссылки и ошибки резолюции по каждой ссылке,
+                вместе с сырым текстом ссылки, чтобы вызывающий код (которому
+                известны окружающие скилл и файл) мог сообщить о ней в
+                контексте. Обнаружение не останавливается на первой ошибке -
+                каждая ссылка обрабатывается.
         """
         content = file_absolute_path.read_text(encoding="utf-8")
         link_data_arr = search_links_in_content(content)
 
         file_links: List["FileLink"] = []
-        errors: List[str] = []
+        errors: List[LinkError] = []
 
         for link_data in link_data_arr:
             link_context = LinkWithContext.build(file_absolute_path, content, link_data)
@@ -86,8 +91,8 @@ class LinkDiscovery:
                 skill_relation_queuer=skill_relation_queuer,
             )
             if error is not None:
-                errors.append(error)
+                errors.append(LinkError(raw=link_data.raw, message=error))
                 continue
             file_links.append(file_link)
 
-        return Result(file_links, errors)
+        return file_links, errors

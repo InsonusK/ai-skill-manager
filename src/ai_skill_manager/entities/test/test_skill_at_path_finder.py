@@ -9,6 +9,7 @@ from unittest.mock import patch
 from ai_skill_manager.entities.skill_at_path_finder import SkillAtPathFinder
 from ai_skill_manager.entities.skill_kind import SkillKind
 from ai_skill_manager.service.skill_discovery.skill.auto import AutoDiscovery
+from ai_skill_manager.tools.path_utils import same_path
 
 
 class TestSkillAtPathFinder(unittest.TestCase):
@@ -139,6 +140,41 @@ class TestSkillAtPathFinder(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.name, "web")
         self.assertEqual(result.kind, SkillKind.dir)
+
+    def test_finds_dir_skill_when_linked_directly_to_its_own_human_dir_main_file(self):
+        # EN: A HumanDir skill's own main file (`{name}.skill/{name}.skill.md`)
+        # also matches the flat `*.skill.md` pattern by name alone. A link
+        # pointing straight at that file must still resolve to the *same*
+        # directory skill (kind=dir, path=the folder) that a full source
+        # scan would have discovered - not a second, distinct flat-kind
+        # Skill for the same file, which would falsely look like a
+        # different skill with a colliding name.
+        # RU: Собственный основной файл HumanDir-скилла
+        # (`{name}.skill/{name}.skill.md`) тоже совпадает с плоским
+        # паттерном `*.skill.md` по одному имени. Ссылка, указывающая прямо
+        # на этот файл, должна по-прежнему разрешаться в тот же самый
+        # директориальный скилл (kind=dir, path=папка), который был бы
+        # обнаружен полным сканированием источника - а не во второй,
+        # отдельный плоский Skill для того же файла, который выглядел бы
+        # как другой скилл с конфликтующим именем.
+        skill_dir = self.tmp / "plateau-create-by-solutions.skill"
+        skill_dir.mkdir()
+        main_file = skill_dir / "plateau-create-by-solutions.skill.md"
+        main_file.write_text("---\nname: plateau-create-by-solutions\n---\n")
+
+        result = self.finder.find(main_file, self.tmp)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "plateau-create-by-solutions")
+        self.assertEqual(result.kind, SkillKind.dir)
+        # same_path(), not a raw Path ==: on Windows, os.path.resolve() can
+        # normalize to the short 8.3 form (e.g. RUNNER~1) while skill_dir
+        # here still uses the long form, and the two must still compare equal.
+        # same_path(), а не сравнение Path напрямую: на Windows
+        # os.path.resolve() может привести путь к короткой 8.3-форме
+        # (например, RUNNER~1), тогда как skill_dir здесь остаётся в
+        # длинной форме, и оба варианта должны считаться равными.
+        self.assertTrue(same_path(result.path, skill_dir))
 
     def test_sibling_subtree_with_a_skill_does_not_affect_resolution(self):
         folder1 = self.tmp / "folder1"

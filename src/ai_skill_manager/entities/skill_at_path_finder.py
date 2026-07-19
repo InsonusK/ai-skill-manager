@@ -78,12 +78,17 @@ class SkillAtPathFinder:
         repo_path = repo_path.resolve()
         auto_discovery = self._get_auto_discovery(repo_path)
 
-        if path.is_file():
-            flat_skill = auto_discovery.match_flat_file(path)
-            if flat_skill is not None:
-                flat_skill.repo_path = repo_path
-                return flat_skill
-
+        # Check directory ownership first: a HumanDir skill's own main file
+        # (e.g. ``foo.skill/foo.skill.md``) also matches the flat pattern by
+        # name alone, so matching flat patterns first would misclassify it
+        # as a *different*, standalone flat skill instead of recognizing it
+        # as that directory skill's own file.
+        # Сначала проверяем принадлежность директории: собственный основной
+        # файл HumanDir-скилла (например, ``foo.skill/foo.skill.md``) тоже
+        # совпадает с плоским паттерном по одному только имени, поэтому
+        # проверка плоских паттернов в первую очередь неверно определила бы
+        # его как *другой*, отдельный плоский скилл, вместо того чтобы
+        # распознать в нём собственный файл этого директориального скилла.
         candidate = path if path.is_dir() else path.parent
         while True:
             skill = self._skill_rooted_at(candidate)
@@ -92,7 +97,7 @@ class SkillAtPathFinder:
                 return skill
 
             if same_path(candidate, repo_path):
-                return None
+                break
 
             parent = candidate.parent
             if parent == candidate:
@@ -102,6 +107,14 @@ class SkillAtPathFinder:
                 )
                 return None
             candidate = parent
+
+        if path.is_file():
+            flat_skill = auto_discovery.match_flat_file(path)
+            if flat_skill is not None:
+                flat_skill.repo_path = repo_path
+                return flat_skill
+
+        return None
 
     def _get_auto_discovery(self, repo_path: Path) -> AutoDiscovery:
         """Return the (lazily created, reused) ``AutoDiscovery`` helper."""
