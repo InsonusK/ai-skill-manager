@@ -11,6 +11,24 @@ Supported syntax / Поддерживаемый синтаксис:
 - ``tag1/tag2/tag3`` — hierarchical tag; matches any consecutive segment
   such as ``tag1``, ``tag2``, ``tag3``, ``tag1/tag2``, ``tag2/tag3`` or
   ``tag1/tag2/tag3``.
+- ``prefix/*`` — single-level prefix wildcard; matches the prefix itself
+  or a direct child ``prefix/<segment>`` (for example, ``lang/*`` matches
+  ``lang`` and ``lang/python``, but not ``lang/python/alfa``).
+- ``prefix/**`` — multi-level prefix wildcard; matches the prefix itself or
+  any descendant starting with ``prefix/`` (for example, ``lang/**`` matches
+  ``lang``, ``lang/python`` and ``lang/python/alfa``).
+- ``prefix/*/suffix`` — single-segment wildcard inside a path; matches exactly
+  one segment between the surrounding parts (for example,
+  ``lang/*/beta`` matches ``lang/python/beta`` but not
+  ``lang/python/alfa/beta``).
+- ``prefix/**/suffix`` — multi-segment wildcard inside a path; matches any
+  number of segments (including zero) between the surrounding parts (for
+  example, ``lang/**/beta`` matches ``lang/python/beta`` and
+  ``lang/python/alfa/beta``).
+- ``*`` — matches any skill that has at least one tag.
+- ``**`` — matches any skill that has at least one tag.
+- ``/*`` — matches any hierarchical tag (a tag containing ``/``).
+- ``/**`` — matches any skill that has at least one tag.
 """
 
 from __future__ import annotations
@@ -51,11 +69,75 @@ def _tag_variants(tag: str) -> List[str]:
     return variants
 
 
+def _match_pattern(pattern: Sequence[str], tag_parts: Sequence[str]) -> bool:
+    """Match a split pattern against a split tag using ``*`` and ``**``.
+
+    ``*`` matches exactly one non-empty segment. ``**`` matches zero or
+    more segments. All other pattern parts are matched literally against the
+    corresponding tag segments.
+    """
+
+    def _match(pi: int, ti: int) -> bool:
+        if pi == len(pattern) and ti == len(tag_parts):
+            return True
+        if pi >= len(pattern):
+            return False
+        part = pattern[pi]
+        if part == "**":
+            for tj in range(ti, len(tag_parts) + 1):
+                if _match(pi + 1, tj):
+                    return True
+            return False
+        if part == "*":
+            if ti >= len(tag_parts):
+                return False
+            return _match(pi + 1, ti + 1)
+        if ti < len(tag_parts) and part == tag_parts[ti]:
+            return _match(pi + 1, ti + 1)
+        return False
+
+    return _match(0, 0)
+
+
 def _matches_tag(skill_tags: Set[str], tag_term: str) -> bool:
     """Check whether a skill tag set satisfies a single tag term.
 
     Проверяет, удовлетворяет ли множество тегов навыка одному теговому терму.
+
+    - ``*`` and ``**`` match any non-empty tag set.
+    - ``/*`` matches any hierarchical tag.
+    - ``/**`` matches any non-empty tag set.
+    - ``prefix/*`` matches the prefix itself or exactly one segment after it.
+    - ``prefix/**`` matches the prefix itself or any descendant.
+    - In-path wildcards (``*/beta``, ``**/beta``) use ``*`` for one segment
+      and ``**`` for zero or more segments.
     """
+    if tag_term in ("*", "**"):
+        return bool(skill_tags)
+    if tag_term == "/*":
+        return any("/" in t for t in skill_tags)
+    if tag_term == "/**":
+        return bool(skill_tags)
+    if tag_term.endswith("/**"):
+        prefix = tag_term[:-3]
+        if not prefix:
+            return bool(skill_tags)
+        return any(t == prefix or t.startswith(prefix + "/") for t in skill_tags)
+    if tag_term.endswith("/*"):
+        prefix = tag_term[:-2]
+        if not prefix:
+            return any("/" in t for t in skill_tags)
+        return any(
+            t == prefix
+            or (
+                t.startswith(prefix + "/")
+                and "/" not in t[len(prefix) + 1 :]
+            )
+            for t in skill_tags
+        )
+    if "*" in tag_term or "**" in tag_term:
+        pattern = tag_term.split("/")
+        return any(_match_pattern(pattern, t.split("/")) for t in skill_tags)
     return any(variant in skill_tags for variant in _tag_variants(tag_term))
 
 
