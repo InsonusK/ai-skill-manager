@@ -12,7 +12,8 @@ sources:
       - skills/common-workflow/architecture/design/solid-decomposition.skill
       - skills/common-workflow/architecture/design/plateau-update-by-solutions.skill
       - skills/devops/devops-github-wf-pr-validation.skill
-      
+      - skills/python/architecture/solutions/python-solution-conformance-testing.skill
+
 settings:
   target: 
     for_each:
