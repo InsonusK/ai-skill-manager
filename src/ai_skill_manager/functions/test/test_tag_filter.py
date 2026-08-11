@@ -77,6 +77,62 @@ class TestCompileTagExpression(unittest.TestCase):
         self.assertTrue(matcher({"a/b"}))
         self.assertFalse(matcher({"a/b/c"}))
 
+    def test_prefix_wildcard(self):
+        matcher = compile_tag_expression("lang/*")
+        self.assertTrue(matcher({"lang"}))
+        self.assertTrue(matcher({"lang/python"}))
+        self.assertTrue(matcher({"lang/dotnet"}))
+        self.assertFalse(matcher({"lang/python/alfa"}))
+        self.assertFalse(matcher({"python"}))
+        self.assertFalse(matcher({"abc"}))
+
+    def test_multi_level_prefix_wildcard(self):
+        matcher = compile_tag_expression("lang/**")
+        self.assertTrue(matcher({"lang"}))
+        self.assertTrue(matcher({"lang/python"}))
+        self.assertTrue(matcher({"lang/python/alfa"}))
+        self.assertFalse(matcher({"python"}))
+        self.assertFalse(matcher({"abc"}))
+
+    def test_prefix_wildcard_with_operators(self):
+        matcher = compile_tag_expression("lang/* & abc")
+        self.assertFalse(matcher({"lang/python"}))
+        self.assertTrue(matcher({"lang/python", "abc"}))
+        matcher = compile_tag_expression("lang/* | abc")
+        self.assertTrue(matcher({"lang/python"}))
+        self.assertTrue(matcher({"abc"}))
+        self.assertFalse(matcher({"other"}))
+
+    def test_bare_star_matches_any_tag(self):
+        matcher = compile_tag_expression("*")
+        self.assertTrue(matcher({"anything"}))
+        self.assertTrue(matcher({"a", "b"}))
+        self.assertFalse(matcher(set()))
+
+    def test_bare_slash_star_matches_hierarchical(self):
+        matcher = compile_tag_expression("/*")
+        self.assertTrue(matcher({"a/b"}))
+        self.assertFalse(matcher({"a"}))
+        self.assertFalse(matcher(set()))
+
+    def test_in_path_single_segment_wildcard(self):
+        matcher = compile_tag_expression("lang/*/beta")
+        self.assertTrue(matcher({"lang/python/beta"}))
+        self.assertFalse(matcher({"lang/python/alfa/beta"}))
+        self.assertFalse(matcher({"lang/beta"}))
+        self.assertFalse(matcher({"lang/python"}))
+        self.assertTrue(matcher({"lang/*/beta"}))
+
+    def test_in_path_multi_segment_wildcard(self):
+        matcher = compile_tag_expression("lang/**/beta")
+        self.assertTrue(matcher({"lang/python/beta"}))
+        self.assertTrue(matcher({"lang/python/alfa/beta"}))
+        self.assertTrue(matcher({"lang/beta"}))
+        self.assertFalse(matcher({"lang"}))
+        self.assertFalse(matcher({"beta"}))
+        self.assertFalse(matcher({"abc"}))
+        self.assertTrue(matcher({"lang/*/beta"}))
+
     def test_invalid_empty(self):
         with self.assertRaises(ValueError):
             compile_tag_expression("")
