@@ -1,0 +1,134 @@
+name: Publish reports
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A push that lands while a previous run of this workflow is still going means that
+# run's eventual report would describe code no longer on master - cancel it instead of
+# letting it finish and publish stale numbers.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'src/**'
+              - 'features/**'
+              - 'src/**/test/**'
+              - 'tests/**'
+              - '.github/workflows/**'
+              - 'Makefile'
+              - 'scripts/**'
+
+  cucumber-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Cucumber tests with coverage
+        run: make cucumber-test WITH_CODE_COVERAGE=true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-test-report
+          path: |
+            tmp/result
+            tmp/report/tests
+            tmp/report/coverage
+          if-no-files-found: error
+
+  mutation-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run mutation tests
+        run: make mutation-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mutation-test-report
+          path: |
+            tmp/result
+            tmp/report/mutation
+          if-no-files-found: error
+
+  result-page:
+    needs: [cucumber-test, mutation-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-test-report"
+          merge-multiple: true
+          path: tmp
+
+      - name: Assemble GitHub Pages site
+        run: make result-page
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: result-page
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

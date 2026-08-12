@@ -18,6 +18,11 @@ metadata:
 
 # AI Skills Manager / Менеджер навыков ИИ
 
+[![PR Tests](https://github.com/InsonusK/ai-skill-manager/actions/workflows/pr.yml/badge.svg)](https://github.com/InsonusK/ai-skill-manager/actions/workflows/pr.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://insonusk.github.io/ai-skill-manager/tests-badge.json)](https://insonusk.github.io/ai-skill-manager/tests/)
+[![Coverage](https://img.shields.io/endpoint?url=https://insonusk.github.io/ai-skill-manager/coverage-badge.json)](https://insonusk.github.io/ai-skill-manager/coverage/)
+[![Mutation score](https://img.shields.io/endpoint?url=https://insonusk.github.io/ai-skill-manager/mutation-badge.json)](https://insonusk.github.io/ai-skill-manager/mutation/)
+
 Sync AI agent skills into `.agents/skills/` from local directories or GitHub repositories.
 Синхронизирует навыки AI-агентов в `.agents/skills/` из локальных директорий или репозиториев GitHub.
 

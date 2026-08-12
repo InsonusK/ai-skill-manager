@@ -14,3 +14,7 @@ profiling/tmp
 profiling/ai-skills
 .agents/skills
 .claude/skills
+tmp/
+public/
+mutants/
+.mutmut-cache
