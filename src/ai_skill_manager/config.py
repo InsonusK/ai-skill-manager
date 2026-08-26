@@ -6,7 +6,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .functions.copy_skills import resolve_copy_skills
 from .functions.copy_skills.abs_copy_skills import CopySkills
@@ -248,3 +248,67 @@ def parse_validation_settings(settings: Any) -> ValidationSettings:
         "settings.validation.rules.link.skip_folder must be a list, string or null, "
         f"got {type(skip_folder).__name__}"
     )
+
+
+@dataclass(frozen=True)
+class LoggingSettings:
+    """Parsed logging settings from ``settings.logging``.
+
+    Разобранные настройки логирования из ``settings.logging``.
+    """
+
+    level: str = "warning"
+    to_file: Optional[Path] = None
+
+
+#: Valid logging level names accepted by ``settings.logging.level``.
+#: Допустимые имена уровней логирования для ``settings.logging.level``.
+_VALID_LOGGING_LEVELS = {"debug", "info", "warning", "error", "critical"}
+
+
+def parse_logging_settings(settings: Any) -> LoggingSettings:
+    """Parse ``settings.logging`` into :class:`LoggingSettings`.
+
+    Разбирает ``settings.logging`` в :class:`LoggingSettings`.
+
+    Args:
+        settings: The ``settings`` section of the loaded config, or ``None``.
+            / Секция ``settings`` загруженной конфигурации или ``None``.
+
+    Returns:
+        Parsed logging settings.
+            / Разобранные настройки логирования.
+    """
+    if not isinstance(settings, dict):
+        return LoggingSettings()
+
+    logging_settings = settings.get("logging") or {}
+    if not isinstance(logging_settings, dict):
+        raise ValueError(
+            "settings.logging must be a mapping, got "
+            f"{type(logging_settings).__name__}"
+        )
+
+    level = logging_settings.get("level", "warning")
+    if not isinstance(level, str):
+        raise ValueError(
+            "settings.logging.level must be a string, got "
+            f"{type(level).__name__}"
+        )
+    level = level.lower()
+    if level not in _VALID_LOGGING_LEVELS:
+        raise ValueError(
+            f"settings.logging.level must be one of {sorted(_VALID_LOGGING_LEVELS)}, "
+            f"got {level!r}"
+        )
+
+    to_file = logging_settings.get("to_file")
+    if to_file is None:
+        return LoggingSettings(level=level, to_file=None)
+    if not isinstance(to_file, str):
+        raise ValueError(
+            "settings.logging.to_file must be a string or null, got "
+            f"{type(to_file).__name__}"
+        )
+
+    return LoggingSettings(level=level, to_file=Path(to_file))

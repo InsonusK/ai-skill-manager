@@ -5,7 +5,13 @@ import tempfile
 import json
 from pathlib import Path
 
-from ai_skill_manager.config import load_config, parse_target_settings, parse_validation_settings
+from ai_skill_manager.config import (
+    LoggingSettings,
+    load_config,
+    parse_logging_settings,
+    parse_target_settings,
+    parse_validation_settings,
+)
 from ai_skill_manager.functions.copy_skills import ClaudePropertyCopySkills, DefaultCopySkills
 
 
@@ -181,6 +187,60 @@ class TestParseValidationSettings(unittest.TestCase):
                     },
                 },
             })
+
+
+class TestParseLoggingSettings(unittest.TestCase):
+    def test_none_returns_defaults(self):
+        settings = parse_logging_settings(None)
+
+        self.assertEqual(settings, LoggingSettings(level="warning", to_file=None))
+
+    def test_empty_settings_returns_defaults(self):
+        settings = parse_logging_settings({})
+
+        self.assertEqual(settings, LoggingSettings(level="warning", to_file=None))
+
+    def test_missing_logging_returns_defaults(self):
+        settings = parse_logging_settings({"target": ".agents/skills"})
+
+        self.assertEqual(settings, LoggingSettings(level="warning", to_file=None))
+
+    def test_custom_level(self):
+        settings = parse_logging_settings({"logging": {"level": "debug"}})
+
+        self.assertEqual(settings.level, "debug")
+        self.assertIsNone(settings.to_file)
+
+    def test_level_case_insensitive(self):
+        settings = parse_logging_settings({"logging": {"level": "INFO"}})
+
+        self.assertEqual(settings.level, "info")
+
+    def test_to_file(self):
+        settings = parse_logging_settings({"logging": {"to_file": "./ai-skill-manager.log"}})
+
+        self.assertEqual(settings.to_file, Path("./ai-skill-manager.log"))
+
+    def test_to_file_null(self):
+        settings = parse_logging_settings({"logging": {"to_file": None}})
+
+        self.assertIsNone(settings.to_file)
+
+    def test_invalid_level_raises(self):
+        with self.assertRaises(ValueError):
+            parse_logging_settings({"logging": {"level": "verbose"}})
+
+    def test_invalid_level_type_raises(self):
+        with self.assertRaises(ValueError):
+            parse_logging_settings({"logging": {"level": 123}})
+
+    def test_invalid_to_file_type_raises(self):
+        with self.assertRaises(ValueError):
+            parse_logging_settings({"logging": {"to_file": 123}})
+
+    def test_logging_not_dict_raises(self):
+        with self.assertRaises(ValueError):
+            parse_logging_settings({"logging": "enabled"})
 
 
 if __name__ == '__main__':
