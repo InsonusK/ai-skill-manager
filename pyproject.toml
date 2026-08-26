@@ -76,6 +76,9 @@ fail_under = 80
 source_paths = ["src/ai_skill_manager"]
 pytest_add_cli_args_test_selection = ["src/"]
 
+[tool.pytest.ini_options]
+testpaths = ["src/ai_skill_manager"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 exclude = ["*.test", "*.test.*", "test", "test.*"]
