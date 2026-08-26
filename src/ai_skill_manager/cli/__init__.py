@@ -11,25 +11,61 @@ console scripts.
 import argparse
 import logging
 import sys
+from pathlib import Path
+from typing import List, Optional
 
+from ..config import LoggingSettings, load_config, parse_logging_settings
 from ..profiling import profile_command
 
+from .common.source_parser import DEFAULT_CONFIG
 from .sync import add_parser as sync_add_parser
 
 __all__ = ["main"]
 
 
-def _configure_logging(debug: bool) -> None:
+def _configure_logging(logging_settings: LoggingSettings) -> None:
     """Set up root logging for the CLI.
 
     Включает корневое логирование для CLI.
     """
-    level = logging.DEBUG if debug else logging.INFO
+    level = getattr(logging, logging_settings.level.upper())
+    handlers: List[logging.Handler] = [logging.StreamHandler()]
+
+    log_file = logging_settings.to_file
+    if log_file is not None:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_file, mode="a"))
+
     logging.basicConfig(
         level=level,
         format="[%(levelname)s] %(message)s",
+        handlers=handlers,
         force=True,
     )
+
+
+def _resolve_config_path(args) -> Optional[Path]:
+    """Resolve the config file path from CLI arguments without loading it.
+
+    Mirrors the resolution order of ``build_sources_from_args``:
+    1. Explicit ``--config``.
+    2. Default config file in the current directory (only when no direct
+       source arguments are given).
+    3. ``None`` when running in direct source mode.
+    """
+    config = getattr(args, "config", None)
+    if config:
+        return Path(config).resolve()
+
+    # Direct source mode does not use a config file.
+    if getattr(args, "type", None):
+        return None
+
+    default_path = Path(DEFAULT_CONFIG).resolve()
+    if default_path.exists():
+        return default_path
+
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -78,7 +114,29 @@ def main():
     parser = _build_parser()
     args = parser.parse_args()
 
-    _configure_logging(getattr(args, "debug", False))
+    config_path = _resolve_config_path(args)
+    config_base: Optional[Path] = None
+    if config_path is not None and config_path.exists():
+        config = load_config(config_path)
+        settings = config.get("settings", {})
+        logging_settings = parse_logging_settings(settings)
+        config_base = config_path.parent
+    else:
+        logging_settings = LoggingSettings()
+
+    if getattr(args, "debug", False):
+        logging_settings = LoggingSettings(
+            level="debug",
+            to_file=logging_settings.to_file,
+        )
+
+    log_file = logging_settings.to_file
+    if log_file is not None and not log_file.is_absolute() and config_base is not None:
+        log_file = config_base / log_file
+
+    _configure_logging(
+        LoggingSettings(level=logging_settings.level, to_file=log_file)
+    )
 
     logger = logging.getLogger(__name__)
     logger.debug("Starting command: %s", args.command)

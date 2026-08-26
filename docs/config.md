@@ -12,6 +12,7 @@ metadata:
   responsibilities:
     - document ai-skills.yaml structure
     - describe sources, settings, and conflict resolution
+    - describe logging settings
     - provide config examples for local and GitHub sources
     - link to the public skills repository
 ---
@@ -41,6 +42,9 @@ settings:
   remove_orphans: true
   on_conflict: error
   dry_run: false
+  logging:
+    level: warning
+    to_file: null
 ```
 
 ## Basic setup examples / Примеры базовой настройки
@@ -320,6 +324,41 @@ settings:
     rules:
       link:
         skip_folder: []
+```
+
+### Logging settings / Настройки логирования
+
+`settings.logging` controls the verbosity and file output of the CLI application logs.
+`settings.logging` управляет уровнем детализации и файловым выводом логов CLI-приложения.
+
+| Setting / Настройка | Type / Тип | Default / По умолчанию | Description / Описание |
+|---------------------|------------|------------------------|------------------------|
+| `level` | string / строка | `warning` | Logging level: `debug`, `info`, `warning`, `error`, or `critical`. Case-insensitive. / Уровень логирования: `debug`, `info`, `warning`, `error` или `critical`. Регистр не имеет значения. |
+| `to_file` | string or null / строка или null | `null` | Path to the log file. Relative paths are resolved from the directory containing the config file. When `null`, logs are not written to a file. When set, the CLI writes its log output to that file in addition to the console. / Путь к файлу логов. Относительные пути разрешаются от директории, содержащей файл конфигурации. При значении `null` лог не пишется в файл. При указании пути CLI записывает лог работы в этот файл в дополнение к консоли. |
+
+The `--debug` CLI flag always overrides `level` to `debug` for a single run.
+Флаг CLI `--debug` всегда переопределяет `level` в значение `debug` для одного запуска.
+
+Example with defaults / Пример с настройками по умолчанию:
+
+```yaml
+settings:
+  target: .agents/skills
+  remove_orphans: true
+  on_conflict: error
+  logging:
+    level: warning
+    to_file: null
+```
+
+Write logs to a file / Запись логов в файл:
+
+```yaml
+settings:
+  target: .agents/skills
+  logging:
+    level: debug
+    to_file: ./ai-skill-manager.log
 ```
 
 ## Multi-target sync / Мульти-target синхронизация
