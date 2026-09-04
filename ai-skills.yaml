@@ -4,17 +4,14 @@ sources:
     tree: master
     subpath:
       - skills/python/architecture/solutions/solution-default-cli.skill
-      - skills/common-workflow/develop/logging-principle.skill.md
+      - skills/common-workflow/develop
       - skills/common-workflow/test
       - skills/common-workflow/work-in-git-tree.skill.md
       - skills/common-workflow/documentation
+      - skills/common-workflow/agent-partnership-mindset.skill
       - skills/common-workflow/skill-design.skill
-      - skills/common-workflow/architecture/design/solid-decomposition.skill
-      - skills/common-workflow/architecture/design/plateau-update-by-solutions.skill
-      - skills/devops/devops-github-wf-pr-validation.skill
-      - skills/python/architecture/solutions/python-solution-conformance-testing.skill
-      - skills/devops/devops-github-wf-bdd-report-publish.skill
-      - skills/devops/devops-github-wf-pr-validation.skill
+      - skills/common-workflow/architecture/core
+      - skills/devops
 
 settings:
   target: 
