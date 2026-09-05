@@ -227,9 +227,10 @@ class GitHubSource(Source):
             скачивается и распаковывается один раз и переиспользуется для
             каждого подпути.
     """
+    @dataclass
     class Context:
         scan_cache: Optional[List[ScanLocation]] = None
-        extracted_dirs:List[Path] = []
+        extracted_dirs: List[Path] = field(default_factory=list)
 
     repo_url: str
     #: GitHub repository URL. / URL репозитория GitHub.

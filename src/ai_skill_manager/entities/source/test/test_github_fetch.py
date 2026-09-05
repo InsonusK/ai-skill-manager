@@ -27,7 +27,7 @@ def _commit(repo: Path, message: str) -> None:
 
 def _make_repo(root: Path, branch: str = "master") -> Path:
     repo = root / "origin"
-    repo.mkdir()
+    repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q", "-b", branch, str(repo)], check=True)
     (repo / "marker.txt").write_text("cloned-content")
     _commit(repo, "init")
@@ -141,6 +141,27 @@ class TestGitHubSourceWithGitClone(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_cleanup_of_one_source_leaves_other_sources_repository(self):
+        repo_a = _make_repo(self.tmpdir / "a")
+        repo_b = _make_repo(self.tmpdir / "b")
+        source_a = GitHubSource(repo_url=str(repo_a), tree="master", subpaths=(None,))
+        source_b = GitHubSource(repo_url=str(repo_b), tree="master", subpaths=(None,))
+        try:
+            locations_a = source_a.get_scan_locations()
+            locations_b = source_b.get_scan_locations()
+            path_a = locations_a[0].repo_path
+            path_b = locations_b[0].repo_path
+
+            source_a.cleanup()
+
+            self.assertFalse(path_a.exists())
+            self.assertTrue(path_b.exists())
+        finally:
+            source_a.cleanup()
+            source_b.cleanup()
+
+        self.assertFalse(path_b.exists())
 
     def test_scan_locations_point_into_cloned_repository(self):
         repo = _make_repo(self.tmpdir)
