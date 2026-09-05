@@ -14,6 +14,7 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from .git_clone import GitCloneError, clone_git_repo
 from .source import ScanLocation, Source
 
 # Module logger / Логгер модуля.
@@ -128,6 +129,89 @@ def _find_extracted_root(extract_to: Path) -> Path:
 
 
     
+def fetch_repo_tree(repo_url: str, tree: str, work_dir: Path) -> Path:
+    """Materialize a repository at a given ref, preferring git clone.
+
+    Материализовать содержимое репозитория на заданном ref, предпочитая git clone.
+
+    Git clone goes through the git CLI, so the user's own credentials apply
+    (SSH keys, credential helpers, URL rewrites) and any git host works —
+    that is what makes private repositories reachable. The anonymous GitHub
+    archive download remains only as a fallback for when git is unavailable
+    or the clone fails and the URL is a GitHub one.
+
+    Клонирование идёт через git CLI, поэтому используются собственные
+    учётные данные пользователя (SSH-ключи, credential helpers, перезапись
+    URL) и работает любой git-хост — именно это делает доступными приватные
+    репозитории. Анонимное скачивание архива GitHub остаётся только как
+    запасной вариант, когда git недоступен или клонирование не удалось и URL
+    указывает на GitHub.
+
+    Args:
+        repo_url: Any URL or path accepted by ``git clone``.
+            / Любой URL или путь, принимаемый ``git clone``.
+        tree: Branch or tag to check out. / Ветка или тег для checkout.
+        work_dir: Existing empty directory the repository is materialized
+            into (a ``repo`` or ``archive`` subdirectory is created inside).
+            / Существующая пустая директория, в которую материализуется
+            репозиторий (внутри создаётся поддиректория ``repo`` или
+            ``archive``).
+
+    Returns:
+        Path to the repository root. / Путь к корню репозитория.
+
+    Raises:
+        GitCloneError: If cloning fails and the URL is not a GitHub URL, so
+            no archive fallback is possible.
+            / Если клонирование не удалось и URL не является URL GitHub, так
+            что запасной вариант с архивом невозможен.
+        Exception: The archive download error if both strategies fail.
+            / Ошибка скачивания архива, если оба способа не удались.
+    """
+    clone_dir = work_dir / "repo"
+    clone_error: Optional[GitCloneError] = None
+    try:
+        return clone_git_repo(repo_url, tree, clone_dir)
+    except GitCloneError as error:
+        # Bound to a separate variable: the except-block variable itself is
+        # deleted when the block ends.
+        # Привязана в отдельную переменную: переменная блока except удаляется
+        # при выходе из блока.
+        clone_error = error
+        logger.warning(
+            "git clone failed for %s (tree=%s), falling back to archive download: %s",
+            repo_url,
+            tree,
+            clone_error,
+        )
+
+    if clone_dir.exists():
+        # A failed clone can leave a partial directory behind; remove it so
+        # the archive extraction sees exactly one top-level directory.
+        # Неудачное клонирование может оставить частичную директорию;
+        # удаляем её, чтобы распаковка архива видела ровно одну директорию
+        # верхнего уровня.
+        shutil.rmtree(clone_dir, ignore_errors=True)
+
+    try:
+        owner, repo = _parse_github_url(repo_url)
+    except ValueError:
+        # Not a GitHub URL — the archive fallback only works for GitHub, so
+        # there is nothing else to try.
+        # URL не GitHub — запасной вариант с архивом работает только для
+        # GitHub, больше пробовать нечего.
+        raise clone_error
+
+    archive_dir = work_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = _download_archive(owner, repo, tree)
+    try:
+        _extract_archive(archive_path, archive_dir)
+        return _find_extracted_root(archive_dir)
+    finally:
+        archive_path.unlink(missing_ok=True)
+
+
 @dataclass(frozen=True)
 class GitHubSource(Source):
     """Skills discovered from a GitHub repository.
@@ -227,27 +311,21 @@ class GitHubSource(Source):
             return self.__context.scan_cache
 
         logger.debug("Resolving GitHub source: %s tree=%s subpaths=%s", self.repo_url, self.tree, self.subpaths)
-        owner, repo = _parse_github_url(self.repo_url)
-        archive_path = _download_archive(owner, repo, self.tree)
-        try:
-            extracted_dir = Path(tempfile.mkdtemp())
-            _extract_archive(archive_path, extracted_dir)
-            self.__context.extracted_dirs.append(extracted_dir)
+        extracted_dir = Path(tempfile.mkdtemp())
+        self.__context.extracted_dirs.append(extracted_dir)
 
-            repo_root = _find_extracted_root(extracted_dir)
-            locations: List[ScanLocation] = []
-            for subpath in self.subpaths:
-                source_path = repo_root / subpath if subpath else repo_root
-                logger.debug("GitHub scan location: repo_root=%s source_path=%s", repo_root, source_path)
-                if not source_path.exists():
-                    # AutoDiscovery treats a missing scan path as an empty result.
-                    # AutoDiscovery обрабатывает отсутствующий путь сканирования как пустой результат.
-                    logger.error("subpath not found: %s", source_path)
-                locations.append(ScanLocation(repo_path=repo_root, scan_path=source_path))
-            self.__context.scan_cache = locations
-            return locations
-        finally:
-            archive_path.unlink(missing_ok=True)
+        repo_root = fetch_repo_tree(self.repo_url, self.tree, extracted_dir)
+        locations: List[ScanLocation] = []
+        for subpath in self.subpaths:
+            source_path = repo_root / subpath if subpath else repo_root
+            logger.debug("GitHub scan location: repo_root=%s source_path=%s", repo_root, source_path)
+            if not source_path.exists():
+                # AutoDiscovery treats a missing scan path as an empty result.
+                # AutoDiscovery обрабатывает отсутствующий путь сканирования как пустой результат.
+                logger.error("subpath not found: %s", source_path)
+            locations.append(ScanLocation(repo_path=repo_root, scan_path=source_path))
+        self.__context.scan_cache = locations
+        return locations
 
     def cleanup(self) -> None:
         """Remove extracted temporary directories and clear the scan cache.
