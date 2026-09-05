@@ -14,3 +14,5 @@ profiling/tmp
 profiling/ai-skills
 .agents/skills
 .claude/skills
+mutants
+tmp

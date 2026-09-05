@@ -29,6 +29,8 @@ depends_on:
   - src/ai_skill_manager/entities/link/file_link.py
   - src/ai_skill_manager/entities/link/file_link_factory.py
   - src/ai_skill_manager/entities/link/raw_path_resolution.py
+  - src/ai_skill_manager/entities/source/git_clone.py
+  - src/ai_skill_manager/entities/source/github.py
 ---
 
 # Sync pipeline
@@ -69,6 +71,8 @@ replays the already-resolved target, it never re-resolves.
 | Validate/represent a skill's identity, kind and kebab-case name | Skill | Class |
 | Represent one file (optionally markdown, with links) owned by a skill | SkillFile / MarkdownSkillFile | Class |
 | Find a already-loaded-or-discoverable skill that owns a given path | SkillAtPathFinder | Function |
+| Clone a git repository at a given ref via the git CLI | clone_git_repo | Function |
+| Materialize a repository at a ref, preferring git clone with archive fallback | fetch_repo_tree | Function |
 
 ## Units
 
@@ -166,6 +170,16 @@ replays the already-resolved target, it never re-resolves.
   - depends on: nothing
   - usage scenario: constructed by `file_discovery.discover` for every file under a skill, markdown files get the `MarkdownSkillFile` subclass so `LinkDiscovery` has somewhere to attach `FileLink`s.
   - test cases: [src/ai_skill_manager/entities/test/test_skill_file_v2.py](../../src/ai_skill_manager/entities/test/test_skill_file_v2.py)
+
+- **clone_git_repo** (Function) — clone a git repository at a given ref into a destination directory via the git CLI, so the user's own credentials apply (SSH keys, credential helpers, URL rewrites) and private repositories on any git host are reachable.
+  - depends on: the git executable in PATH
+  - usage scenario: called by `fetch_repo_tree` when resolving a `github`-type source; raises `GitCloneError` when git is missing or the clone command fails.
+  - test cases: [src/ai_skill_manager/entities/source/test/test_git_clone.py](../../src/ai_skill_manager/entities/source/test/test_git_clone.py)
+
+- **fetch_repo_tree** (Function) — materialize a repository at a ref into a working directory: git clone first, anonymous GitHub archive download as fallback when git is unavailable or the clone fails and the URL parses as a GitHub one.
+  - depends on: `clone_git_repo`, archive downloader/extractor helpers
+  - usage scenario: called by `GitHubSource.get_scan_locations` instead of downloading the tarball directly; re-raises the clone error for non-GitHub URLs where no archive fallback exists.
+  - test cases: [src/ai_skill_manager/entities/source/test/test_github_fetch.py](../../src/ai_skill_manager/entities/source/test/test_github_fetch.py), trace matrix: [src/ai_skill_manager/entities/source/TESTS.md](../../src/ai_skill_manager/entities/source/TESTS.md)
 
 - **SkillAtPathFinder** (Function) — find a skill (already loaded or freshly discoverable) that owns a given filesystem path.
   - depends on: `AutoDiscovery` (scoped to a candidate path)
