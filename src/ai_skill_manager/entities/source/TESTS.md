@@ -22,6 +22,8 @@ Status ✅ covered | ⚠️ weak | ❌ not covered | 🔧 planned
 | 9 | Given clone fails and the archive download also fails, When fetch_repo_tree runs, Then the archive download error propagates | error | `test_archive_error_propagates_when_both_strategies_fail` | `RuntimeError("archive download failed")` propagates | ✅ |
 | 10 | Given a GitHubSource pointing at a local git repository (file path URL), When get_scan_locations runs, Then scan locations point into the cloned repository content | happy | `test_scan_locations_point_into_cloned_repository` | 1 location; `scan_path/marker.txt` content == "cloned-content"; `repo_path == scan_path` | ✅ |
 | 11 | Given two GitHubSource instances with materialized repositories, When cleanup is called on the first, Then only its own repository is removed and the second's stays intact until its own cleanup | regression | `test_cleanup_of_one_source_leaves_other_sources_repository` | after `source_a.cleanup()`: `path_a` gone, `path_b` exists; after `source_b.cleanup()`: `path_b` gone | ✅ |
+| 12 | Given a cloned repository whose .git files are read-only (Windows), When cleanup runs, Then the directory is fully removed | error | `test_cleanup_removes_read_only_files_left_by_git` | read-only file in an extracted dir: `leftover` no longer exists after `cleanup()` | ✅ |
+| 13 | Given a failed rmtree step on a read-only entry, When the onerror handler retries, Then it makes the entry writable before re-invoking the failed function | error | `test_makes_entry_writable_before_retrying` | mode recorded by retried func has `S_IWRITE` set; file is gone | ✅ |
 
 Note on mocks: rows 6-9 mock `clone_git_repo`/`_download_archive` at the `github` module boundary
 to simulate git-missing/clone-failure without depending on machine git state; every mock has a
@@ -35,7 +37,7 @@ the fallback wiring breaks. Rows 1, 2, 5, 10 use real local git repositories and
 | happy | 4 | 4 | 0 | 0 |
 | boundary | 1 | 1 | 0 | 0 |
 | negative | 1 | 1 | 0 | 0 |
-| error | 5 | 5 | 0 | 0 |
+| error | 7 | 7 | 0 | 0 |
 | regression | 1 | 1 | 0 | 0 |
 
 No ❌ rows — all happy/negative/error scenarios covered.
@@ -54,3 +56,5 @@ No ❌ rows — all happy/negative/error scenarios covered.
 | `fetch_repo_tree()` — both strategies fail | `test_archive_error_propagates_when_both_strategies_fail` | |
 | `GitHubSource.get_scan_locations()` — git-clone materialization | `test_scan_locations_point_into_cloned_repository` | end-to-end through the entity |
 | `GitHubSource.cleanup()` — removes only own extracted dirs (per-instance `Context`, not shared class attribute) | `test_cleanup_of_one_source_leaves_other_sources_repository` | regression: `Context.extracted_dirs` was a class-level list shared between instances |
+| `GitHubSource.cleanup()` — read-only `.git` entries on Windows | `test_cleanup_removes_read_only_files_left_by_git` | Windows CI failure: git marks `.git/objects` files read-only |
+| `_remove_readonly_and_retry()` — chmod + retry | `test_makes_entry_writable_before_retrying` | retried func observes `S_IWRITE` mode |

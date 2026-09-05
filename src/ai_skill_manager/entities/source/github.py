@@ -4,8 +4,10 @@
 """
 
 import logging
+import os
 import re
 import shutil
+import stat
 import tarfile
 import tempfile
 import urllib.request
@@ -212,6 +214,25 @@ def fetch_repo_tree(repo_url: str, tree: str, work_dir: Path) -> Path:
         archive_path.unlink(missing_ok=True)
 
 
+def _remove_readonly_and_retry(func, path, exc_info) -> None:
+    """Retry a failed rmtree step after making the entry writable.
+
+    Повторить неудавшийся шаг rmtree после снятия атрибута «только чтение».
+
+    Git marks files under ``.git/objects`` read-only on Windows, so removing
+    a git clone with :func:`shutil.rmtree` fails with ``PermissionError``
+    unless the read-only attribute is cleared first. ``onerror`` is used
+    instead of ``onexc`` because the project still supports Python 3.9.
+
+    Git помечает файлы в ``.git/objects`` атрибутом «только чтение» на
+    Windows, поэтому удаление git-клона через :func:`shutil.rmtree` падает
+    с ``PermissionError``, пока атрибут не снят. Используется ``onerror``
+    вместо ``onexc``, потому что проект поддерживает Python 3.9.
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
 @dataclass(frozen=True)
 class GitHubSource(Source):
     """Skills discovered from a GitHub repository.
@@ -338,5 +359,5 @@ class GitHubSource(Source):
         for extracted_dir in self.__context.extracted_dirs:
             if extracted_dir.exists():
                 logger.debug("Removing extracted directory: %s", extracted_dir)
-                shutil.rmtree(extracted_dir)
+                shutil.rmtree(extracted_dir, onerror=_remove_readonly_and_retry)
         self.__context.extracted_dirs = []

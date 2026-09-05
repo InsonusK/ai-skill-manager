@@ -1,4 +1,6 @@
+import os
 import shutil
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -6,7 +8,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from ai_skill_manager.entities.source.github import fetch_repo_tree
+from ai_skill_manager.entities.source.github import (
+    _remove_readonly_and_retry,
+    fetch_repo_tree,
+)
 from ai_skill_manager.entities.source.git_clone import GitCloneError
 from ai_skill_manager.entities import GitHubSource
 
@@ -135,6 +140,29 @@ class TestFetchRepoTree(unittest.TestCase):
         self.assertIn("archive download failed", str(ctx.exception))
 
 
+class TestRemoveReadonlyAndRetry(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_makes_entry_writable_before_retrying(self):
+        read_only_file = self.tmpdir / "ro.txt"
+        read_only_file.write_text("data")
+        read_only_file.chmod(stat.S_IREAD)
+        observed_modes = []
+
+        def func(path):
+            observed_modes.append(os.stat(path).st_mode)
+            os.unlink(path)
+
+        _remove_readonly_and_retry(func, str(read_only_file), None)
+
+        self.assertFalse(read_only_file.exists())
+        self.assertTrue(observed_modes[0] & stat.S_IWRITE)
+
+
 class TestGitHubSourceWithGitClone(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp())
@@ -162,6 +190,23 @@ class TestGitHubSourceWithGitClone(unittest.TestCase):
             source_b.cleanup()
 
         self.assertFalse(path_b.exists())
+
+    def test_cleanup_removes_read_only_files_left_by_git(self):
+        # Git marks files under .git/objects read-only on Windows, which
+        # used to make shutil.rmtree fail with PermissionError.
+        # Git помечает файлы в .git/objects атрибутом «только чтение» на
+        # Windows, из-за чего shutil.rmtree падал с PermissionError.
+        source = GitHubSource(repo_url="https://github.com/owner/repo")
+        leftover = self.tmpdir / "leftover"
+        (leftover / "objects").mkdir(parents=True)
+        read_only_file = leftover / "objects" / "pack"
+        read_only_file.write_text("data")
+        read_only_file.chmod(0o444)
+        source._GitHubSource__context.extracted_dirs.append(leftover)
+
+        source.cleanup()
+
+        self.assertFalse(leftover.exists())
 
     def test_scan_locations_point_into_cloned_repository(self):
         repo = _make_repo(self.tmpdir)
