@@ -62,7 +62,9 @@ class SkillRelationQueuer:
             ссылки, но которые находятся вне настроенных источников.
     """
 
-    def __init__(self, add_relations: bool, queue: Optional[List["Skill"]] = None) -> None:
+    def __init__(
+        self, add_relations: bool, queue: Optional[List["Skill"]] = None
+    ) -> None:
         """Initialize with the run's ``add_relations`` policy and starting queue.
 
         Args:
@@ -109,7 +111,7 @@ class SkillRelationQueuer:
                 queued=False,
                 error=(
                     f"resolves to skill {candidate.name!r} at {candidate.path}, which is not "
-                    f"part of the configured sources (add_relations is disabled)"
+                    f"part of the configured sources (settings.add_relations is disabled)"
                 ),
             )
 
