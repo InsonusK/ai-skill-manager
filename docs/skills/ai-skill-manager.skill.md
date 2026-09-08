@@ -45,7 +45,7 @@ tags:
 
 ## SHOULD
 - Keep the default config file name `ai-skills.yaml` in the project root.
-- Use `type: auto` for local directories unless you specifically need GitHub.
+- Use `type: local` for local directories unless you specifically need GitHub.
 - Enable `--debug` when a command fails and the cause is unclear.
 
 ## MAY
@@ -80,7 +80,7 @@ Synchronizes discovered skills into the configured target directory(s).
 
 **Usage**
 ```bash
-ai-skill-manager sync [-c CONFIG] [-t {auto,github}] [-p PATH] [--subpath SUBPATH]
+ai-skill-manager sync [-c CONFIG] [-t {local,github}] [-p PATH] [--subpath SUBPATH]
                       [--target TARGET] [--remove-orphans | --keep-orphans]
                       [--dry-run] [-f]
 ```
@@ -89,7 +89,7 @@ ai-skill-manager sync [-c CONFIG] [-t {auto,github}] [-p PATH] [--subpath SUBPAT
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `-c`, `--config` | string | `ai-skills.yaml` | Path to the config file. |
-| `-t`, `--type` | `auto` \| `github` | — | Source type for a single source. Requires `--path`. |
+| `-t`, `--type` | `local` \| `github` | — | Source type for a single source. Requires `--path`. Legacy `auto`/`flat`/`directory` still accepted as aliases for `local`. |
 | `-p`, `--path` | string | — | Local source path or GitHub repo URL. Optional branch for GitHub: `"url branch"`. |
 | `--subpath` | string (repeatable) | `skills` | Subpath(s) inside a GitHub repo to scan. |
 | `--target` | string | from config | Override the target directory; replaces multi-target config with a single target. |
@@ -140,7 +140,7 @@ Profiling can also be enabled with `AI_SKILL_MANAGER_PROFILE=1`.
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills
@@ -155,7 +155,7 @@ Each source is a mapping:
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `path` | yes | — | Local directory (relative to config) or GitHub repo URL. |
-| `type` | no | `auto` | `auto` (local filesystem) or `github`. Legacy `flat`/`directory` are treated as `auto`. |
+| `type` | no | `local` | `local` (local filesystem) or `github`. Legacy `auto`/`flat`/`directory` are treated as `local`. |
 | `name` | no | — | Explicit skill name override. |
 
 GitHub-only fields:

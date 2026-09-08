@@ -34,7 +34,7 @@ Default file name: `ai-skills.yaml`
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills
@@ -50,7 +50,7 @@ settings:
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills
@@ -89,7 +89,7 @@ List of source locations to scan for skills. Each source is a dictionary with th
 | Field / Поле | Required / Обязательное | Default / По умолчанию | Description / Описание |
 |--------------|-------------------------|------------------------|------------------------|
 | `path` | Yes / Да | — | Directory path relative to the config file (or GitHub repo URL when `type: github`). / Путь к директории относительно файла конфигурации (или URL репозитория GitHub при `type: github`). |
-| `type` | No / Нет | `auto` | Source type: `auto` (local filesystem) or `github`. Values `flat` and `directory` are accepted for backward compatibility and treated as `auto`. / Тип источника: `auto` (локальная файловая система) или `github`. Значения `flat` и `directory` принимаются для обратной совместимости и обрабатываются как `auto`. |
+| `type` | No / Нет | `local` | Source type: `local` (local filesystem) or `github`. The legacy values `auto`, `flat` and `directory` are still accepted for backward compatibility and treated as `local` (with a deprecation warning). / Тип источника: `local` (локальная файловая система) или `github`. Устаревшие значения `auto`, `flat` и `directory` по-прежнему принимаются для обратной совместимости и обрабатываются как `local` (с предупреждением об устаревании). |
 | `name` | No / Нет | — | Explicit skill name override. / Явное переопределение имени навыка. |
 | `tags` | No / Нет | — | List of tag filter expressions. Skills must match every expression to be included. / Список выражений-фильтров тегов. Навык включается, только если соответствует каждому выражению. |
 | `skip_folder` | No / Нет | `["examples"]` | Directory names inside a directory skill that are ignored when checking for nested skills. The directories are still copied as part of the skill. / Имена директорий внутри директориального навыка, которые игнорируются при проверке на вложенные навыки. Сами директории всё равно копируются вместе с навыком. |
@@ -112,7 +112,7 @@ Examples / Примеры:
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
     tags:
       - python & cli
       - "!deprecated"
@@ -145,12 +145,14 @@ tags:
 ```
 
 
-### Discovery types / Типы обнаружения
+### Source types / Типы источников
 
-#### `auto`
+#### `local`
 
-Recursively scans the source path and automatically detects the skill format.
-Рекурсивно сканирует источник и автоматически определяет формат навыка.
+Recursively scans the source path on the local filesystem and automatically
+detects the skill format.
+Рекурсивно сканирует локальный путь источника и автоматически определяет
+формат навыка.
 
 Supported formats / Поддерживаемые форматы:
 
@@ -161,8 +163,8 @@ Supported formats / Поддерживаемые форматы:
 - **HumanFlat** — a single file named `*.skill.md`.
   **HumanFlat** — один файл с именем `*.skill.md`.
 
-`auto` resolves ambiguities and reports errors for conflicting patterns:
-`auto` разрешает неоднозначности и сообщает об ошибках при конфликтующих паттернах:
+Detection resolves ambiguities and reports errors for conflicting patterns:
+Обнаружение разрешает неоднозначности и сообщает об ошибках при конфликтующих паттернах:
 
 - If a file matches more than one flat pattern, an error is raised.
   Если файл соответствует более чем одному плоскому паттерну, выдаётся ошибка.
@@ -185,13 +187,15 @@ my-skills/
     extra.md              # regular file, ignored as a skill
 ```
 
-#### `flat` and `directory`
+#### `auto`, `flat` and `directory` (deprecated / устаревшие)
 
-These types are kept for backward compatibility and are internally mapped to `auto`.
-Эти типы сохранены для обратной совместимости и внутренне замаплены на `auto`.
-
-They no longer have separate behavior; `auto` detects all supported formats.
-Они больше не имеют отдельного поведения; `auto` обнаруживает все поддерживаемые форматы.
+These legacy type values are kept for backward compatibility and are mapped to
+`local` (a deprecation warning is logged). They have no separate behavior;
+`local` detects all supported formats. Use `type: local` instead.
+Эти устаревшие значения `type` сохранены для обратной совместимости и
+отображаются на `local` (с логированием предупреждения об устаревании).
+Отдельного поведения у них нет; `local` обнаруживает все поддерживаемые
+форматы. Используйте `type: local`.
 
 #### `github`
 
@@ -206,11 +210,11 @@ Downloads a GitHub repository archive and discovers skills from one or more subp
 | `tree` | No / Нет | `master` | Branch or tag name to checkout. / Имя ветки или тега для скачивания. |
 | `subpath` | No / Нет | `skills` | Path or list of paths inside the repo to scan for skills. / Путь или список путей внутри репозитория для сканирования навыков. |
 
-Each subpath is processed using **auto** logic:
-Каждый подпуть обрабатывается логикой **auto**:
+Each subpath is processed using the same automatic detection as `local`:
+Каждый подпуть обрабатывается тем же автоматическим обнаружением, что и `local`:
 
-- If the path is a directory, it is scanned recursively using `auto` rules.
-  Если путь — директория, она рекурсивно сканируется по правилам `auto`.
+- If the path is a directory, it is scanned recursively using the same rules.
+  Если путь — директория, она рекурсивно сканируется по тем же правилам.
 - If the path is a single `*.skill.md` file, it is treated as a HumanFlat skill.
   Если путь — один файл `*.skill.md`, он считается навыком HumanFlat.
 - Missing paths are silently skipped.
@@ -243,7 +247,7 @@ sources:
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
   - path: https://github.com/InsonusK/ai-skills.git
     type: github
     tree: master
