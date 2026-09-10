@@ -93,7 +93,7 @@ class TestSyncCLI(unittest.TestCase):
         src.mkdir()
         (src / "guide.skill.md").write_text("---\nname: guide\n---\n# Guide")
 
-        args = self._args(type="auto", path=str(src), target=str(self.tmpdir / "target"))
+        args = self._args(type="local", path=str(src), target=str(self.tmpdir / "target"))
         with patch("sys.stdout", new_callable=StringIO) as stdout:
             exit_code = sync_run(args)
             output = stdout.getvalue()

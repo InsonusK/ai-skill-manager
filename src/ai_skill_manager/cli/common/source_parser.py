@@ -20,8 +20,13 @@ from ...service.source_factory import SourceFactory
 DEFAULT_CONFIG = "ai-skills.yaml"
 #: Default config file name. / Имя файла конфигурации по умолчанию.
 
-_SOURCE_TYPES = ["auto", "github"]
-#: Source types supported by the CLI. / Типы источников, поддерживаемые CLI.
+_SOURCE_TYPES = ["local", "github"]
+#: Canonical source types supported by the CLI.
+#: Канонические типы источников, поддерживаемые CLI.
+
+_LEGACY_SOURCE_TYPES = ["auto", "flat", "directory"]
+#: Deprecated ``--type`` aliases still accepted (mapped to ``local``).
+#: Устаревшие псевдонимы ``--type``, которые всё ещё принимаются (маппятся на ``local``).
 
 
 def add_source_arguments(
@@ -58,9 +63,10 @@ def add_source_arguments(
     parser.add_argument(
         "-t",
         "--type",
-        choices=_SOURCE_TYPES,
-        help="Discovery strategy for a single source / "
-             "Стратегия обнаружения для одного источника",
+        choices=_SOURCE_TYPES + _LEGACY_SOURCE_TYPES,
+        metavar="{" + ",".join(_SOURCE_TYPES) + "}",
+        help="Source type for a single source: local or github / "
+             "Тип источника для одного источника: local или github",
     )
     parser.add_argument(
         "-p",
