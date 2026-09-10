@@ -38,7 +38,7 @@ Create an `ai-skills.yaml` config in your project root:
 ```yaml
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills

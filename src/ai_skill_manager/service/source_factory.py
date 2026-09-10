@@ -3,15 +3,52 @@
 Строит объекты Source из отдельных параметров или файла конфигурации.
 """
 
+import logging
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple
 
 from ..config import load_config
 from ..entities import GitHubSource, LocalSource, Source
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_GITHUB_SUBPATHS: Tuple[str, ...] = ("skills",)
 #: Default subpaths for a GitHub source when none are given.
 #: Подпути GitHub по умолчанию, если ни один не указан.
+
+DEFAULT_SOURCE_TYPE = "local"
+#: Source type assumed when a config entry omits ``type``.
+#: Тип источника, предполагаемый, когда запись конфигурации опускает ``type``.
+
+#: Legacy ``type`` values mapped onto the canonical ``local`` source.
+#: Устаревшие значения ``type``, отображаемые на канонический источник ``local``.
+_LEGACY_LOCAL_TYPES = ("auto", "flat", "directory")
+
+
+def _normalize_source_type(source_type: Optional[str]) -> str:
+    """Resolve a raw ``type`` value to a canonical source type.
+
+    Приводит сырое значение ``type`` к каноническому типу источника.
+
+    Canonical types are ``"local"`` and ``"github"``. The legacy values
+    ``"auto"``, ``"flat"`` and ``"directory"`` are still accepted and map to
+    ``"local"`` with a deprecation warning.
+
+    Канонические типы — ``"local"`` и ``"github"``. Устаревшие значения
+    ``"auto"``, ``"flat"`` и ``"directory"`` по-прежнему принимаются и
+    отображаются на ``"local"`` с предупреждением об устаревании.
+    """
+    if not source_type:
+        return DEFAULT_SOURCE_TYPE
+    if source_type in _LEGACY_LOCAL_TYPES:
+        logger.warning(
+            "Source type %r is deprecated; use 'local' instead. / "
+            "Тип источника %r устарел; используйте 'local'.",
+            source_type,
+            source_type,
+        )
+        return "local"
+    return source_type
 
 
 def _normalize_subpaths(subpath: Any) -> Tuple[Optional[str], ...]:
@@ -100,8 +137,10 @@ class SourceFactory:
         Строит источники из отдельно переданных параметров.
 
         Args:
-            source_type: ``"github"``, ``"local"`` or ``"auto"``.
-                / ``"github"``, ``"local"`` или ``"auto"``.
+            source_type: ``"local"`` or ``"github"`` (legacy ``"auto"`` /
+                ``"flat"`` / ``"directory"`` map to ``"local"``).
+                / ``"local"`` или ``"github"`` (устаревшие ``"auto"`` /
+                ``"flat"`` / ``"directory"`` отображаются на ``"local"``).
             path: GitHub repository URL or local filesystem path.
                 / URL репозитория GitHub или локальный путь файловой системы.
             subpath: Subpaths inside a GitHub repository to scan. Defaults to
@@ -119,11 +158,13 @@ class SourceFactory:
             ValueError: If ``source_type`` is unknown.
                 / Если ``source_type`` неизвестен.
         """
+        source_type = _normalize_source_type(source_type)
+
         if source_type == "github":
             subpaths = tuple(subpath) if subpath else DEFAULT_GITHUB_SUBPATHS
             return [GitHubSource(repo_url=path, tree=tree, subpaths=subpaths)]
 
-        if source_type in ("auto", "local"):
+        if source_type == "local":
             return [LocalSource(scan_paths=(Path(path).absolute(),))]
 
         raise ValueError(f"Unknown source type: {source_type}")
@@ -149,7 +190,7 @@ class SourceFactory:
         sources: List[Source] = []
 
         for src in config.get("sources", []):
-            src_type = src.get("type", "auto")
+            src_type = _normalize_source_type(src.get("type"))
             src_path = src.get("path", "")
             tags = _normalize_tags(src.get("tags"))
             skip_folders = _normalize_skip_folders(src.get("skip_folder"))
@@ -187,6 +228,6 @@ class SourceFactory:
                     )
                 )
             else:
-                raise ValueError(f"Unkonwn {src_type}")
+                raise ValueError(f"Unknown source type: {src_type}")
 
         return sources

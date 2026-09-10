@@ -49,17 +49,27 @@ class TestBuildSourcesFromArgs(unittest.TestCase):
             build_sources_from_args(
                 self._args(config=str(self.tmp / "missing.yaml")))
 
-    def test_auto_source(self):
+    def test_local_source(self):
         src = self.tmp / "skills"
         src.mkdir()
 
         sources, config_path = build_sources_from_args(
-            self._args(type="auto", path=str(src)))
+            self._args(type="local", path=str(src)))
 
         self.assertEqual(len(sources), 1)
         self.assertIsInstance(sources[0], LocalSource)
         self.assertEqual(sources[0].scan_paths, (src,))
         self.assertIsNone(config_path)
+
+    def test_legacy_auto_type_still_maps_to_local(self):
+        src = self.tmp / "skills"
+        src.mkdir()
+
+        sources, _ = build_sources_from_args(
+            self._args(type="auto", path=str(src)))
+
+        self.assertEqual(len(sources), 1)
+        self.assertIsInstance(sources[0], LocalSource)
 
     def test_github_source_default_tree(self):
         sources, config_path = build_sources_from_args(

@@ -25,11 +25,20 @@ class TestCreateFromParams(unittest.TestCase):
         src = self.tmp / "skills"
         src.mkdir()
 
-        sources = self.factory.create_from_params(source_type="auto", path=str(src))
+        sources = self.factory.create_from_params(source_type="local", path=str(src))
 
         self.assertEqual(len(sources), 1)
         self.assertIsInstance(sources[0], LocalSource)
         self.assertEqual(sources[0].scan_paths, (src,))
+
+    def test_legacy_auto_type_maps_to_local(self):
+        src = self.tmp / "skills"
+        src.mkdir()
+
+        sources = self.factory.create_from_params(source_type="auto", path=str(src))
+
+        self.assertEqual(len(sources), 1)
+        self.assertIsInstance(sources[0], LocalSource)
 
     def test_github_source_default_subpath(self):
         sources = self.factory.create_from_params(
@@ -138,6 +147,32 @@ class TestCreateFromConfig(unittest.TestCase):
             sources[0].scan_paths,
             (self.tmpdir / "repo" / "skills", self.tmpdir / "repo" / "docs"),
         )
+
+    def test_build_legacy_auto_source_is_treated_as_local(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - type: auto\n"
+            "    path: ./docs/skills\n"
+        )
+        (self.tmpdir / "docs" / "skills").mkdir(parents=True)
+        sources = self.factory.create_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertIsInstance(sources[0], LocalSource)
+        self.assertEqual(sources[0].scan_paths, ((self.tmpdir / "docs" / "skills").absolute(),))
+
+    def test_build_source_defaults_to_local_when_type_omitted(self):
+        config = self.tmpdir / "ai-skills.yaml"
+        config.write_text(
+            "sources:\n"
+            "  - path: skills\n"
+        )
+        (self.tmpdir / "skills").mkdir()
+        sources = self.factory.create_from_config(config)
+
+        self.assertEqual(len(sources), 1)
+        self.assertIsInstance(sources[0], LocalSource)
 
     def test_build_local_source_with_tags(self):
         config = self.tmpdir / "ai-skills.yaml"

@@ -145,7 +145,7 @@ mkdir my-skills
 cat > ai-skills.yaml << 'EOF'
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills
@@ -176,7 +176,7 @@ mkdir my-skills
 @'
 sources:
   - path: ./my-skills
-    type: auto
+    type: local
 
 settings:
   target: .agents/skills
