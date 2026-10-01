@@ -16,6 +16,9 @@ metadata:
     - link to detailed documentation and example skills
 ---
 
+# ATTENTION
+Repository is deprecated use [go-ai-skill-manager](https://github.com/InsonusK/go-ai-skill-manage)
+
 # AI Skills Manager / Менеджер навыков ИИ
 
 Sync AI agent skills into `.agents/skills/` from local directories or GitHub repositories.
